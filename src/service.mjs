@@ -127,7 +127,19 @@ async function main() {
 		return;
 	}
 
-	console.error('usage: node src/service.mjs start|stop|logs');
+	if (verb === 'status') {
+		const pid = runningPid();
+		if (pid === undefined) {
+			console.log('Team1 is not running.');
+			process.exit(1);
+		}
+
+		console.log('Team1 is running, pid ' + pid + '. Log: ' + logPath());
+
+		return;
+	}
+
+	console.error('usage: node src/service.mjs start|stop|logs|status');
 	process.exit(1);
 }
 

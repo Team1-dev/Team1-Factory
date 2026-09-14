@@ -188,6 +188,12 @@ Watch logs with:
 npm run logs
 ```
 
+Check whether it is running with:
+
+```sh
+npm run status
+```
+
 Stop gracefully with:
 
 ```sh

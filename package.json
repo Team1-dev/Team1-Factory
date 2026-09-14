@@ -10,6 +10,7 @@
     "start": "node --env-file-if-exists=.env src/service.mjs start",
     "stop": "node --env-file-if-exists=.env src/service.mjs stop",
     "logs": "node --env-file-if-exists=.env src/service.mjs logs",
+    "status": "node --env-file-if-exists=.env src/service.mjs status",
     "tick": "node --env-file-if-exists=.env src/poll.mjs --once",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
