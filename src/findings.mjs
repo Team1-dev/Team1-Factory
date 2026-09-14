@@ -43,7 +43,7 @@ export async function fileFindings(run, findings, limit, originNote) {
 
 	try {
 		const number = await findingsCard(run);
-		const body = note(run.stage.name, 'finding', {
+		const body = note(run, 'finding', {
 			findings: sections.join('\n\n'),
 			origin: fragment('_notes.md', originNote, { number: run.lead.number }),
 		}, { verdict: 'proposed', cost: 0 });

@@ -7,7 +7,7 @@ the stage returned output nothing could read
 <!-- stage-failed -->
 **{stage}** could not complete: {error}
 
-The card stays on `{label}`. {retry}
+The card stays on `{label}`. {retry} This card has cost **${total}** so far.
 
 {stamp}
 <!-- stage-failed-retry -->
@@ -167,6 +167,6 @@ Could not merge #{number}.
 <!-- merge-refused-conflict -->
 The branch conflicts with the base — it needs rebasing onto the current default branch before this can land.
 <!-- merged -->
-Merged #{number}.
+Merged #{number}. This card cost **${total}** in total.
 
 {stamp}

@@ -27,9 +27,9 @@ export function readBoardLabels() {
 	return boardLabels;
 }
 
-export function stampLine(stage, verdict, cost, model) {
-	let line = STAMP_MARKER + ' · ' + stage + ' · ' + verdict + ' · $' + cost.toFixed(2);
-	if (model !== undefined) line += ' · ' + model;
+export function stampLine(stage, verdict, cost, totals) {
+	let line = STAMP_MARKER + ' · ' + stage + ' · ' + verdict + ' · $' + cost.toFixed(2) + ' · total $' + totals.total.toFixed(2);
+	if (totals.model !== undefined) line += ' · ' + totals.model;
 
 	return line;
 }

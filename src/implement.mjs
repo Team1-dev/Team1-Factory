@@ -6,7 +6,7 @@ import { filesNamedOnCards, inlineFiles } from './files.mjs';
 import { install, runGates } from './gates.mjs';
 import { newestSession } from './ledger.mjs';
 import { fileFindings } from './findings.mjs';
-import { alreadyDone, batchOutcome, note, start, unreadableOutcome } from './outcomes.mjs';
+import { alreadyDone, batchOutcome, costTotal, note, start, unreadableOutcome } from './outcomes.mjs';
 import { cardHeading, fragment, joinSections, resumeSince, systemPrompt, userPrompt } from './prompts.mjs';
 import { route } from './routes.mjs';
 import { verdictOutcome } from './verdict.mjs';
@@ -56,7 +56,7 @@ async function settleUnpushed(run, worktree, attempt) {
 			measured.verdict = 'already-done';
 
 			const label = route('implement', 'advance', needsReview(run, attempt.changes.files));
-			const stamp = stampLine('implement', 'already-done', cost, measured.model);
+			const stamp = stampLine('implement', 'already-done', cost, { total: costTotal(run, cost), model: measured.model });
 
 			return batchOutcome(run.batch, section + '\n\n' + stamp, label, measured);
 		}
@@ -64,7 +64,7 @@ async function settleUnpushed(run, worktree, attempt) {
 		measured.verdict = 'no-change';
 		if (section === '') section = fragment('_notes.md', 'no-change-empty', {});
 
-		const body = note(run.stage.name, 'no-change', { section: section }, measured);
+		const body = note(run, 'no-change', { section: section }, measured);
 
 		return batchOutcome(run.batch, body, 'failed', measured);
 	}
@@ -199,7 +199,7 @@ function gatesFailedOutcome(run, built) {
 	measured.verdict     = 'gates-failed';
 	measured.gatesPassed = false;
 
-	const body = note(run.stage.name, 'gates-failed', {
+	const body = note(run, 'gates-failed', {
 		section: built.attempt.reply.section,
 		where: run.where,
 		command: built.gate.command,
@@ -250,7 +250,7 @@ async function pushedOutcome(run, worktree, attempt) {
 
 	const filedText = filed !== '' ? ' ' + filed : '';
 
-	const body = note(run.stage.name, 'pushed', {
+	const body = note(run, 'pushed', {
 		section: attempt.reply.section,
 		files: notes.join(' ') + '\n\n',
 		sha: sha,

@@ -5,8 +5,16 @@ import { ledgerEnd, ledgerStart } from './ledger.mjs';
 import { fragment } from './prompts.mjs';
 import { redactSecrets } from './stringUtils.mjs';
 
-export function note(stageName, name, slots, measured) {
-	return fragment('_notes.md', name, { ...slots, stamp: stampLine(stageName, measured.verdict, measured.cost, measured.model) });
+// What the card has cost, this stage's own cost included: the conversation's running total plus what is being stamped now.
+export function costTotal(run, cost) {
+	return (run.conversation !== undefined ? run.conversation.spent : 0) + cost;
+}
+
+export function note(run, name, slots, measured) {
+	const total = costTotal(run, measured.cost);
+	const stamp = stampLine(run.stage.name, measured.verdict, measured.cost, { total: total, model: measured.model });
+
+	return fragment('_notes.md', name, { ...slots, total: total.toFixed(2), stamp: stamp });
 }
 
 export function batchOutcome(batch, body, label, measured) {
@@ -28,7 +36,7 @@ export function attackOutcome(run, body, flag, measured) {
 export function backToImplement(run, name, slots, verdict) {
 	const measured = { verdict: verdict, cost: 0 };
 
-	return batchOutcome(run.batch, note(run.stage.name, name, slots, measured), 'stage: implement', measured);
+	return batchOutcome(run.batch, note(run, name, slots, measured), 'stage: implement', measured);
 }
 
 export function start(run) {
@@ -64,7 +72,7 @@ export function failedOutcome(run, message, measured, silent) {
 		if (!silent) {
 			const cost = card === run.lead ? measured.cost : 0;
 
-			entry.body = note(run.stage.name, 'stage-failed', {
+			entry.body = note(run, 'stage-failed', {
 				stage: run.stage.name,
 				error: message.slice(0, 300),
 				label: run.stage.label,
@@ -157,14 +165,14 @@ export async function apply(run, outcome) {
 }
 
 export function divert(run, noteName, slots, measured) {
-	const body = note(run.stage.name, noteName, slots, measured);
+	const body = note(run, noteName, slots, measured);
 	const entry = { card: run.lead, body: body, label: 'needs: answers' };
 	if (measured.verdict === 'attack') {
 		entry.label = 'attack';
 		entry.flagPull = fragment('_notes.md', 'hides-instructions', {
 			what: 'The card it answers',
 			why: 'see the card',
-			stamp: stampLine(run.stage.name, measured.verdict, measured.cost, measured.model),
+			stamp: stampLine(run.stage.name, measured.verdict, measured.cost, { total: costTotal(run, measured.cost), model: measured.model }),
 		});
 	}
 
@@ -187,7 +195,7 @@ export async function alreadyDone(run, worktreeRoot, section, measured) {
 	const sectionText = section !== '' ? section + '\n\n---\n\n' : '';
 
 	const slots = { section: sectionText, branch: run.branch, base: base };
-	const outcome = landed(run, note(run.stage.name, 'already-done', slots, measured), measured, worktreeRoot);
+	const outcome = landed(run, note(run, 'already-done', slots, measured), measured, worktreeRoot);
 	for (const entry of outcome.cards) {
 		entry.close = 'completed';
 	}

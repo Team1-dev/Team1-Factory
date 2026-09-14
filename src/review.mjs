@@ -10,7 +10,7 @@ import { verdictOutcome } from './verdict.mjs';
 
 function hidingPull(run, pullNumber, finding) {
 	const measured = { verdict: 'attack', cost: finding.cost };
-	const body = note(run.stage.name, 'pull-hides-instructions', { number: pullNumber, why: finding.why }, measured);
+	const body = note(run, 'pull-hides-instructions', { number: pullNumber, why: finding.why }, measured);
 
 	return attackOutcome(run, body, body, measured);
 }
