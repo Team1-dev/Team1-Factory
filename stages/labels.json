@@ -1,0 +1,19 @@
+[
+	{ "name": "stage: triage", "color": "fbca04", "description": "Waiting to be sized and checked for blocking questions." },
+	{ "name": "stage: implement", "color": "1d76db", "description": "Being planned and built on its own branch." },
+	{ "name": "stage: review", "color": "5319e7", "description": "Built; being read by an agent that did not write it." },
+	{ "name": "ready to merge", "color": "0e8a16", "description": "Reviewed and green. Team1 merges it if the project allows." },
+	{ "name": "needs: answers", "color": "d93f0b", "description": "Stopped for a person. Reply on the card to restart it." },
+	{ "name": "human-review", "color": "d4c5f9", "description": "A person merges this, or takes the label off. Team1 will not merge while it is on." },
+	{ "name": "parked", "color": "e99695", "description": "Irreversible as asked — money, deletion, migration. Nothing was changed." },
+	{ "name": "failed", "color": "b60205", "description": "Could not proceed. The card says where it stopped." },
+	{ "name": "attack", "color": "d1242f", "description": "Hides instructions or was judged an attack. Stopped, unbuilt — a person reviews and closes it." },
+	{ "name": "findings", "color": "c2e0c6", "description": "Team1's running log of things noticed while working other cards. Not itself worked." },
+	{ "name": "duplicate", "color": "ededed", "description": "Triage believes another card covers this. A person confirms: close it, or send it back to triage." },
+	{ "name": "priority: high", "color": "d73a4a", "description": "Worked before everything else at its stage. Put on by a person; carried for life." },
+	{ "name": "priority: medium", "color": "fb8c00", "description": "Worked before unlabelled cards at its stage." },
+	{ "name": "priority: low", "color": "fef2c0", "description": "Worked after everything else at its stage, including unlabelled cards." },
+	{ "name": "tier: trivial", "color": "c5def5", "description": "A constant, a colour, a one-line fix. Merged unreviewed." },
+	{ "name": "tier: contained", "color": "c5def5", "description": "One feature, one area. Reviewed." },
+	{ "name": "tier: structural", "color": "c5def5", "description": "A shape other code depends on. Reviewed, and gets the full test bar automatically." }
+]

@@ -1,0 +1,166 @@
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { splitCommaList } from './stringUtils.mjs';
+import { repository } from './git.mjs';
+
+// Only these reach a child process. The operator's shell holds GITHUB_TOKEN and whatever else; none of it may reach the model or the gates.
+// CLAUDE_* is for the model child alone: a gate command comes from the cloned repo and must never see a claude credential.
+const CHILD_ENVIRONMENT_NAMES = [
+	'PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'TZ', 'LANG', 'LANGUAGE', 'TERM', 'COLORTERM',
+	'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'no_proxy', 'all_proxy',
+	'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE',
+];
+const CHILD_ENVIRONMENT_PREFIXES = ['LC_', 'XDG_'];
+const MODEL_ENVIRONMENT_PREFIX = 'CLAUDE_';
+
+const KNOB_DEFAULTS = {
+	POLL_INTERVAL_MS: 30000,
+	IDLE_INTERVAL_MS: 3600000,
+	WIP_CAP: 4,
+	MERGE_DELAY_MS: 120000,
+	MAX_ROUNDS: 2,
+	MAX_ROUNDS_EVER: 4,
+	MAX_COST_PER_CARD: 15,
+	MAX_GATE_FIXES: 2,
+};
+
+// Settings from the environment, then the process state and the caches, all reset by loadEnv.
+export const state = {
+	repos: [],
+	tokens: {},
+	trustedLogins: [],
+	knobs: {},
+	workDir: undefined,
+	ledgerPath: undefined,
+	childEnvironment: {},
+	modelEnvironment: {},
+	childAbort: undefined,
+	haltAsked: false,
+	onceOnly: false,
+	runnerLogins: {},
+	runnerEmails: {},
+	sessions: undefined,
+	lastClaudeCallAt: 0,
+	exhaustedUntil: 0,
+	repoStates: {},
+	hiddenReadings: {},
+};
+
+function childAllowed(name) {
+	if (CHILD_ENVIRONMENT_NAMES.includes(name)) return true;
+
+	for (const prefix of CHILD_ENVIRONMENT_PREFIXES) {
+		if (name.startsWith(prefix)) return true;
+	}
+
+	return false;
+}
+
+// A setting that is wrong is refused here, at boot: a knob that is not a number would silently switch its guard off.
+export function loadEnv(env) {
+	const REPO_REGEX = /^[\w.-]+\/[\w.-]+$/;
+	state.repos = splitCommaList(env.REPOS);
+	for (const repo of state.repos) {
+		if (!REPO_REGEX.test(repo)) throw new Error('REPOS entry is not owner/name: ' + repo);
+	}
+
+	state.trustedLogins = splitCommaList(env.TRUSTED_LOGINS);
+	state.workDir = env.WORK_DIR ?? join(homedir(), '.team1', 'work');
+	state.ledgerPath = join(state.workDir, 'metrics.jsonl');
+
+	state.tokens = {};
+	state.knobs  = {};
+	for (const name of Object.keys(env)) {
+		if (name.startsWith('GITHUB_TOKEN')) state.tokens[name] = env[name];
+	}
+
+	for (const name of Object.keys(KNOB_DEFAULTS)) {
+		state.knobs[name] = KNOB_DEFAULTS[name];
+		if (env[name] === undefined) continue;
+
+		state.knobs[name] = Number(env[name]);
+		if (Number.isNaN(state.knobs[name])) throw new Error(name + ' is not a number: ' + env[name]);
+	}
+
+	state.childEnvironment = {};
+	state.modelEnvironment = {};
+	for (const name of Object.keys(env)) {
+		if (childAllowed(name)) state.childEnvironment[name] = env[name];
+		if (childAllowed(name) || name.startsWith(MODEL_ENVIRONMENT_PREFIX)) state.modelEnvironment[name] = env[name];
+	}
+
+	state.childAbort       = new AbortController();
+	state.haltAsked        = false;
+	state.onceOnly         = false;
+	state.runnerLogins     = {};
+	state.runnerEmails     = {};
+	state.sessions         = undefined;
+	state.lastClaudeCallAt = 0;
+	state.exhaustedUntil   = 0;
+	state.repoStates       = {};
+	state.hiddenReadings   = {};
+}
+
+export function tokenNameFor(repo) {
+	let ownName = 'GITHUB_TOKEN_';
+	for (const character of repo) {
+		const nameCharacter = '0123456789abcdefghijklmnopqrstuvwxyz'.includes(character.toLowerCase()) ? character : '_';
+
+		ownName += nameCharacter;
+	}
+
+	if (state.tokens[ownName] !== undefined) return ownName;
+
+	return 'GITHUB_TOKEN';
+}
+
+export function workDirectory(repo) {
+	return join(state.workDir, repo.replace('/', '__'));
+}
+
+export function childEnvironment() {
+	return { ...state.childEnvironment };
+}
+
+export function modelEnvironment() {
+	return { ...state.modelEnvironment };
+}
+
+export function repositoryFor(repo, runnerLogin) {
+	const tokenName = tokenNameFor(repo);
+	const environment = childEnvironment();
+	environment.RUNNER_GIT_TOKEN = state.tokens[tokenName];
+
+	return repository({
+		store: workDirectory(repo) + '/.repo',
+		url: 'https://github.com/' + repo + '.git',
+		environment: environment,
+		tokenVariable: 'RUNNER_GIT_TOKEN',
+		tokenUser: 'x-access-token',
+		userName: runnerLogin,
+		userEmail: state.runnerEmails[tokenName],
+		excludes: ['.agent-out/'],
+	});
+}
+
+export function repoState(repo) {
+	if (state.repoStates[repo] === undefined) {
+		state.repoStates[repo] = {
+			fingerprint: undefined, said: {}, labelsBootstrapped: false, projectLabelSet: '', defaultBranch: undefined,
+		};
+	}
+
+	return state.repoStates[repo];
+}
+
+export function sayOnce(repo, key, line) {
+	const said = repoState(repo).said;
+	if (said[key] === line) return;
+
+	console.log(repo + ': ' + line);
+	said[key] = line;
+}
+
+export function forgetSaid(repo, key) {
+	delete repoState(repo).said[key];
+}

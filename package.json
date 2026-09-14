@@ -1,0 +1,23 @@
+{
+  "name": "team1-software-factory",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/service.mjs start",
+    "stop": "node --env-file-if-exists=.env src/service.mjs stop",
+    "logs": "node --env-file-if-exists=.env src/service.mjs logs",
+    "tick": "node --env-file-if-exists=.env src/poll.mjs --once",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint": "^10.9.1",
+    "globals": "^17.12.0"
+  }
+}
