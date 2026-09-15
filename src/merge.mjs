@@ -55,7 +55,7 @@ async function answerComments(run, pull, unanswered) {
 		const path = objection.path !== undefined ? fragment('_notes.md', 'objection-path', { path: objection.path }) + ' ' : '';
 
 		const measured = { verdict: 'objection', cost: cost };
-		const body = note(run.stage.name, 'objection', {
+		const body = note(run, 'objection', {
 			author: objection.login,
 			number: pull.number,
 			quote: blockquote(objection.body, 1500),
@@ -70,7 +70,7 @@ async function answerComments(run, pull, unanswered) {
 	const reason = newestReading.reason !== '' ? ': ' + newestReading.reason : '.';
 
 	const measured = { verdict: 'comment-noted', cost: cost };
-	const body = note(run.stage.name, 'comment-noted', {
+	const body = note(run, 'comment-noted', {
 		author: newest.login,
 		quote: squash(newest.body, false).slice(0, 200),
 		number: pull.number,
@@ -92,7 +92,7 @@ async function closePullAsAttack(run, pull, body, ledgerVerdict) {
 // A pull already marked hostile, or one opened from any repository but this one, is closed unread with its card.
 async function refusedPull(run, pull) {
 	if (findLabel(pull.labels, 'attack') !== undefined) {
-		const body = note(run.stage.name, 'attack-label', { number: pull.number }, { verdict: 'attack', cost: 0 });
+		const body = note(run, 'attack-label', { number: pull.number }, { verdict: 'attack', cost: 0 });
 
 		return closePullAsAttack(run, pull, body, 'attack-pull');
 	}
@@ -107,7 +107,7 @@ async function refusedPull(run, pull) {
 		console.log(run.tag + ': labelling the pull failed: ' + error.message);
 	}
 
-	const body = note(run.stage.name, 'foreign-pull', { number: pull.number, branch: run.branch, head: head }, { verdict: 'attack', cost: 0 });
+	const body = note(run, 'foreign-pull', { number: pull.number, branch: run.branch, head: head }, { verdict: 'attack', cost: 0 });
 
 	return closePullAsAttack(run, pull, body, 'foreign-pull');
 }
@@ -177,7 +177,7 @@ async function landPull(run, pull) {
 
 		if (!gate.passed) {
 			const measured = { verdict: 'base-moved', cost: 0, gatesPassed: false };
-			const body = note(run.stage.name, 'base-moved', {
+			const body = note(run, 'base-moved', {
 				base: base, number: pull.number, where: run.where, command: gate.command, code: gate.code, output: gate.output,
 			}, measured);
 
@@ -209,7 +209,7 @@ async function landPull(run, pull) {
 
 	const measured = { verdict: 'merged', cost: 0 };
 
-	return landed(run, note(run.stage.name, 'merged', { number: pull.number }, measured), measured, worktree.root);
+	return landed(run, note(run, 'merged', { number: pull.number }, measured), measured, worktree.root);
 }
 
 export async function handleMerge(run) {

@@ -1,6 +1,6 @@
 import { promptClaude } from './claude.mjs';
 import { readLabels, stampLine, TIERS } from './cards.mjs';
-import { start, unreadableOutcome } from './outcomes.mjs';
+import { costTotal, start, unreadableOutcome } from './outcomes.mjs';
 import { cardHeading, conversationPrompt, fragment, joinSections, sectionOf, systemPrompt } from './prompts.mjs';
 import { route, ROUTES } from './routes.mjs';
 import { orNone } from './stringUtils.mjs';
@@ -97,7 +97,8 @@ async function decisionEntry(run, member, decision, reply) {
 	if (section === '') section = '## Triage\n\n' + decision.section.trim();
 	if (label === 'duplicate') section += '\n\n' + fragment('_notes.md', 'duplicate-shelved', {});
 
-	const stamp = stampLine('triage', outcome, member === run.lead ? reply.metrics.cost : 0, reply.metrics.model);
+	const cost = member === run.lead ? reply.metrics.cost : 0;
+	const stamp = stampLine('triage', outcome, cost, { total: costTotal(run, cost), model: reply.metrics.model });
 	const entry = { card: member, body: section + '\n\n' + stamp, label: label, ledger: { verdict: outcome } };
 	if (outcome === 'threat') entry.flagPull = fragment('_notes.md', 'attack-by-triage', { stamp: stamp });
 
