@@ -131,18 +131,28 @@ Each is posted to Team1's running findings card, which nothing picks up until a 
 
 ## Write
 
-Under `## Reviews`, **80 words maximum**, and only these three things — after a `## Reply`, only
-when a person asked Team1 a question the review is the place to answer:
+Under `## Review`, **80 words maximum, and usually one line.** When the verdict is `advance` and you
+filed nothing, the whole section is:
 
-1. **What you are rejecting for**, worst first — nothing, when the verdict is `advance`.
-2. **What you could not check.** If part of the ask needs a running page, a real credential or a
-   device, say which part in one line — that tells the person holding the card what to look at
-   themselves. Say nothing when you could check everything.
-3. **One line naming the cards you filed**, if any.
+```
+Nothing to reject.
+```
 
-**Do not list what you checked and found sound.** If you found nothing, **quote the two lines in
-this diff most likely to be wrong later and say in half a sentence each why they are not** — about
-twenty words, and the proof you read the code.
+Add a line only for these, in this order, and only when each applies:
+
+1. **What you are rejecting for**, worst first: the defect, where it is, and the fix. Only on a reject.
+2. **What you could not check**: the part that needs a running page, a real credential or a device,
+   named in one line so the person holding the card knows what to look at. Only when such a part exists.
+3. **The cards you filed**, one line. Only when you filed some.
+
+**Never list what you checked and found sound, and never explain why the code is fine.** The
+verdict is the proof you read it. A complete review that found nothing and filed one card:
+
+```
+## Review
+
+Nothing to reject. Filed: delete is untested against a list of more than one todo.
+```
 <!-- change-under-review -->
 # The change under review
 
