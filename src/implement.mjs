@@ -10,10 +10,11 @@ import { alreadyDone, batchOutcome, costTotal, note, start, unreadableOutcome } 
 import { cardHeading, fragment, joinSections, resumeSince, systemPrompt, userPrompt } from './prompts.mjs';
 import { route } from './routes.mjs';
 import { verdictOutcome } from './verdict.mjs';
-import { backticked, pluralSuffix, redactSecrets } from './stringUtils.mjs';
+import { backticked, capHeadingWords, pluralSuffix, redactSecrets } from './stringUtils.mjs';
 
 const TREE_LINES = 400;
 const PREREAD_CHARS = 30000;
+const SECTION_BUDGET = { Plan: 60, Implementation: 60 };
 
 // Paths as the repo root sees them: git names a changed file from the root, the model may name it from the area.
 function rootRelative(file, areaPath) {
@@ -164,6 +165,8 @@ async function labelBatch(run) {
 async function buildUntilGreen(run, worktree, prompts, options) {
 	const base = run.board.defaultBranch;
 	let reply = await promptClaude(run.role, run, prompts.prompt, options);
+	reply.section = capHeadingWords(reply.section, SECTION_BUDGET);
+
 	let spent = 0;
 	let turns = 0;
 	for (let fixes = 0; ; fixes += 1) {
@@ -189,6 +192,7 @@ async function buildUntilGreen(run, worktree, prompts, options) {
 				where: run.where, command: gate.command, code: gate.code, output: gate.output, attempt: fixes + 1, of: state.knobs.MAX_GATE_FIXES,
 			}),
 		});
+		reply.section = capHeadingWords(reply.section, SECTION_BUDGET);
 	}
 }
 

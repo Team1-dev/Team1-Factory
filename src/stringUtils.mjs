@@ -213,3 +213,46 @@ export function backticked(files) {
 
 	return quoted.join(', ');
 }
+
+// Cuts prose to its first `limit` words, keeping the original spacing and markup up to the cut.
+export function capWords(text, limit) {
+	const trimmed = text.trim();
+	const words = [...trimmed.matchAll(/\S+/g)];
+	if (words.length <= limit) return trimmed;
+
+	const cutAt = words[limit - 1].index + words[limit - 1][0].length;
+
+	return trimmed.slice(0, cutAt).trimEnd() + ' …';
+}
+
+// A section's body, one heading at a time: a heading named in `budgets` has its body word-capped, one left out is kept as written.
+export function capHeadingWords(text, budgets) {
+	const HEADING_REGEX = /^#{1,6}\s+(.*)$/;
+	const lines = text.split('\n');
+	const blocks = [];
+	let heading;
+	let bodyStart = -1;
+
+	function flushBody(from, to) {
+		if (from === -1) return;
+
+		const body = lines.slice(from, to).join('\n').trim();
+		if (body === '') return;
+
+		blocks.push(budgets[heading] !== undefined ? capWords(body, budgets[heading]) : body);
+	}
+
+	for (let index = 0; index < lines.length; index += 1) {
+		const match = lines[index].match(HEADING_REGEX);
+		if (match === null) continue;
+
+		flushBody(bodyStart, index);
+		blocks.push(lines[index]);
+		heading = match[1].trim();
+		bodyStart = index + 1;
+	}
+
+	flushBody(bodyStart, lines.length);
+
+	return blocks.join('\n\n');
+}

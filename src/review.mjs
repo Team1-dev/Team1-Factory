@@ -5,8 +5,10 @@ import { state } from './config.mjs';
 import { compactDiff, inlineFiles, parseDiff } from './files.mjs';
 import { attackOutcome, backToImplement, missingPull, note, readClone, start, waitMergeable } from './outcomes.mjs';
 import { fragment, joinSections, systemPrompt, userPrompt } from './prompts.mjs';
-import { backticked } from './stringUtils.mjs';
+import { backticked, capHeadingWords } from './stringUtils.mjs';
 import { verdictOutcome } from './verdict.mjs';
+
+const SECTION_BUDGET = { Reviews: 80 };
 
 function hidingPull(run, pullNumber, finding) {
 	const measured = { verdict: 'attack', cost: finding.cost };
@@ -101,6 +103,8 @@ export async function handleReview(run) {
 		schema: verdictSchema(run.stage.verdicts),
 		permissionMode: 'bypassPermissions',
 	});
+
+	reply.section = capHeadingWords(reply.section, SECTION_BUDGET);
 
 	return verdictOutcome(run, reply, {
 		defaultVerdict: 'fail',

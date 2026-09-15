@@ -3,8 +3,10 @@ import { readLabels, stampLine, TIERS } from './cards.mjs';
 import { costTotal, start, unreadableOutcome } from './outcomes.mjs';
 import { cardHeading, conversationPrompt, fragment, joinSections, sectionOf, systemPrompt } from './prompts.mjs';
 import { route, ROUTES } from './routes.mjs';
-import { orNone } from './stringUtils.mjs';
+import { capHeadingWords, orNone } from './stringUtils.mjs';
 import { readText } from './trust.mjs';
+
+const SECTION_BUDGET = { Triage: 25 };
 
 function triageSchema(verdicts) {
 	return {
@@ -95,6 +97,7 @@ async function decisionEntry(run, member, decision, reply) {
 	const label = route('triage', outcome, member.reviewed);
 	let section = sectionOf(decision.section);
 	if (section === '') section = '## Triage\n\n' + decision.section.trim();
+	section = capHeadingWords(section, SECTION_BUDGET);
 	if (label === 'duplicate') section += '\n\n' + fragment('_notes.md', 'duplicate-shelved', {});
 
 	const cost = member === run.lead ? reply.metrics.cost : 0;
