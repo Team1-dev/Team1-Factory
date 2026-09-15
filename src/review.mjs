@@ -4,7 +4,7 @@ import { hiddenInstruction } from './classify.mjs';
 import { state } from './config.mjs';
 import { compactDiff, inlineFiles, parseDiff } from './files.mjs';
 import { attackOutcome, backToImplement, missingPull, note, readClone, start, waitMergeable } from './outcomes.mjs';
-import { fragment, joinSections, systemPrompt, userPrompt } from './prompts.mjs';
+import { fragment, joinSections, systemPrompt, userPrompt, withholdAuthorSections } from './prompts.mjs';
 import { backticked } from './stringUtils.mjs';
 import { verdictOutcome } from './verdict.mjs';
 
@@ -66,7 +66,8 @@ async function reviewPrompt(run, change) {
 	parts.push(inlined.text);
 	if (diff.addedComments.length > 0) parts.push(fragment('review.md', 'comments-added', { comments: diff.addedComments.join('\n') }));
 
-	if (change.body !== '') parts.push(fragment('review.md', 'pull-body', { body: change.body }));
+	const pullBody = withholdAuthorSections(change.body).text;
+	if (pullBody !== '') parts.push(fragment('review.md', 'pull-body', { body: pullBody }));
 
 	if (change.messages.length > 0) parts.push(fragment('review.md', 'commit-messages', { messages: change.messages.join('\n\n') }));
 

@@ -91,11 +91,7 @@ Built together with {mates} — the gates cannot say which card broke them, so a
 <!-- in-area -->
 in `{path}`
 <!-- pushed -->
-{section}
-
----
-
-{files}Pushed `{sha}` to `{branch}`. {url}{filed}
+{files}Pushed `{sha}` to `{branch}` — the plan and implementation notes are on the pull request. {url}{filed}
 
 {stamp}
 <!-- files-changed -->
