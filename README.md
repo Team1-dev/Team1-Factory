@@ -14,9 +14,10 @@ Team1 runs as a single process on infrastructure you control, using your Claude 
 
 ## See it work
 
-[Team1-demo](https://github.com/Team1-dev/Team1-demo) is a demo app that Team1-Factory is building one issue at a time. 
+[Team1-demo](https://github.com/Team1-dev/Team1-demo) is a demo app repository that Team1-Factory is building one issue at a time. 
 Every [issue](https://github.com/Team1-dev/Team1-demo/issues?q=is%3Aissue) shows the stages as comments, from triage to merge with the total cost of each.
 Every [pull request](https://github.com/Team1-dev/Team1-demo/pulls?q=is%3Apr) was opened, reviewed and merged by Team1-Factory.
+
 
 
 > [!CAUTION]
