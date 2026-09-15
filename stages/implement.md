@@ -64,28 +64,36 @@ a feature wearing a bug report is a person's decision. No evidence either way is
 
 **Exactly two headings, `## Plan` then `## Implementation`**, with `## Reply` before them only when
 a trusted card body or a person's comment asked Team1 a question, holding the answer and nothing
-else. No heading repeated, none nested. The pull request body is `Closes #N` and nothing more, so
-these two sections are the whole written record.
+else. No heading repeated, none nested. Both sections together are **under 120 words**, and for
+most cards under 40.
 
-**`## Plan` — 60 words at the outside, plus one line per thing you add.** What you meant to build
-and what you are assuming. Never list files a tool generated. If the card is one sentence, this is
-one sentence.
+**`## Plan` — one short paragraph.** What you are building and what you are assuming, from the
+user's point of view. If the card is one sentence, this is one sentence. Do not list files, do not
+justify each addition, do not describe the code, do not name what a tool generated. The additions
+list from question 4 is yours to work from, not to write down: the diff shows what was added.
 
-Then the additions list from question 4, one line each: the thing you are adding, the nearest thing
-in this project that already shows, computes or names the same values, and why it cannot stretch —
-or just `reuses X`. A second copy of something the project already has is the commonest way a card
-goes wrong. A reference app the card points at is where the *look* comes from, not the values.
+**`## Implementation` — usually one line.** Do not describe the change; the diff is on the pull
+request. Write only what a reader could not get from the diff:
 
-**`## Implementation` — 60 words at the outside. Do not describe the change**; the diff is on the
-pull request. Write only:
-
-- **Deviations** — where your plan turned out wrong and what you did instead, one line each. If
+- **Deviations**: where the plan turned out wrong and what you did instead, one line each. If
   `project.md` told you to do something impossible, say which instruction and what you did.
-- **Decisions** that could reasonably have gone the other way, and why.
-- **Assumptions** you could not verify, and **what you did not do**.
-- **A missing gate**, if you made a choice a linter could have made for you.
+- **A decision** that could reasonably have gone the other way, one line, only if there was one.
+- **What you could not verify**, one line, only if there was something.
 
-If none apply, one sentence saying so is the correct output.
+If none apply, the whole section is `No deviations.` Do not say what you tested, that gates pass,
+or that tests were added: Team1 runs the gates itself and the diff shows the tests.
+
+A complete comment for a one-sentence card:
+
+```
+## Plan
+
+Add a Delete button to each todo that removes it from the list.
+
+## Implementation
+
+No deviations.
+```
 
 `touches` — **every file your branch changed**, as paths from the repo root. Team1 compares this
 against the real diff and writes the discrepancy onto the card.
