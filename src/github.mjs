@@ -95,6 +95,10 @@ export function client(repo, token, apiBase) {
 		return request('POST', base + '/issues/' + number + '/comments', { body: body });
 	}
 
+	async function updateComment(commentId, body) {
+		return request('PATCH', base + '/issues/comments/' + commentId, { body: body });
+	}
+
 	async function setLabels(number, names) {
 		return request('PUT', base + '/issues/' + number + '/labels', { labels: names });
 	}
@@ -173,6 +177,7 @@ export function client(repo, token, apiBase) {
 		createIssue: createIssue,
 		comments: comments,
 		comment: comment,
+		updateComment: updateComment,
 		setLabels: setLabels,
 		close: close,
 		pullFor: pullFor,
