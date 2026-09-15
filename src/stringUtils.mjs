@@ -214,13 +214,41 @@ export function backticked(files) {
 	return quoted.join(', ');
 }
 
-// Cuts prose to its first `limit` words, keeping the original spacing and markup up to the cut.
+// True when `marker` (a backtick or `**`) opens a span in `text` that is still open at the end of it.
+function spanOpen(text, marker) {
+	let count = 0;
+	for (let from = text.indexOf(marker); from !== -1; from = text.indexOf(marker, from + marker.length)) {
+		count += 1;
+	}
+
+	return count % 2 === 1;
+}
+
+// Where `marker`'s span, still open at `from`, closes in `text` — or the end of the text, if it never does.
+function spanEnd(text, marker, from) {
+	const close = text.indexOf(marker, from);
+
+	return close === -1 ? text.length : close + marker.length;
+}
+
+// Cuts prose to its first `limit` words, keeping the original spacing and markup up to the cut. Never inside a backtick or `**`
+// span: GitHub reads an unclosed one as running to the next stray marker, swallowing everything after it.
 export function capWords(text, limit) {
 	const trimmed = text.trim();
 	const words = [...trimmed.matchAll(/\S+/g)];
 	if (words.length <= limit) return trimmed;
 
-	const cutAt = words[limit - 1].index + words[limit - 1][0].length;
+	let cutAt = words[limit - 1].index + words[limit - 1][0].length;
+	let extended = true;
+	while (extended) {
+		extended = false;
+		for (const marker of ['`', '**']) {
+			if (!spanOpen(trimmed.slice(0, cutAt), marker)) continue;
+
+			cutAt = spanEnd(trimmed, marker, cutAt);
+			extended = true;
+		}
+	}
 
 	return trimmed.slice(0, cutAt).trimEnd() + ' …';
 }
