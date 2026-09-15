@@ -3,32 +3,35 @@ import { note } from './outcomes.mjs';
 import { fragment } from './prompts.mjs';
 import { redactSecrets } from './stringUtils.mjs';
 
-const FINDINGS_TITLE = 'Findings from Team1';
+function proposalsTitle(lead) {
+	return 'Proposals from #' + lead.number + ': ' + redactSecrets(lead.title);
+}
 
-// The one running card per repo that findings go on: found among the open cards once per process
-// and cached from there, or created the first time anything is filed.
-async function findingsCard(run) {
+// The one proposals issue for this lead card: found among the open cards once per process and cached
+// from there, keyed by card number, or created the first time anything is filed on this card.
+async function proposalsCard(run, title) {
 	const perRepo = repoState(run.repo);
-	if (perRepo.findingsCard !== undefined) return perRepo.findingsCard;
+	perRepo.proposalsCards ??= {};
+	if (perRepo.proposalsCards[run.lead.number] !== undefined) return perRepo.proposalsCards[run.lead.number];
 
 	for (const card of run.board.cards) {
-		if (card.title === FINDINGS_TITLE) {
-			perRepo.findingsCard = card.number;
+		if (card.title === title) {
+			perRepo.proposalsCards[run.lead.number] = card.number;
 
 			return card.number;
 		}
 	}
 
-	const issue = await run.github.createIssue(FINDINGS_TITLE, fragment('_shared.md', 'findings-card', {}), ['findings']);
+	const issue = await run.github.createIssue(title, fragment('_shared.md', 'findings-card', { number: run.lead.number }), ['findings']);
 
-	perRepo.findingsCard = issue.number;
+	perRepo.proposalsCards[run.lead.number] = issue.number;
 
 	return issue.number;
 }
 
-// What a stage found worth doing separately, posted as one comment on the running findings card
-// rather than filed as its own tracked issue: no title-dedup against a growing board, no digest
-// carried into every prompt — a person reading the thread notices a repeat for themselves.
+// What a stage found worth doing separately, posted as one comment per origin (implement, review) on this
+// card's own proposals issue: a rerun of the same stage on the same card replaces its own comment rather
+// than piling another one up, since the origin note it is filed under is the same text every time.
 export async function fileFindings(run, findings, limit, originNote) {
 	if (findings === undefined || findings.length === 0) return '';
 
@@ -42,13 +45,19 @@ export async function fileFindings(run, findings, limit, originNote) {
 	if (sections.length === 0) return '';
 
 	try {
-		const number = await findingsCard(run);
+		const title = proposalsTitle(run.lead);
+		const number = await proposalsCard(run, title);
+		const origin = fragment('_notes.md', originNote, { number: run.lead.number });
 		const body = note(run, 'finding', {
 			findings: sections.join('\n\n'),
-			origin: fragment('_notes.md', originNote, { number: run.lead.number }),
+			origin: origin,
 		}, { verdict: 'proposed', cost: 0 });
 
-		await run.github.comment(number, redactSecrets(body));
+		const existing = await run.github.comments(number);
+		const previous = existing.find(comment => comment.body.includes(origin));
+
+		if (previous !== undefined) await run.github.updateComment(previous.id, redactSecrets(body));
+		else await run.github.comment(number, redactSecrets(body));
 
 		return fragment('_notes.md', 'filed', { card: number });
 	} catch (error) {

@@ -8,7 +8,7 @@
 	{ "name": "parked", "color": "e99695", "description": "Irreversible as asked — money, deletion, migration. Nothing was changed." },
 	{ "name": "failed", "color": "b60205", "description": "Could not proceed. The card says where it stopped." },
 	{ "name": "attack", "color": "d1242f", "description": "Hides instructions or was judged an attack. Stopped, unbuilt — a person reviews and closes it." },
-	{ "name": "findings", "color": "c2e0c6", "description": "Team1's running log of things noticed while working other cards. Not itself worked." },
+	{ "name": "findings", "color": "c2e0c6", "description": "Team1's proposals issue for one card: what it noticed while working it. Not itself worked." },
 	{ "name": "duplicate", "color": "ededed", "description": "Triage believes another card covers this. A person confirms: close it, or send it back to triage." },
 	{ "name": "priority: high", "color": "d73a4a", "description": "Worked before everything else at its stage. Put on by a person; carried for life." },
 	{ "name": "priority: medium", "color": "fb8c00", "description": "Worked before unlabelled cards at its stage." },
