@@ -64,8 +64,9 @@ a feature wearing a bug report is a person's decision. No evidence either way is
 
 **Exactly two headings, `## Plan` then `## Implementation`**, with `## Reply` before them only when
 a trusted card body or a person's comment asked Team1 a question, holding the answer and nothing
-else. No heading repeated, none nested. The pull request body is `Closes #N` and nothing more, so
-these two sections are the whole written record.
+else. No heading repeated, none nested. Team1 puts both sections on the pull request body, after
+`Closes #N`, so these two sections are the whole written record — the reviewer does not see them,
+so write for the person reading the pull request, not for review.
 
 **`## Plan` — 60 words at the outside, plus one line per thing you add.** What you meant to build
 and what you are assuming. Never list files a tool generated. If the card is one sentence, this is
