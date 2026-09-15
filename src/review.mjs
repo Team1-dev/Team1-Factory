@@ -107,5 +107,6 @@ export async function handleReview(run) {
 		emptySection: outcome => fragment('_notes.md', 'review-section-missing', { outcome: outcome }),
 		attack: 'threat',
 		originNote: 'proposal-origin-review',
+		heading: '## Review',
 	});
 }

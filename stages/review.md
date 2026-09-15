@@ -131,7 +131,8 @@ Each is posted to Team1's running findings card, which nothing picks up until a 
 
 ## Write
 
-Under `## Reviews`, **80 words maximum**, and only these three things — after a `## Reply`, only
+Team1 puts the `## Review` heading on for you — start your section straight in with the words
+below. **80 words maximum**, and only these three things — after a `## Reply`, only
 when a person asked Team1 a question the review is the place to answer:
 
 1. **What you are rejecting for**, worst first — nothing, when the verdict is `advance`.

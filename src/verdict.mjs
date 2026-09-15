@@ -4,6 +4,18 @@ import { attackOutcome, batchOutcome, costTotal } from './outcomes.mjs';
 import { fragment, joinSections } from './prompts.mjs';
 import { route } from './routes.mjs';
 
+// Replaces whatever heading (if any) the model wrote at the top of a section with the one the stage owns, so the wording never
+// drifts card to card.
+function withHeading(section, heading) {
+	if (section === '') return heading;
+
+	const lines = section.split('\n');
+	if (lines[0].startsWith('#')) lines[0] = heading;
+	else lines.unshift(heading, '');
+
+	return lines.join('\n');
+}
+
 // The shared tail of a stage that asks the model for one verdict on the lead card: the section is stamped, findings are filed
 // where the stage allows them (originNote), and the outcome is routed by verdict. attack names the one verdict, if any, that
 // closes the batch as hostile instead of routing normally.
@@ -14,6 +26,7 @@ export async function verdictOutcome(run, reply, options) {
 	let section = reply.section;
 	if (options.sameAsBefore !== undefined && section.length >= 80 && options.sameAsBefore.includes(section)) section = fragment('implement.md', 'same-as-before', {});
 	if (section === '' && options.emptySection !== undefined) section = options.emptySection(outcome);
+	if (options.heading !== undefined) section = withHeading(section, options.heading);
 
 	const stamp = stampLine(run.stage.name, outcome, metrics.cost, { total: costTotal(run, metrics.cost), model: metrics.model });
 	metrics.verdict = outcome;
