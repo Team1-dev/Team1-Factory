@@ -12,6 +12,13 @@ Claude Code agents do the engineering work while Team1 manages branches, worktre
 
 Team1 runs as a single process on infrastructure you control, using your Claude Code login and GitHub account.
 
+## See it work
+
+[Team1-demo](https://github.com/Team1-dev/Team1-demo) is a demo app that Team1-Factory is building one issue at a time. 
+Every [issue](https://github.com/Team1-dev/Team1-demo/issues?q=is%3Aissue) shows the stages as comments, from triage to merge with the total cost of each.
+Every [pull request](https://github.com/Team1-dev/Team1-demo/pulls?q=is%3Apr) was opened, reviewed and merged by Team1-Factory.
+
+
 > [!CAUTION]
 > ## ⚠️ WARNING — run Team1 on an isolated machine
 >
