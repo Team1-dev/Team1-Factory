@@ -18,7 +18,9 @@ Team1 runs as a single process on infrastructure you control, using your Claude 
 Every [issue](https://github.com/Team1-dev/Team1-demo/issues?q=is%3Aissue) shows the stages as comments, from triage to merge with the total cost of each.
 Every [pull request](https://github.com/Team1-dev/Team1-demo/pulls?q=is%3Apr) was opened, reviewed and merged by Team1-Factory.
 
+---
 
+<br>
 
 > [!CAUTION]
 > ## ⚠️ WARNING — run Team1 on an isolated machine
