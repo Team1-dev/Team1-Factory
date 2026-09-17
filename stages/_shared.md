@@ -75,3 +75,21 @@ Decide what the comment is. You have no other context, so judge only what it ask
 If it genuinely reads two ways, take `change-request`: wrongly holding a merge costs one build round, merging past a real objection is a person ignored. Praise with an emoji is not two readings.
 
 Return one JSON object and nothing else: `verdict` (one of the three) and `reason` — one short sentence, written for the person who will read it on the card, saying what you took the comment to be.
+<!-- classify-proposal -->
+# Does this change already cover a proposal?
+
+Before #{number} landed, Team1 noted the following as worth doing separately from that card:
+
+**{title}**
+
+{body}
+
+Here is the diff that just landed for #{number}:
+
+```diff
+{diff}
+```
+
+Decide whether the diff already does what the proposal asks, incidentally or otherwise.
+
+Return one JSON object: `verdict` (`covered` if the diff already does this, `open` if it does not) and `reason` — one short sentence saying why.

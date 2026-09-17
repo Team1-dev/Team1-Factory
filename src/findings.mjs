@@ -1,7 +1,12 @@
+import { classify } from './classify.mjs';
 import { repoState } from './config.mjs';
+import { ledgerClassify } from './ledger.mjs';
 import { note } from './outcomes.mjs';
 import { fragment } from './prompts.mjs';
 import { redactSecrets } from './stringUtils.mjs';
+
+const ORIGIN_NOTES = ['proposal-origin-implement', 'proposal-origin-review'];
+const DIFF_LIMIT = 6000;
 
 function proposalsTitle(lead) {
 	return 'Proposals from #' + lead.number + ': ' + redactSecrets(lead.title);
@@ -64,5 +69,92 @@ export async function fileFindings(run, findings, limit, originNote) {
 		console.log(run.tag + ': findings not posted: ' + error.message);
 
 		return '';
+	}
+}
+
+// The `### Title` sections of one of our own findings comments, stripped of the origin note and stamp that follow
+// them: only Team1's own comments, filed under this lead's own origins, count — the issue is open to anyone who
+// can comment, so a stranger pasting the origin text is never read as one of our findings.
+function findingSections(run, comment) {
+	if (comment.user === null || comment.user.login !== run.board.runnerLogin) return [];
+
+	let origin;
+	for (const originNote of ORIGIN_NOTES) {
+		const text = fragment('_notes.md', originNote, { number: run.lead.number });
+		if (comment.body.includes(text)) {
+			origin = text;
+			break;
+		}
+	}
+
+	if (origin === undefined) return [];
+
+	const sections = [];
+	let current;
+	for (const line of comment.body.slice(0, comment.body.indexOf(origin)).split('\n')) {
+		if (line.startsWith('### ')) {
+			current = { title: line.slice(4).trim(), body: [], commentId: comment.id };
+			sections.push(current);
+			continue;
+		}
+
+		if (current !== undefined) current.body.push(line);
+	}
+
+	return sections.map(section => ({ title: section.title, body: section.body.join('\n').trim(), commentId: section.commentId }));
+}
+
+async function judgeProposal(run, diffText, section) {
+	const prompt = fragment('_shared.md', 'classify-proposal', {
+		number: run.lead.number,
+		title: section.title,
+		body: section.body,
+		diff: diffText.slice(0, DIFF_LIMIT),
+	});
+
+	return classify(run.tag, prompt, 'proposal', ['covered', 'open']);
+}
+
+// Once a card lands, its own proposals issue is read for what the merged diff already covers: each covered
+// proposal gets its own comment naming the pull request, and the issue closes once none are left open. A card
+// lands once, so this is the only pass its proposals issue ever gets.
+export async function closeCoveredProposals(run, pull) {
+	try {
+		const title = proposalsTitle(run.lead);
+		const issue = run.board.cards.find(card => card.title === title);
+
+		if (issue === undefined) return;
+
+		const sections = [];
+		for (const comment of await run.github.comments(issue.number)) {
+			sections.push(...findingSections(run, comment));
+		}
+
+		if (sections.length === 0) return;
+
+		const diffText = await run.github.diff(pull.number);
+
+		let allCovered = true;
+		for (const section of sections) {
+			const reading = await judgeProposal(run, diffText, section);
+
+			if (reading === undefined) {
+				allCovered = false;
+				continue;
+			}
+
+			ledgerClassify(run, section.commentId, reading);
+			if (reading.verdict !== 'covered') {
+				allCovered = false;
+				continue;
+			}
+
+			const body = fragment('_notes.md', 'proposal-covered', { number: pull.number, title: redactSecrets(section.title) });
+			await run.github.comment(issue.number, redactSecrets(body));
+		}
+
+		if (allCovered) await run.github.close(issue.number, 'completed');
+	} catch (error) {
+		console.log(run.tag + ': proposals issue not checked: ' + error.message);
 	}
 }

@@ -1,6 +1,7 @@
 import { findLabel, readComment } from './cards.mjs';
 import { classifyComment } from './classify.mjs';
 import { state } from './config.mjs';
+import { closeCoveredProposals } from './findings.mjs';
 import { runGates } from './gates.mjs';
 import { ledgerEnd } from './ledger.mjs';
 import { backToImplement, batchOutcome, hold, landed, missingPull, note, start, waitMergeable } from './outcomes.mjs';
@@ -206,6 +207,8 @@ async function landPull(run, pull) {
 
 		return backToImplement(run, 'merge-refused', { number: pull.number, why: why }, kind === 'conflict' ? 'conflict' : 'merge-refused');
 	}
+
+	await closeCoveredProposals(run, pull);
 
 	const measured = { verdict: 'merged', cost: 0 };
 

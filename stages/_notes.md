@@ -48,6 +48,8 @@ Found by review on #{number}, where it was not serious enough to stop the change
 Noticed by implement while building #{number}, outside what that card asked for.
 <!-- filed -->
 Noted on the findings card: #{card}.
+<!-- proposal-covered -->
+Done — #{number} already covers this: {title}
 <!-- duplicate-shelved -->
 Nothing will work on this while `duplicate` is on. A person confirms: close it, or move it back to `stage: triage`.
 <!-- attack-by-triage -->
