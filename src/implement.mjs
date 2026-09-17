@@ -78,15 +78,54 @@ async function settleUnpushed(run, worktree, attempt) {
 	return undefined;
 }
 
-// The model sometimes wraps its section in a heading of its own before `## Plan` (or `## Reply`) — the contract's two
-// headings are enforced here, not trusted from the model's output.
+const PLAN_HEADING_REGEX = /^(#{1,6})\s+(Reply|Plan|Implementation)\s*$/;
+
+// The model sometimes wraps its section in a heading of its own before `## Plan` (or `## Reply`), or writes the contract's
+// headings one level down under a title of its own — the contract's own two headings are enforced here, not trusted from
+// the model's output. Headings inside a fenced code block are not headings.
 function planSection(text) {
 	const lines = text.split('\n');
+	let fenced = false;
+	let cutAt = -1;
 	for (let index = 0; index < lines.length; index += 1) {
-		if (lines[index].startsWith('## Reply') || lines[index].startsWith('## Plan')) return lines.slice(index).join('\n').trim();
+		if (lines[index].trimStart().startsWith('```')) {
+			fenced = !fenced;
+			continue;
+		}
+
+		if (fenced) continue;
+
+		const heading = lines[index].match(PLAN_HEADING_REGEX);
+		if (heading !== null && heading[2] !== 'Implementation') {
+			cutAt = index;
+			break;
+		}
 	}
 
-	return text;
+	if (cutAt === -1) return text;
+
+	const kept = lines.slice(cutAt);
+	fenced = false;
+	for (let index = 0; index < kept.length; index += 1) {
+		if (kept[index].trimStart().startsWith('```')) {
+			fenced = !fenced;
+			continue;
+		}
+
+		if (fenced) continue;
+
+		const heading = kept[index].match(PLAN_HEADING_REGEX);
+		if (heading !== null) kept[index] = '## ' + heading[2];
+	}
+
+	return kept.join('\n').trim();
+}
+
+async function promptPlan(role, run, prompt, options) {
+	const reply = await promptClaude(role, run, prompt, options);
+	reply.section = planSection(reply.section);
+
+	return reply;
 }
 
 function treeText(files) {
@@ -174,9 +213,7 @@ async function labelBatch(run) {
 // the attempt that ended it with its gate and how many fix rounds it took; the attempt's measured carries the session's whole cost.
 async function buildUntilGreen(run, worktree, prompts, options) {
 	const base = run.board.defaultBranch;
-	let reply = await promptClaude(run.role, run, prompts.prompt, options);
-	reply.section = planSection(reply.section);
-
+	let reply = await promptPlan(run.role, run, prompts.prompt, options);
 	let spent = 0;
 	let turns = 0;
 	for (let fixes = 0; ; fixes += 1) {
@@ -195,14 +232,13 @@ async function buildUntilGreen(run, worktree, prompts, options) {
 
 		if (gate.passed || fixes === state.knobs.MAX_GATE_FIXES) return { attempt: attempt, gate: gate, fixes: fixes };
 
-		reply = await promptClaude(run.role, run, prompts.prompt, {
+		reply = await promptPlan(run.role, run, prompts.prompt, {
 			...options,
 			priorSession: reply.sessionId,
 			resumePrompt: fragment('implement.md', 'gates-red', {
 				where: run.where, command: gate.command, code: gate.code, output: gate.output, attempt: fixes + 1, of: state.knobs.MAX_GATE_FIXES,
 			}),
 		});
-		reply.section = planSection(reply.section);
 	}
 }
 
