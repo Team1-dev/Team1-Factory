@@ -211,8 +211,21 @@ async function labelBatch(run) {
 
 // The first build, then fix rounds in the same session while the gates are red, up to MAX_GATE_FIXES. Either a settled outcome, or
 // the attempt that ended it with its gate and how many fix rounds it took; the attempt's measured carries the session's whole cost.
+// An untracked file is the card's work only when the stage's own touches list names it; anything else untracked — node_modules,
+// a build's dist/ or cache, whatever install or the gates left behind — is named in leftOut and never staged.
+function committedChanges(raw, touches, areaPath) {
+	const leftOut = unmatched(raw.untracked, touches, areaPath);
+	const touchedUntracked = raw.untracked.filter(file => !leftOut.includes(file));
+
+	const files = [];
+	for (const file of raw.changed.concat(touchedUntracked)) {
+		if (!files.includes(file)) files.push(file);
+	}
+
+	return { unpushed: raw.unpushed, files: files, leftOut: leftOut };
+}
+
 async function buildUntilGreen(run, worktree, prompts, options) {
-	const toolingJunk = worktree.toolingJunk;
 	const base = run.board.defaultBranch;
 	let reply = await promptPlan(run.role, run, prompts.prompt, options);
 	let spent = 0;
@@ -223,18 +236,14 @@ async function buildUntilGreen(run, worktree, prompts, options) {
 		spent += reply.metrics.cost;
 		turns += reply.metrics.turns;
 
-		const changes = await run.git.changes(worktree.root, run.branch, base, toolingJunk);
+		const raw = await run.git.changes(worktree.root, run.branch, base);
+		const changes = committedChanges(raw, reply.output.touches ?? [], run.area.path);
 		const attempt = { reply: reply, changes: changes, measured: { ...reply.metrics, cost: spent, turns: turns } };
 		const settled = await settleUnpushed(run, worktree, attempt);
 
 		if (settled !== undefined) return { outcome: settled };
 
-		const beforeGate = await run.git.untrackedFiles(worktree.root);
 		const gate = await runGates(worktree.root, run, changes.files);
-		const afterGate = await run.git.untrackedFiles(worktree.root);
-		for (const file of afterGate) {
-			if (!beforeGate.includes(file)) toolingJunk.push(file);
-		}
 
 		if (gate.passed || fixes === state.knobs.MAX_GATE_FIXES) return { attempt: attempt, gate: gate, fixes: fixes };
 
@@ -322,6 +331,8 @@ async function pushedOutcome(run, worktree, attempt) {
 
 	if (untouched.length > 0) notes.push(fragment('_notes.md', 'files-untouched', { files: backticked(untouched) }));
 
+	if (attempt.changes.leftOut.length > 0) notes.push(fragment('_notes.md', 'files-left-out', { files: backticked(attempt.changes.leftOut) }));
+
 	const filedText = filed !== '' ? ' ' + filed : '';
 
 	const body = note(run, 'pushed', {
@@ -350,10 +361,7 @@ export async function handleImplement(run) {
 
 	await run.git.ensureGitignore(worktree.root, run.area.path);
 
-	const beforeInstall = await run.git.untrackedFiles(worktree.root);
 	const installed = await install(worktree.root, run.area);
-	const afterInstall = await run.git.untrackedFiles(worktree.root);
-	worktree.toolingJunk = afterInstall.filter(file => !beforeInstall.includes(file));
 
 	if (installed.error !== undefined) console.log(run.tag + ': install failed: ' + installed.error);
 

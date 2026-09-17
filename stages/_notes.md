@@ -112,6 +112,8 @@ in `{path}`
 **Not in the stage's own list:** {files}.
 <!-- files-untouched -->
 **Listed but untouched:** {files}.
+<!-- files-left-out -->
+**Left out of the commit, untracked and not in the stage's own list:** {files}.
 <!-- already-done -->
 {section}`{branch}` carries no change against `{base}` — what the card asks for is already there. Closing the card.
 

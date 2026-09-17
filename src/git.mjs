@@ -151,18 +151,9 @@ export function repository(settings) {
 		return { root: root, resumed: from.resumed };
 	}
 
-	async function untrackedFiles(root) {
-		const untracked = await git(root, ['ls-files', '--others', '--exclude-standard']);
-
-		if (untracked === '') return [];
-
-		return untracked.split('\n');
-	}
-
-	// excludeUntracked is what install or a gate produced rather than the card's own work (node_modules missed by .gitignore, a
-	// build's dist/ or cache): new since the last snapshot, so left out of both the diff and the commit.
-	async function changes(root, branch, base, excludeUntracked) {
-		const exclude = excludeUntracked ?? [];
+	// changed and untracked are kept apart: a changed tracked file is always the card's work, but an untracked one is only the
+	// card's work when the stage says it touched it, and the caller is the one who knows what the stage said.
+	async function changes(root, branch, base) {
 		const mergeBase = await git(root, ['merge-base', 'HEAD', 'origin/' + base]);
 		let unpushed = true;
 		const clean = await isClean(root);
@@ -178,19 +169,12 @@ export function repository(settings) {
 			unpushed = head !== pushedSha;
 		}
 
-		const changed = await git(root, ['diff', '--name-only', mergeBase]);
-		const untracked = await untrackedFiles(root);
+		const changedOutput = await git(root, ['diff', '--name-only', mergeBase]);
+		const changed = changedOutput === '' ? [] : changedOutput.split('\n');
+		const untrackedOutput = await git(root, ['ls-files', '--others', '--exclude-standard']);
+		const untracked = untrackedOutput === '' ? [] : untrackedOutput.split('\n');
 
-		const files = [];
-		for (const file of changed.split('\n').concat(untracked)) {
-			if (file === '') continue;
-			if (files.includes(file)) continue;
-			if (exclude.includes(file)) continue;
-
-			files.push(file);
-		}
-
-		return { unpushed: unpushed, files: files };
+		return { unpushed: unpushed, changed: changed, untracked: untracked };
 	}
 
 	async function commitAndPush(root, branch, message, files) {
@@ -230,7 +214,6 @@ export function repository(settings) {
 		changes: changes,
 		commitAndPush: commitAndPush,
 		ensureGitignore: ensureGitignore,
-		untrackedFiles: untrackedFiles,
 		listFiles: listFiles,
 		forcePush: forcePush,
 		rebaseOnto: rebaseOnto,
