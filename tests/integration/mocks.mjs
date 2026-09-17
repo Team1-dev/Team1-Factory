@@ -18,8 +18,8 @@ async function sleep(ms) {
 
 vi.mock('node:timers/promises', () => ({ setTimeout: sleep }));
 
-// The real shell runner, for the tests that drive it against real processes.
-export const realShell = await vi.importActual('../../src/shell.mjs');
+// The real shell runner: a child the test did not queue an outcome for runs for real.
+const realShell = await vi.importActual('../../src/shell.mjs');
 
 // A queued outcome answers the next child; with none queued the real child runs, except claude, which no test may spawn.
 async function run(cwd, command, args, options) {
@@ -100,9 +100,6 @@ function repository() {
 	};
 }
 
-// The real repository factory, for the test that drives it against a real origin.
-export const realGit = await vi.importActual('../../src/git.mjs');
-
 vi.mock('../../src/git.mjs', () => ({ repository: repository }));
 
 async function install(worktreeRoot, area) {
@@ -125,12 +122,9 @@ async function runGates(worktreeRoot, cardRun, changedFiles) {
 	return gates.given.gate;
 }
 
-// The real gates, for the test that runs a gate through the real shell.
-export const realGates = await vi.importActual('../../src/gates.mjs');
-
 vi.mock('../../src/gates.mjs', () => ({ install: install, runGates: runGates }));
 
-export const realGithub = await vi.importActual('../../src/github.mjs');
+const realGithub = await vi.importActual('../../src/github.mjs');
 
 function githubClient(repo, token, apiBase) {
 	if (githubMock.client !== undefined) return githubMock.client(repo, token);

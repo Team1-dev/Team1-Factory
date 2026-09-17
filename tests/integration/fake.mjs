@@ -15,7 +15,6 @@ const EMPTY_GIVEN = {
 	pulls: {},
 	files: {},
 	reviews: {},
-	reviewComments: {},
 	commits: {},
 	closedIssues: [],
 	closedError: undefined,
@@ -25,7 +24,6 @@ const EMPTY_GIVEN = {
 	labels: undefined,
 	pullError: undefined,
 	compareError: undefined,
-	issueError: undefined,
 };
 
 export function setup() {
@@ -154,8 +152,6 @@ export function fakeGithub(given) {
 	}
 
 	async function createIssue(title, body, labelNames) {
-		if (given.issueError !== undefined) throw new Error(given.issueError);
-
 		writes.push({ name: 'createIssue', title: title, body: body, labels: labelNames });
 
 		return { number: 900 + writes.length };
@@ -236,10 +232,8 @@ export function fakeGithub(given) {
 		return given.reviews[number];
 	}
 
-	async function reviewComments(number) {
-		if (given.reviewComments[number] === undefined) return [];
-
-		return given.reviewComments[number];
+	async function reviewComments() {
+		return [];
 	}
 
 	async function pullCommits(number) {
