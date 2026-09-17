@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { childEnvironment, loadEnv, modelEnvironment, state, tokenNameFor } from '../src/config.mjs';
+import { childEnvironment, loadEnv, modelEnvironment, state, tokenNameFor } from '../../src/config.mjs';
 
 const ENV = {
 	REPOS: 'acme/app, acme/web-ui', GITHUB_TOKEN: 'shared', GITHUB_TOKEN_acme_web_ui: 'own', MAX_ROUNDS: '3',

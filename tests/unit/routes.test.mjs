@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { systemPrompt } from '../src/prompts.mjs';
-import { labelOfStage, ROUTES, route, STAGES, stageOf } from '../src/routes.mjs';
+import { systemPrompt } from '../../src/prompts.mjs';
+import { labelOfStage, ROUTES, route, STAGES, stageOf } from '../../src/routes.mjs';
 
 test('every verdict a stage may return is named in the prompt the model reads, and every one of them routes somewhere', () => {
 	for (const stage of STAGES) {

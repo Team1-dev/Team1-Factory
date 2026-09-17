@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-// The setup file of every test: the model, git, the gates, the shell, the clock and the GitHub client are replaced here, and a test
+// The setup file of every integration test: the model, git, the gates, the shell, the clock and the GitHub client are replaced here, and a test
 // says what each gives and reads what each was asked.
 export const model = { answers: [], calls: [] };
 export const git = { given: {}, calls: [] };
@@ -19,7 +19,7 @@ async function sleep(ms) {
 vi.mock('node:timers/promises', () => ({ setTimeout: sleep }));
 
 // The real shell runner, for the tests that drive it against real processes.
-export const realShell = await vi.importActual('../src/shell.mjs');
+export const realShell = await vi.importActual('../../src/shell.mjs');
 
 // A queued outcome answers the next child; with none queued the real child runs, except claude, which no test may spawn.
 async function run(cwd, command, args, options) {
@@ -31,7 +31,7 @@ async function run(cwd, command, args, options) {
 	return shell.given.shift();
 }
 
-vi.mock('../src/shell.mjs', async importOriginal => ({ ...await importOriginal(), run: run }));
+vi.mock('../../src/shell.mjs', async importOriginal => ({ ...await importOriginal(), run: run }));
 
 async function checkout(relativeRoot, branch, readOnly) {
 	git.calls.push({ name: 'checkout', root: relativeRoot, branch: branch, readOnly: readOnly });
@@ -101,9 +101,9 @@ function repository() {
 }
 
 // The real repository factory, for the test that drives it against a real origin.
-export const realGit = await vi.importActual('../src/git.mjs');
+export const realGit = await vi.importActual('../../src/git.mjs');
 
-vi.mock('../src/git.mjs', () => ({ repository: repository }));
+vi.mock('../../src/git.mjs', () => ({ repository: repository }));
 
 async function install(worktreeRoot, area) {
 	gates.calls.push({ name: 'install', root: worktreeRoot, area: area.name });
@@ -126,11 +126,11 @@ async function runGates(worktreeRoot, cardRun, changedFiles) {
 }
 
 // The real gates, for the test that runs a gate through the real shell.
-export const realGates = await vi.importActual('../src/gates.mjs');
+export const realGates = await vi.importActual('../../src/gates.mjs');
 
-vi.mock('../src/gates.mjs', () => ({ install: install, runGates: runGates }));
+vi.mock('../../src/gates.mjs', () => ({ install: install, runGates: runGates }));
 
-export const realGithub = await vi.importActual('../src/github.mjs');
+export const realGithub = await vi.importActual('../../src/github.mjs');
 
 function githubClient(repo, token, apiBase) {
 	if (githubMock.client !== undefined) return githubMock.client(repo, token);
@@ -138,9 +138,9 @@ function githubClient(repo, token, apiBase) {
 	return realGithub.client(repo, token, apiBase);
 }
 
-vi.mock('../src/github.mjs', () => ({ client: githubClient }));
+vi.mock('../../src/github.mjs', () => ({ client: githubClient }));
 
-const realClaude = await vi.importActual('../src/claude.mjs');
+const realClaude = await vi.importActual('../../src/claude.mjs');
 
 // The real chain, for tests that fake the child instead of the model.
 export const realPromptClaude = realClaude.promptClaude;
@@ -155,4 +155,4 @@ async function promptClaude(role, cardRun, prompt, options) {
 	return answer;
 }
 
-vi.mock('../src/claude.mjs', () => ({ ...realClaude, promptClaude: promptClaude }));
+vi.mock('../../src/claude.mjs', () => ({ ...realClaude, promptClaude: promptClaude }));

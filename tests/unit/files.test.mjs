@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { inlineFiles, parseDiff } from '../src/files.mjs';
+import { inlineFiles, parseDiff } from '../../src/files.mjs';
 
 function fileDiff(path, added) {
 	return 'diff --git a/' + path + ' b/' + path + '\n--- a/' + path + '\n+++ b/' + path + '\n@@ -1 +1,2 @@\n x\n+' + added + '\n';

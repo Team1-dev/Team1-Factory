@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { decodeJsonStringLiteral, redactSecrets, stripInvisible, stripReferenceDefinitions } from '../src/stringUtils.mjs';
-import { readText } from '../src/trust.mjs';
+import { decodeJsonStringLiteral, redactSecrets, stripInvisible, stripReferenceDefinitions } from '../../src/stringUtils.mjs';
+import { readText } from '../../src/trust.mjs';
 
 test('stripInvisible: the tag block, joiners and fillers go; an emoji\'s variation selector and a bidi mark stay', () => {
 	const tags = String.fromCodePoint(0xE0049, 0xE0047, 0xE004E);
