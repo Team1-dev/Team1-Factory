@@ -86,6 +86,13 @@ export function repository(settings) {
 		return ancestry.code === 0;
 	}
 
+	// False once the store's repository has been recreated: the worktree's history and the fresh remote share no commit.
+	async function hasCommonHistory(root, reference) {
+		const mergeBase = await tryGit(root, ['merge-base', 'HEAD', reference]);
+
+		return mergeBase.code === 0;
+	}
+
 	async function removeWorktree(root) {
 		await rm(root, { recursive: true, force: true });
 
@@ -121,7 +128,7 @@ export function repository(settings) {
 			return { root: root, resumed: from.resumed };
 		}
 
-		if (await worktreeOnBranch(root, branch)) {
+		if (await worktreeOnBranch(root, branch) && await hasCommonHistory(root, from.start)) {
 			if (from.resumed && await isClean(root) && await isBehind(root, from.start)) await git(root, ['reset', '--hard', from.start]);
 
 			return { root: root, resumed: true };
