@@ -7,7 +7,7 @@ const CALLBACKS = 'map|filter|some|every|find|findIndex|findLast|findLastIndex';
 const BRANCH = ':matches(LogicalExpression, ConditionalExpression)';
 
 export default defineConfig([
-	{ name: 'runner/files', files: ['src/**/*.mjs'] },
+	{ name: 'runner/files', files: ['src/**/*.mjs', 'tests/**/*.mjs'] },
 	globalIgnores(['node_modules/**', 'work/**', 'eslint.config.mjs']),
 	js.configs.recommended,
 	{

@@ -13,6 +13,7 @@
     "logs": "node --env-file-if-exists=.env src/service.mjs logs",
     "status": "node --env-file-if-exists=.env src/service.mjs status",
     "tick": "node --env-file-if-exists=.env src/poll.mjs --once",
+    "test": "vitest run",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
@@ -20,6 +21,7 @@
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "eslint": "^10.9.1",
-    "globals": "^17.12.0"
+    "globals": "^17.12.0",
+    "vitest": "^5.0.1"
   }
 }
