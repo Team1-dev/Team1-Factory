@@ -2,7 +2,7 @@
 
 **Turn GitHub issues into shipped software.**
 
-Visit [tryteam1.com](https://tryteam1.com) for the latest updates.
+Visit [tryteam1.com](https://tryteam1.com) for the latest updates, or join the [Discord](https://discord.gg/8GtxarKJy).
 
 Team1 is a local-first, agentic software factory for GitHub. Point it at your repositories and it runs:
 
