@@ -653,3 +653,87 @@ test('a pull that cannot be opened is said so on the pushed note and the card st
 	expect(pass.writes[0].body).toContain('(no PR: rate limited)');
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: review']);
 });
+
+test('a .gitignore Team1 wrote itself is committed though the stage never listed it; one it did not write is left out like any unlisted file', async () => {
+	setup();
+	answered('advance', { touches: ['src/cli.mjs'] }, 0.5);
+	git.given.wroteGitignore = true;
+	git.given.changes = { unpushed: true, changed: ['src/cli.mjs'], untracked: ['.gitignore', 'node_modules/x/index.js'] };
+
+	const written = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(git.calls[1]).toEqual({ name: 'ensureGitignore', root: ROOT, areaPath: '.' });
+	expect(git.calls[4].files).toEqual(['src/cli.mjs', '.gitignore']);
+	expect(written.writes[1].body).toContain('**Left out of the commit, untracked and not in the stage\'s own list:** `node_modules/x/index.js`.');
+
+	setup();
+	answered('advance', { touches: ['src/cli.mjs'] }, 0.5);
+	git.given.changes = { unpushed: true, changed: ['src/cli.mjs'], untracked: ['.gitignore'] };
+
+	const found = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(git.calls[4].files).toEqual(['src/cli.mjs']);
+	expect(found.writes[1].body).toContain('**Left out of the commit, untracked and not in the stage\'s own list:** `.gitignore`.');
+});
+
+function changedFiles(count) {
+	const files = [];
+	for (let index = 1; index <= count; index += 1) {
+		files.push('lib/generated-' + index + '.js');
+	}
+
+	return files;
+}
+
+test('more changed files outside the stage\'s own list than a card plausibly touches: the card fails and nothing is pushed; at the limit it is pushed', async () => {
+	setup();
+	answered('advance', { touches: ['src/cli.mjs'] }, 0.5);
+	pushed(['src/cli.mjs'].concat(changedFiles(21)));
+
+	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(callNames(git.calls)).not.toContain('commitAndPush');
+	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
+	expect(pass.writes[0].body).toContain(SECTION + '\n\n---\n\n**Stopped — 21 file(s) outside the stage\'s own list, more than this card plausibly touches:**'
+		+ ' `lib/generated-1.js`, ');
+	expect(pass.writes[0].body).toContain('`lib/generated-20.js`, and 1 more. Nothing was pushed.');
+	expect(pass.writes[0].body).not.toContain('generated-21');
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · fail · $0.50 · total $0.60 · sonnet')).toBe(true);
+	expect(pass.writes[1].labels).toEqual(['tier: contained', 'failed']);
+	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:fail']);
+	expect(ledgerLines()[1].gatesPassed).toBe(false);
+
+	setup();
+	answered('advance', { touches: ['src/cli.mjs'] }, 0.5);
+	pushed(['src/cli.mjs'].concat(changedFiles(20)));
+
+	const atLimit = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(callNames(git.calls)).toContain('commitAndPush');
+	expect(atLimit.writes[2].labels).toEqual(['tier: contained', 'stage: review']);
+});
+
+// What the model wrote as its section, and the section Team1 posts: on the pull for a build, on the card for a question.
+async function sectionPosted(section, verdict) {
+	setup();
+	model.answers.push(modelAnswer({ section: section, verdict: verdict }, 0.5));
+	if (verdict === 'advance') pushed(['a.js']);
+
+	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+	const body = pass.writes[0].body;
+
+	return verdict === 'advance' ? body.slice('Closes #5\n\n'.length) : body.slice(0, body.lastIndexOf('\n\n— team1-factory'));
+}
+
+test('the section keeps the contract\'s own headings: a title the model put above Plan is cut, the headings are level two, a fenced heading is not one', async () => {
+	const PLAN = '## Plan\n\nParse the flag early.\n\n## Implementation\n\nDone in cli.mjs.';
+
+	expect(await sectionPosted('# Card 5: the quiet flag\n\nA word before starting.\n\n' + PLAN, 'advance')).toBe(PLAN);
+	expect(await sectionPosted('# Notes\n\n### Plan\n\nParse the flag early.\n\n# Implementation\n\nDone in cli.mjs.', 'advance')).toBe(PLAN);
+	expect(await sectionPosted('#### Summary\n\n### Reply\n\nWhich flag did you mean?', 'questions')).toBe('## Reply\n\nWhich flag did you mean?');
+
+	const fenced = '## Plan\n\nThe real plan.\n\n```md\n# Implementation\n```\n\n## Implementation\n\nDone.';
+
+	expect(await sectionPosted('# Notes\n\n```md\n## Plan\nan example, not the plan\n```\n\n' + fenced, 'advance')).toBe(fenced);
+	expect(await sectionPosted('## Implementation\n\nNo plan heading at all.', 'advance')).toBe('## Implementation\n\nNo plan heading at all.');
+});
