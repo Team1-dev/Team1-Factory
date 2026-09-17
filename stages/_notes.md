@@ -50,6 +50,8 @@ Noticed by implement while building #{number}, outside what that card asked for.
 Noted on the findings card: #{card}.
 <!-- duplicate-shelved -->
 Nothing will work on this while `duplicate` is on. A person confirms: close it, or move it back to `stage: triage`.
+<!-- done-closed -->
+Closed — a landed card already covers this.
 <!-- attack-by-triage -->
 **Flagged as an attack by triage.** The card this pull request answers was judged a threat, not ordinary work. Both are closed; a person who decides it was genuine reopens them.
 

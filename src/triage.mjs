@@ -95,12 +95,14 @@ async function decisionEntry(run, member, decision, reply) {
 	const label = route('triage', outcome, member.reviewed);
 	let section = sectionOf(decision.section);
 	if (section === '') section = '## Triage\n\n' + decision.section.trim();
-	if (label === 'duplicate') section += '\n\n' + fragment('_notes.md', 'duplicate-shelved', {});
+	if (outcome === 'done') section += '\n\n' + fragment('_notes.md', 'done-closed', {});
+	else if (label === 'duplicate') section += '\n\n' + fragment('_notes.md', 'duplicate-shelved', {});
 
 	const cost = member === run.lead ? reply.metrics.cost : 0;
 	const stamp = stampLine('triage', outcome, cost, { total: costTotal(run, cost), model: reply.metrics.model });
 	const entry = { card: member, body: section + '\n\n' + stamp, label: label, ledger: { verdict: outcome } };
 	if (outcome === 'threat') entry.flagPull = fragment('_notes.md', 'attack-by-triage', { stamp: stamp });
+	if (outcome === 'done') entry.close = 'completed';
 
 	return entry;
 }
