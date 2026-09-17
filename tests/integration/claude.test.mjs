@@ -3,8 +3,9 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { state } from '../../src/config.mjs';
-import { realPromptClaude, shell, timers } from './mocks.mjs';
-import { ledgerLines, setup } from './fake.mjs';
+import { realPromptClaude } from './mocks.mjs';
+import { shell, timers } from '../doubles.mjs';
+import { ledgerLines, setup } from '../fake.mjs';
 
 // The real promptClaude, down to the child: only the claude process itself is replaced, by what the test queues on the shell.
 const WORK = mkdtempSync(join(tmpdir(), 'claude-test-'));

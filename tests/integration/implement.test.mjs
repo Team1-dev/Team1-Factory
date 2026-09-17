@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { state } from '../../src/config.mjs';
 import { branchOf, stampLine } from '../../src/cards.mjs';
-import { model, git, gates } from './mocks.mjs';
-import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from './fake.mjs';
+import { model, git, gates } from '../doubles.mjs';
+import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { REPO, issue, mine, openPull, person, stamped } from '../builders.mjs';
 
 const CARD = 5;

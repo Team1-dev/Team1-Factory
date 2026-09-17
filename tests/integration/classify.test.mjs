@@ -2,8 +2,8 @@ import { beforeEach, expect, test } from 'vitest';
 import { failure } from '../../src/claude.mjs';
 import { classify } from '../../src/classify.mjs';
 import { state } from '../../src/config.mjs';
-import { model } from './mocks.mjs';
-import { ledgerVerdicts, modelAnswer, passOver, setup } from './fake.mjs';
+import { model } from '../doubles.mjs';
+import { ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { issue, person } from '../builders.mjs';
 
 const CARD = 5;

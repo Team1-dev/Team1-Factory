@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from 'vitest';
 import { loadBoard } from '../../src/board.mjs';
 import { branchOf, readBoardLabels } from '../../src/cards.mjs';
-import { callNames, fakeGithub, ledgerVerdicts, passOver, setup } from './fake.mjs';
+import { callNames, fakeGithub, ledgerVerdicts, passOver, setup } from '../fake.mjs';
 import { RUNNER, issue, openPull } from '../builders.mjs';
 
 const ROOT_FILE = 'Gates: npm test\nhuman-approvals: 2\nreview-ignore: [dist/, *.lock]\nauto-merge: TRUE\n\n'

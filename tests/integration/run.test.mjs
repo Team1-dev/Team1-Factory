@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { model } from './mocks.mjs';
-import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from './fake.mjs';
+import { model } from '../doubles.mjs';
+import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { issue, mine, person, stamped, stranger } from '../builders.mjs';
 
 const CARD = 5;

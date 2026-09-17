@@ -1,6 +1,6 @@
 import { beforeEach, expect, test } from 'vitest';
-import { model } from './mocks.mjs';
-import { modelAnswer, passOver, setup } from './fake.mjs';
+import { model } from '../doubles.mjs';
+import { modelAnswer, passOver, setup } from '../fake.mjs';
 import { RUNNER, issue, mine } from '../builders.mjs';
 
 const TOKEN = 'ghp_' + 'a'.repeat(36);

@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { branchOf, stampLine } from '../../src/cards.mjs';
-import { model, git } from './mocks.mjs';
-import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from './fake.mjs';
+import { model, git } from '../doubles.mjs';
+import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { issue, mine, openPull, stamped } from '../builders.mjs';
 
 const CARD = 5;

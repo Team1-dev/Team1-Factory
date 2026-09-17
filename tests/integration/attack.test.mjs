@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { branchOf } from '../../src/cards.mjs';
-import { model } from './mocks.mjs';
-import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from './fake.mjs';
+import { model } from '../doubles.mjs';
+import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { OWNER, STRANGER, issue, mine, openPull, person, stamped, stranger } from '../builders.mjs';
 
 const CARD = 5;

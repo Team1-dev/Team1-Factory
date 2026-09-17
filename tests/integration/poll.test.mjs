@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadEnv, repoState, state, workDirectory } from '../../src/config.mjs';
 import { loop, processRepo } from '../../src/poll.mjs';
-import { model, githubMock, timers } from './mocks.mjs';
-import { fakeGithub, modelAnswer, setup } from './fake.mjs';
+import { model, githubMock, timers } from '../doubles.mjs';
+import { fakeGithub, modelAnswer, setup } from '../fake.mjs';
 import { REPO, issue } from '../builders.mjs';
 
 // One pass over one repo with the board faked at the client: the loop's own rules, not a card's.

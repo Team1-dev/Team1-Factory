@@ -1,13 +1,13 @@
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readResult } from '../../src/claude.mjs';
-import { state, loadEnv } from '../../src/config.mjs';
-import { readBoardLabels } from '../../src/cards.mjs';
-import { loadBoard } from '../../src/board.mjs';
-import { processCard } from '../../src/run.mjs';
-import { model, git, gates, shell, timers, githubMock } from './mocks.mjs';
-import { REPO, RUNNER, openPull } from '../builders.mjs';
+import { readResult } from '../src/claude.mjs';
+import { state, loadEnv } from '../src/config.mjs';
+import { readBoardLabels } from '../src/cards.mjs';
+import { loadBoard } from '../src/board.mjs';
+import { processCard } from '../src/run.mjs';
+import { model, git, gates, shell, timers, githubMock } from './doubles.mjs';
+import { REPO, RUNNER, openPull } from './builders.mjs';
 
 const EMPTY_GIVEN = {
 	issues: [],
