@@ -3,6 +3,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { state } from '../../src/config.mjs';
+import { PLAN_CUT, PLAN_NORMALIZE } from '../../src/implement.mjs';
 import { branchOf, stampLine } from '../../src/cards.mjs';
 import { model, git, gates } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
@@ -716,7 +717,7 @@ test('more changed files outside the stage\'s own list than a card plausibly tou
 // What the model wrote as its section, and the section Team1 posts: on the pull for a build, on the card for a question.
 async function sectionPosted(section, verdict) {
 	setup();
-	model.answers.push(modelAnswer({ section: section, verdict: verdict }, 0.5));
+	model.answers.push(modelAnswer({ section: section, verdict: verdict }, 0.5, PLAN_CUT, PLAN_NORMALIZE));
 	if (verdict === 'advance') pushed(['a.js']);
 
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);

@@ -164,11 +164,52 @@ export function userPrompt(lead, comments, situation, hideAuthor) {
 	return joinSections([situation, cardParts.join('\n\n'), conversationPrompt(comments, hideAuthor)]);
 }
 
-export function sectionOf(text) {
+const HEADING_REGEX = /^(#{1,6})\s+(.+?)\s*$/;
+
+// Cuts text to its first heading. When cutOn names a set of headings, the cut waits for the first of those instead, falling
+// back to the first heading of any kind when none of them appear — never empty just because the model's own heading isn't
+// one of them. After a cut on one of those names, every heading in normalize is rewritten to level two throughout what is
+// kept, so the contract's own headings never drift in level even when the model wrote them under a title of its own.
+// Headings inside a fenced code block are not headings.
+export function sectionOf(text, cutOn, normalize) {
 	const lines = text.split('\n');
+	let fenced = false;
+	let firstHeading = -1;
+	let anchorAt = -1;
 	for (let index = 0; index < lines.length; index += 1) {
-		if (lines[index].startsWith('#')) return lines.slice(index).join('\n').trim();
+		if (lines[index].trimStart().startsWith('```')) {
+			fenced = !fenced;
+			continue;
+		}
+
+		if (fenced || !lines[index].startsWith('#')) continue;
+		if (firstHeading === -1) firstHeading = index;
+
+		const heading = lines[index].match(HEADING_REGEX);
+		if (cutOn !== undefined && heading !== null && cutOn.includes(heading[2])) {
+			anchorAt = index;
+			break;
+		}
 	}
 
-	return '';
+	const cutAt = anchorAt !== -1 ? anchorAt : firstHeading;
+	if (cutAt === -1) return '';
+
+	const kept = lines.slice(cutAt);
+	if (anchorAt === -1 || normalize === undefined) return kept.join('\n').trim();
+
+	fenced = false;
+	for (let index = 0; index < kept.length; index += 1) {
+		if (kept[index].trimStart().startsWith('```')) {
+			fenced = !fenced;
+			continue;
+		}
+
+		if (fenced) continue;
+
+		const heading = kept[index].match(HEADING_REGEX);
+		if (heading !== null && normalize.includes(heading[2])) kept[index] = '## ' + heading[2];
+	}
+
+	return kept.join('\n').trim();
 }

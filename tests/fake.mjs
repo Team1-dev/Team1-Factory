@@ -105,13 +105,13 @@ export function callNames(calls) {
 
 // What the model answered, read by the real readResult from the JSON claude would have printed: the reply a stage gets here is the
 // reply it gets in production, the section taken out of the output included.
-export function modelAnswer(output, cost) {
+export function modelAnswer(output, cost, cutOn, normalize) {
 	const printed = {
 		result: '', structured_output: output, total_cost_usd: cost, num_turns: 1, duration_ms: 1000, session_id: 'session-' + cost,
 		modelUsage: { sonnet: {} }, usage: {},
 	};
 
-	return readResult(printed, 'sonnet', { prompt: 'x'.repeat(100), budget: 1 }, printed.session_id);
+	return readResult(printed, 'sonnet', { prompt: 'x'.repeat(100), budget: 1, cutOn: cutOn, normalize: normalize }, printed.session_id);
 }
 
 export function fakeGithub(given) {
