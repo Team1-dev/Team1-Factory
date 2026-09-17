@@ -104,12 +104,10 @@ export function callNames(calls) {
 	return names;
 }
 
+// The record src/claude.mjs readResult returns, field for field; tests/unit/claude.test.mjs pins the real one.
 export function modelAnswer(output, cost) {
 	return {
-		text: JSON.stringify(output),
 		output: output,
-		model: 'sonnet',
-		cost: cost,
 		sessionId: 'session-' + cost,
 		section: '',
 		metrics: { model: 'sonnet', cost: cost, turns: 1, durationMs: 1000, promptChars: 100, outputChars: 2, usage: {} },
