@@ -73,8 +73,11 @@ export async function fileFindings(run, findings, limit, originNote) {
 }
 
 // The `### Title` sections of one of our own findings comments, stripped of the origin note and stamp that follow
-// them: only comments filed under this lead's own origins count, so a person's reply on the issue is never read as one.
+// them: only Team1's own comments, filed under this lead's own origins, count — the issue is open to anyone who
+// can comment, so a stranger pasting the origin text is never read as one of our findings.
 function findingSections(run, comment) {
+	if (comment.user === null || comment.user.login !== run.board.runnerLogin) return [];
+
 	let origin;
 	for (const originNote of ORIGIN_NOTES) {
 		const text = fragment('_notes.md', originNote, { number: run.lead.number });
