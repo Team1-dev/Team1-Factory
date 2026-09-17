@@ -78,6 +78,17 @@ async function settleUnpushed(run, worktree, attempt) {
 	return undefined;
 }
 
+// The model sometimes wraps its section in a heading of its own before `## Plan` (or `## Reply`) — the contract's two
+// headings are enforced here, not trusted from the model's output.
+function planSection(text) {
+	const lines = text.split('\n');
+	for (let index = 0; index < lines.length; index += 1) {
+		if (lines[index].startsWith('## Reply') || lines[index].startsWith('## Plan')) return lines.slice(index).join('\n').trim();
+	}
+
+	return text;
+}
+
 function treeText(files) {
 	if (files.length <= TREE_LINES) return files.join('\n');
 
@@ -164,6 +175,8 @@ async function labelBatch(run) {
 async function buildUntilGreen(run, worktree, prompts, options) {
 	const base = run.board.defaultBranch;
 	let reply = await promptClaude(run.role, run, prompts.prompt, options);
+	reply.section = planSection(reply.section);
+
 	let spent = 0;
 	let turns = 0;
 	for (let fixes = 0; ; fixes += 1) {
@@ -189,6 +202,7 @@ async function buildUntilGreen(run, worktree, prompts, options) {
 				where: run.where, command: gate.command, code: gate.code, output: gate.output, attempt: fixes + 1, of: state.knobs.MAX_GATE_FIXES,
 			}),
 		});
+		reply.section = planSection(reply.section);
 	}
 }
 
