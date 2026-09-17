@@ -108,8 +108,11 @@ export function repository(settings) {
 		if (!isNodeProject) isNodeProject = await exists(join(root, areaPath, 'package.json'));
 
 		const hasGitignore = await exists(join(root, '.gitignore'));
+		const willWrite = isNodeProject && !hasGitignore;
 
-		if (isNodeProject && !hasGitignore) await writeFile(join(root, '.gitignore'), 'node_modules\n');
+		if (willWrite) await writeFile(join(root, '.gitignore'), 'node_modules\n');
+
+		return willWrite;
 	}
 
 	async function listFiles(directory) {

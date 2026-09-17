@@ -211,10 +211,12 @@ async function labelBatch(run) {
 
 // The first build, then fix rounds in the same session while the gates are red, up to MAX_GATE_FIXES. Either a settled outcome, or
 // the attempt that ended it with its gate and how many fix rounds it took; the attempt's measured carries the session's whole cost.
-// An untracked file is the card's work only when the stage's own touches list names it; anything else untracked — node_modules,
-// a build's dist/ or cache, whatever install or the gates left behind — is named in leftOut and never staged.
-function committedChanges(raw, touches, areaPath) {
-	const leftOut = unmatched(raw.untracked, touches, areaPath);
+// An untracked file is the card's work only when the stage's own touches list names it, or when forceInclude does — the
+// harness's own write (a generated .gitignore) rather than the model's, so never a name the model could have listed. Anything
+// else untracked — node_modules, a build's dist/ or cache, whatever install or the gates left behind — is named in leftOut and
+// never staged.
+function committedChanges(raw, touches, areaPath, forceInclude) {
+	const leftOut = unmatched(raw.untracked, touches, areaPath).filter(file => !forceInclude.includes(file));
 	const touchedUntracked = raw.untracked.filter(file => !leftOut.includes(file));
 
 	const files = [];
@@ -237,7 +239,7 @@ async function buildUntilGreen(run, worktree, prompts, options) {
 		turns += reply.metrics.turns;
 
 		const raw = await run.git.changes(worktree.root, run.branch, base);
-		const changes = committedChanges(raw, reply.output.touches ?? [], run.area.path);
+		const changes = committedChanges(raw, reply.output.touches ?? [], run.area.path, worktree.forceInclude);
 		const attempt = { reply: reply, changes: changes, measured: { ...reply.metrics, cost: spent, turns: turns } };
 		const settled = await settleUnpushed(run, worktree, attempt);
 
@@ -359,7 +361,8 @@ export async function handleImplement(run) {
 	worktree.cwd = join(worktree.root, run.area.path);
 	run.resumed = worktree.resumed;
 
-	await run.git.ensureGitignore(worktree.root, run.area.path);
+	const wroteGitignore = await run.git.ensureGitignore(worktree.root, run.area.path);
+	worktree.forceInclude = wroteGitignore ? ['.gitignore'] : [];
 
 	const installed = await install(worktree.root, run.area);
 
