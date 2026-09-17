@@ -1,4 +1,4 @@
-gates: npm run lint
+gates: npm run lint && npm test
 human-approvals: 1
 auto-merge: false
 
