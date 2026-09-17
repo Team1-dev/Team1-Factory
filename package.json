@@ -13,7 +13,8 @@
     "logs": "node --env-file-if-exists=.env src/service.mjs logs",
     "status": "node --env-file-if-exists=.env src/service.mjs status",
     "tick": "node --env-file-if-exists=.env src/poll.mjs --once",
-    "test": "vitest run",
+    "test": "vitest run --project unit --project integration",
+    "test:e2e": "vitest run --project e2e --reporter=verbose",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
