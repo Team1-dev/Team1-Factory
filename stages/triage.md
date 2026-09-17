@@ -20,6 +20,8 @@ The board index is context for the duplicate check, not a backlog to re-plan.
   of one feature are not. **Different `project:` is never a duplicate**, however close the titles
   read — check the project shown in the board index before naming `of`.
 - **`done`** — a *closed* card's fix plainly already covers this ask. Name it in `of` and say why.
+  **Different `project:` is never done by it**, however close the titles read — each project's own
+  build is what covers its own cards.
 - **`reroute`** — in a repository of several projects, the card wears one project's label and the
   files it names belong to another. Name the right one in `project`; the card comes back to you in
   that project. Only the files named settle this — "shared" or "common" in the title does not.

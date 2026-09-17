@@ -41,10 +41,10 @@ function replaceLabel(card, prefix, value) {
 const INDEX_LABELS = ['duplicate', 'ready to merge'];
 const INDEX_PREFIXES = ['stage: ', 'tier: ', 'project: '];
 
-function boardIndexLine(card) {
-	const shown = card.labels.filter(label => INDEX_LABELS.includes(label) || INDEX_PREFIXES.some(prefix => label.startsWith(prefix)));
+function indexLine(number, title, labelNames) {
+	const shown = labelNames.filter(label => INDEX_LABELS.includes(label) || INDEX_PREFIXES.some(prefix => label.startsWith(prefix)));
 
-	let line = '- #' + card.number + ' ' + card.title.slice(0, 90);
+	let line = '- #' + number + ' ' + title.slice(0, 90);
 	if (shown.length > 0) line += ' (' + shown.join(', ') + ')';
 
 	return line;
@@ -54,13 +54,13 @@ function boardIndexLine(card) {
 async function triagePrompt(run) {
 	const opened = [];
 	for (const card of run.board.cards) {
-		if (!run.batch.includes(card) && !card.labels.includes('findings')) opened.push(boardIndexLine(card));
+		if (!run.batch.includes(card) && !card.labels.includes('findings')) opened.push(indexLine(card.number, card.title, card.labels));
 	}
 
 	const closed = [];
 	try {
 		for (const githubIssue of await run.github.closedIssues(40)) {
-			if (githubIssue.pull_request === undefined) closed.push('- #' + githubIssue.number + ' ' + readText(githubIssue.title).visible.slice(0, 90));
+			if (githubIssue.pull_request === undefined) closed.push(indexLine(githubIssue.number, readText(githubIssue.title).visible, githubIssue.labels.map(label => label.name)));
 		}
 	} catch (error) {
 		console.log(run.tag + ': closed issues unavailable: ' + error.message);
