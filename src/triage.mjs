@@ -37,9 +37,9 @@ function replaceLabel(card, prefix, value) {
 	readLabels(card);
 }
 
-// What an index line shows of a card's labels: its stage and tier, and two states.
+// What an index line shows of a card's labels: its stage, tier and project, and two states.
 const INDEX_LABELS = ['duplicate', 'ready to merge'];
-const INDEX_PREFIXES = ['stage: ', 'tier: '];
+const INDEX_PREFIXES = ['stage: ', 'tier: ', 'project: '];
 
 function boardIndexLine(card) {
 	const shown = card.labels.filter(label => INDEX_LABELS.includes(label) || INDEX_PREFIXES.some(prefix => label.startsWith(prefix)));

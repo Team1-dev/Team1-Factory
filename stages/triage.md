@@ -17,7 +17,8 @@ The board index is context for the duplicate check, not a backlog to re-plan.
 
 - **`duplicate`** — an *open* card already asks for substantially the same thing. Name it (`of`)
   and say which words match. Two cards that would produce the same diff are duplicates; two corners
-  of one feature are not.
+  of one feature are not. **Different `project:` is never a duplicate**, however close the titles
+  read — check the project shown in the board index before naming `of`.
 - **`done`** — a *closed* card's fix plainly already covers this ask. Name it in `of` and say why.
 - **`reroute`** — in a repository of several projects, the card wears one project's label and the
   files it names belong to another. Name the right one in `project`; the card comes back to you in
