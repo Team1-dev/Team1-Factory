@@ -262,9 +262,31 @@ function gatesFailedOutcome(run, built) {
 	return batchOutcome(run.batch, body, 'failed', measured);
 }
 
+function tooManyFilesOutcome(run, attempt, unlisted) {
+	const measured = attempt.measured;
+	measured.verdict     = 'fail';
+	measured.gatesPassed = false;
+
+	const body = note(run, 'too-many-files', {
+		section: attempt.reply.section,
+		count: unlisted.length,
+		files: backticked(unlisted),
+	}, measured);
+
+	return batchOutcome(run.batch, body, 'failed', measured);
+}
+
 async function pushedOutcome(run, worktree, attempt) {
 	const base = run.board.defaultBranch;
 	const measured = attempt.measured;
+	const touches = attempt.reply.output.touches ?? [];
+
+	const outside = attempt.changes.files.filter(file => run.ownArea && !file.startsWith(run.area.path + '/'));
+	const unlisted = unmatched(attempt.changes.files, touches, run.area.path);
+	const untouched = unmatched(touches, attempt.changes.files, run.area.path);
+
+	if (unlisted.length > state.knobs.MAX_UNLISTED_FILES) return tooManyFilesOutcome(run, attempt, unlisted);
+
 	let title = run.lead.title;
 	if (run.mates.length > 0) title += ' (+' + run.mates.length + ' more: ' + run.mateNumbers + ')';
 
@@ -286,11 +308,6 @@ async function pushedOutcome(run, worktree, attempt) {
 
 	const filed = await fileFindings(run, attempt.reply.output.cards, run.stage.proposals, 'proposal-origin-implement');
 
-	const touches = attempt.reply.output.touches ?? [];
-
-	const outside = attempt.changes.files.filter(file => run.ownArea && !file.startsWith(run.area.path + '/'));
-	const unlisted = unmatched(attempt.changes.files, touches, run.area.path);
-	const untouched = unmatched(touches, attempt.changes.files, run.area.path);
 	const changedFiles = { count: attempt.changes.files.length, files: backticked(attempt.changes.files) };
 	const notes = [fragment('_notes.md', 'files-changed', changedFiles)];
 	if (outside.length > 0) notes.push(fragment('_notes.md', 'files-outside', { path: run.area.path, files: backticked(outside) }));
@@ -324,6 +341,8 @@ export async function handleImplement(run) {
 
 	worktree.cwd = join(worktree.root, run.area.path);
 	run.resumed = worktree.resumed;
+
+	await run.git.ensureGitignore(worktree.root);
 
 	const installed = await install(worktree.root, run.area);
 

@@ -1,4 +1,4 @@
-import { appendFile, mkdir, rm } from 'node:fs/promises';
+import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { run, exists } from './shell.mjs';
 
@@ -99,6 +99,14 @@ export function repository(settings) {
 		const cloned = await exists(join(store, '.git'));
 
 		if (cloned) await git(store, ['worktree', 'prune']);
+	}
+
+	// A node project with no .gitignore leaves node_modules untracked but not excluded: `git add -A` would stage it whole.
+	async function ensureGitignore(root) {
+		const isNodeProject = await exists(join(root, 'package.json'));
+		const hasGitignore = await exists(join(root, '.gitignore'));
+
+		if (isNodeProject && !hasGitignore) await writeFile(join(root, '.gitignore'), 'node_modules\n');
 	}
 
 	async function listFiles(directory) {
@@ -206,6 +214,7 @@ export function repository(settings) {
 		checkout: checkout,
 		changes: changes,
 		commitAndPush: commitAndPush,
+		ensureGitignore: ensureGitignore,
 		listFiles: listFiles,
 		forcePush: forcePush,
 		rebaseOnto: rebaseOnto,
