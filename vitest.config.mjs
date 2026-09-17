@@ -2,5 +2,5 @@ import { defineConfig } from 'vitest/config';
 
 // work/ holds other repositories' checkouts, tests included; only ours run.
 export default defineConfig({
-	test: { include: ['tests/*.test.mjs'] },
+	test: { include: ['tests/*.test.mjs'], setupFiles: ['tests/mocks.mjs'] },
 });
