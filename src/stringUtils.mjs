@@ -208,8 +208,13 @@ export function bulleted(items) {
 	return orNone(lines);
 }
 
-export function backticked(files) {
-	const quoted = files.map(file => '`' + file + '`');
+// A file list this long already means something is wrong; spelling out every name would also blow past GitHub's comment limit.
+const BACKTICKED_LIMIT = 20;
 
-	return quoted.join(', ');
+export function backticked(files) {
+	const shown = files.slice(0, BACKTICKED_LIMIT).map(file => '`' + file + '`').join(', ');
+
+	if (files.length <= BACKTICKED_LIMIT) return shown;
+
+	return shown + ', and ' + (files.length - BACKTICKED_LIMIT) + ' more';
 }

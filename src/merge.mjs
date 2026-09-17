@@ -174,7 +174,7 @@ async function landPull(run, pull) {
 	let pushedSha;
 	if (rebase.moved) {
 		const changes = await run.git.changes(worktree.root, run.branch, base);
-		const gate = await runGates(worktree.root, run, changes.files);
+		const gate = await runGates(worktree.root, run, changes.changed.concat(changes.untracked));
 
 		if (!gate.passed) {
 			const measured = { verdict: 'base-moved', cost: 0, gatesPassed: false };

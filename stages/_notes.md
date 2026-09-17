@@ -92,6 +92,14 @@ The implement stage produced no changes.
 Built together with {mates} — the gates cannot say which card broke them, so all of them come back.
 <!-- in-area -->
 in `{path}`
+<!-- too-many-files -->
+{section}
+
+---
+
+**Stopped — {count} file(s) outside the stage's own list, more than this card plausibly touches:** {files}. Nothing was pushed. If a generated directory such as `node_modules` got swept in, check `.gitignore`.
+
+{stamp}
 <!-- pushed -->
 {files}Pushed `{sha}` to `{branch}` — the plan and implementation notes are on the pull request. {url}{filed}
 
@@ -104,6 +112,8 @@ in `{path}`
 **Not in the stage's own list:** {files}.
 <!-- files-untouched -->
 **Listed but untouched:** {files}.
+<!-- files-left-out -->
+**Left out of the commit, untracked and not in the stage's own list:** {files}.
 <!-- already-done -->
 {section}`{branch}` carries no change against `{base}` — what the card asks for is already there. Closing the card.
 

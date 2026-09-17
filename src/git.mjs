@@ -1,4 +1,4 @@
-import { appendFile, mkdir, rm } from 'node:fs/promises';
+import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { run, exists } from './shell.mjs';
 
@@ -101,6 +101,20 @@ export function repository(settings) {
 		if (cloned) await git(store, ['worktree', 'prune']);
 	}
 
+	// A node project with no .gitignore leaves node_modules untracked but not excluded: `git add -A` would stage it whole. A
+	// pattern with no leading slash matches at any depth, so one line at the root also covers a monorepo project's own node_modules.
+	async function ensureGitignore(root, areaPath) {
+		let isNodeProject = await exists(join(root, 'package.json'));
+		if (!isNodeProject) isNodeProject = await exists(join(root, areaPath, 'package.json'));
+
+		const hasGitignore = await exists(join(root, '.gitignore'));
+		const willWrite = isNodeProject && !hasGitignore;
+
+		if (willWrite) await writeFile(join(root, '.gitignore'), 'node_modules\n');
+
+		return willWrite;
+	}
+
 	async function listFiles(directory) {
 		const listing = await git(directory, ['ls-files']);
 
@@ -140,6 +154,8 @@ export function repository(settings) {
 		return { root: root, resumed: from.resumed };
 	}
 
+	// changed and untracked are kept apart: a changed tracked file is always the card's work, but an untracked one is only the
+	// card's work when the stage says it touched it, and the caller is the one who knows what the stage said.
 	async function changes(root, branch, base) {
 		const mergeBase = await git(root, ['merge-base', 'HEAD', 'origin/' + base]);
 		let unpushed = true;
@@ -156,22 +172,16 @@ export function repository(settings) {
 			unpushed = head !== pushedSha;
 		}
 
-		const changed = await git(root, ['diff', '--name-only', mergeBase]);
-		const untracked = await git(root, ['ls-files', '--others', '--exclude-standard']);
+		const changedOutput = await git(root, ['diff', '--name-only', mergeBase]);
+		const changed = changedOutput === '' ? [] : changedOutput.split('\n');
+		const untrackedOutput = await git(root, ['ls-files', '--others', '--exclude-standard']);
+		const untracked = untrackedOutput === '' ? [] : untrackedOutput.split('\n');
 
-		const files = [];
-		for (const file of changed.split('\n').concat(untracked.split('\n'))) {
-			if (file === '') continue;
-			if (files.includes(file)) continue;
-
-			files.push(file);
-		}
-
-		return { unpushed: unpushed, files: files };
+		return { unpushed: unpushed, changed: changed, untracked: untracked };
 	}
 
-	async function commitAndPush(root, branch, message) {
-		await git(root, ['add', '-A']);
+	async function commitAndPush(root, branch, message, files) {
+		if (files.length > 0) await git(root, ['add', '--', ...files]);
 
 		const staged = await tryGit(root, ['diff', '--cached', '--quiet']);
 
@@ -206,6 +216,7 @@ export function repository(settings) {
 		checkout: checkout,
 		changes: changes,
 		commitAndPush: commitAndPush,
+		ensureGitignore: ensureGitignore,
 		listFiles: listFiles,
 		forcePush: forcePush,
 		rebaseOnto: rebaseOnto,

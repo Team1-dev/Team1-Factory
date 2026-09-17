@@ -22,6 +22,7 @@ const KNOB_DEFAULTS = {
 	MAX_ROUNDS_EVER: 4,
 	MAX_COST_PER_CARD: 15,
 	MAX_GATE_FIXES: 2,
+	MAX_UNLISTED_FILES: 20,
 };
 
 // Settings from the environment, then the process state and the caches, all reset by loadEnv.

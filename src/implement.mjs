@@ -211,6 +211,22 @@ async function labelBatch(run) {
 
 // The first build, then fix rounds in the same session while the gates are red, up to MAX_GATE_FIXES. Either a settled outcome, or
 // the attempt that ended it with its gate and how many fix rounds it took; the attempt's measured carries the session's whole cost.
+// An untracked file is the card's work only when the stage's own touches list names it, or when forceInclude does — the
+// harness's own write (a generated .gitignore) rather than the model's, so never a name the model could have listed. Anything
+// else untracked — node_modules, a build's dist/ or cache, whatever install or the gates left behind — is named in leftOut and
+// never staged.
+function committedChanges(raw, touches, areaPath, forceInclude) {
+	const leftOut = unmatched(raw.untracked, touches, areaPath).filter(file => !forceInclude.includes(file));
+	const touchedUntracked = raw.untracked.filter(file => !leftOut.includes(file));
+
+	const files = [];
+	for (const file of raw.changed.concat(touchedUntracked)) {
+		if (!files.includes(file)) files.push(file);
+	}
+
+	return { unpushed: raw.unpushed, files: files, leftOut: leftOut };
+}
+
 async function buildUntilGreen(run, worktree, prompts, options) {
 	const base = run.board.defaultBranch;
 	let reply = await promptPlan(run.role, run, prompts.prompt, options);
@@ -222,7 +238,8 @@ async function buildUntilGreen(run, worktree, prompts, options) {
 		spent += reply.metrics.cost;
 		turns += reply.metrics.turns;
 
-		const changes = await run.git.changes(worktree.root, run.branch, base);
+		const raw = await run.git.changes(worktree.root, run.branch, base);
+		const changes = committedChanges(raw, reply.output.touches ?? [], run.area.path, worktree.forceInclude);
 		const attempt = { reply: reply, changes: changes, measured: { ...reply.metrics, cost: spent, turns: turns } };
 		const settled = await settleUnpushed(run, worktree, attempt);
 
@@ -262,16 +279,38 @@ function gatesFailedOutcome(run, built) {
 	return batchOutcome(run.batch, body, 'failed', measured);
 }
 
+function tooManyFilesOutcome(run, attempt, unlisted) {
+	const measured = attempt.measured;
+	measured.verdict     = 'fail';
+	measured.gatesPassed = false;
+
+	const body = note(run, 'too-many-files', {
+		section: attempt.reply.section,
+		count: unlisted.length,
+		files: backticked(unlisted),
+	}, measured);
+
+	return batchOutcome(run.batch, body, 'failed', measured);
+}
+
 async function pushedOutcome(run, worktree, attempt) {
 	const base = run.board.defaultBranch;
 	const measured = attempt.measured;
+	const touches = attempt.reply.output.touches ?? [];
+
+	const outside = attempt.changes.files.filter(file => run.ownArea && !file.startsWith(run.area.path + '/'));
+	const unlisted = unmatched(attempt.changes.files, touches, run.area.path);
+	const untouched = unmatched(touches, attempt.changes.files, run.area.path);
+
+	if (unlisted.length > state.knobs.MAX_UNLISTED_FILES) return tooManyFilesOutcome(run, attempt, unlisted);
+
 	let title = run.lead.title;
 	if (run.mates.length > 0) title += ' (+' + run.mates.length + ' more: ' + run.mateNumbers + ')';
 
 	const closes = run.batch.map(card => 'Closes #' + card.number);
 	const pullBody = closes.join('\n') + '\n\n' + attempt.reply.section;
 
-	const sha = await run.git.commitAndPush(worktree.root, run.branch, title + '\n\n' + closes.join('\n'));
+	const sha = await run.git.commitAndPush(worktree.root, run.branch, title + '\n\n' + closes.join('\n'), attempt.changes.files);
 
 	let pull;
 	let pullError = '';
@@ -286,11 +325,6 @@ async function pushedOutcome(run, worktree, attempt) {
 
 	const filed = await fileFindings(run, attempt.reply.output.cards, run.stage.proposals, 'proposal-origin-implement');
 
-	const touches = attempt.reply.output.touches ?? [];
-
-	const outside = attempt.changes.files.filter(file => run.ownArea && !file.startsWith(run.area.path + '/'));
-	const unlisted = unmatched(attempt.changes.files, touches, run.area.path);
-	const untouched = unmatched(touches, attempt.changes.files, run.area.path);
 	const changedFiles = { count: attempt.changes.files.length, files: backticked(attempt.changes.files) };
 	const notes = [fragment('_notes.md', 'files-changed', changedFiles)];
 	if (outside.length > 0) notes.push(fragment('_notes.md', 'files-outside', { path: run.area.path, files: backticked(outside) }));
@@ -298,6 +332,8 @@ async function pushedOutcome(run, worktree, attempt) {
 	if (unlisted.length > 0) notes.push(fragment('_notes.md', 'files-unlisted', { files: backticked(unlisted) }));
 
 	if (untouched.length > 0) notes.push(fragment('_notes.md', 'files-untouched', { files: backticked(untouched) }));
+
+	if (attempt.changes.leftOut.length > 0) notes.push(fragment('_notes.md', 'files-left-out', { files: backticked(attempt.changes.leftOut) }));
 
 	const filedText = filed !== '' ? ' ' + filed : '';
 
@@ -324,6 +360,9 @@ export async function handleImplement(run) {
 
 	worktree.cwd = join(worktree.root, run.area.path);
 	run.resumed = worktree.resumed;
+
+	const wroteGitignore = await run.git.ensureGitignore(worktree.root, run.area.path);
+	worktree.forceInclude = wroteGitignore ? ['.gitignore'] : [];
 
 	const installed = await install(worktree.root, run.area);
 
