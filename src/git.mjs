@@ -101,9 +101,12 @@ export function repository(settings) {
 		if (cloned) await git(store, ['worktree', 'prune']);
 	}
 
-	// A node project with no .gitignore leaves node_modules untracked but not excluded: `git add -A` would stage it whole.
-	async function ensureGitignore(root) {
-		const isNodeProject = await exists(join(root, 'package.json'));
+	// A node project with no .gitignore leaves node_modules untracked but not excluded: `git add -A` would stage it whole. A
+	// pattern with no leading slash matches at any depth, so one line at the root also covers a monorepo project's own node_modules.
+	async function ensureGitignore(root, areaPath) {
+		let isNodeProject = await exists(join(root, 'package.json'));
+		if (!isNodeProject) isNodeProject = await exists(join(root, areaPath, 'package.json'));
+
 		const hasGitignore = await exists(join(root, '.gitignore'));
 
 		if (isNodeProject && !hasGitignore) await writeFile(join(root, '.gitignore'), 'node_modules\n');
@@ -148,7 +151,18 @@ export function repository(settings) {
 		return { root: root, resumed: from.resumed };
 	}
 
-	async function changes(root, branch, base) {
+	async function untrackedFiles(root) {
+		const untracked = await git(root, ['ls-files', '--others', '--exclude-standard']);
+
+		if (untracked === '') return [];
+
+		return untracked.split('\n');
+	}
+
+	// excludeUntracked is what install or a gate produced rather than the card's own work (node_modules missed by .gitignore, a
+	// build's dist/ or cache): new since the last snapshot, so left out of both the diff and the commit.
+	async function changes(root, branch, base, excludeUntracked) {
+		const exclude = excludeUntracked ?? [];
 		const mergeBase = await git(root, ['merge-base', 'HEAD', 'origin/' + base]);
 		let unpushed = true;
 		const clean = await isClean(root);
@@ -165,12 +179,13 @@ export function repository(settings) {
 		}
 
 		const changed = await git(root, ['diff', '--name-only', mergeBase]);
-		const untracked = await git(root, ['ls-files', '--others', '--exclude-standard']);
+		const untracked = await untrackedFiles(root);
 
 		const files = [];
-		for (const file of changed.split('\n').concat(untracked.split('\n'))) {
+		for (const file of changed.split('\n').concat(untracked)) {
 			if (file === '') continue;
 			if (files.includes(file)) continue;
+			if (exclude.includes(file)) continue;
 
 			files.push(file);
 		}
@@ -178,8 +193,8 @@ export function repository(settings) {
 		return { unpushed: unpushed, files: files };
 	}
 
-	async function commitAndPush(root, branch, message) {
-		await git(root, ['add', '-A']);
+	async function commitAndPush(root, branch, message, files) {
+		if (files.length > 0) await git(root, ['add', '--', ...files]);
 
 		const staged = await tryGit(root, ['diff', '--cached', '--quiet']);
 
@@ -215,6 +230,7 @@ export function repository(settings) {
 		changes: changes,
 		commitAndPush: commitAndPush,
 		ensureGitignore: ensureGitignore,
+		untrackedFiles: untrackedFiles,
 		listFiles: listFiles,
 		forcePush: forcePush,
 		rebaseOnto: rebaseOnto,
