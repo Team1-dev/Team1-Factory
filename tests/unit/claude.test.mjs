@@ -72,3 +72,19 @@ test('readResult: an error reply throws with its cost and session; a good one is
 	expect(structured.metrics.model).toBe('opus');
 	expect(structured.metrics.cost).toBe(0);
 });
+
+test('a section written as a JSON string is unwrapped; one with real newlines is taken as written', () => {
+	const call = { prompt: 'x', budget: 1 };
+	const quoted = readResult({
+		result: '', structured_output: { verdict: 'reject-local', section: '"## Reviews\\n\\nsaid \\"no\\""' },
+	}, 'sonnet', call, 's');
+
+	expect(quoted.section).toBe('## Reviews\n\nsaid "no"');
+	expect(quoted.output).toEqual({ verdict: 'reject-local' });
+
+	const plain = readResult({
+		result: '', structured_output: { section: '## Reviews\n\nline one\\nstill one' },
+	}, 'sonnet', call, 's');
+
+	expect(plain.section).toBe('## Reviews\n\nline one\\nstill one');
+});

@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readResult } from '../../src/claude.mjs';
 import { state, loadEnv } from '../../src/config.mjs';
 import { readBoardLabels } from '../../src/cards.mjs';
 import { loadBoard } from '../../src/board.mjs';
@@ -104,14 +105,15 @@ export function callNames(calls) {
 	return names;
 }
 
-// The record src/claude.mjs readResult returns, field for field; tests/unit/claude.test.mjs pins the real one.
+// What the model answered, read by the real readResult from the JSON claude would have printed: the reply a stage gets here is the
+// reply it gets in production, the section taken out of the output included.
 export function modelAnswer(output, cost) {
-	return {
-		output: output,
-		sessionId: 'session-' + cost,
-		section: '',
-		metrics: { model: 'sonnet', cost: cost, turns: 1, durationMs: 1000, promptChars: 100, outputChars: 2, usage: {} },
+	const printed = {
+		result: '', structured_output: output, total_cost_usd: cost, num_turns: 1, duration_ms: 1000, session_id: 'session-' + cost,
+		modelUsage: { sonnet: {} }, usage: {},
 	};
+
+	return readResult(printed, 'sonnet', { prompt: 'x'.repeat(100), budget: 1 }, printed.session_id);
 }
 
 export function fakeGithub(given) {

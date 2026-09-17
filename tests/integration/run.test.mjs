@@ -1,0 +1,176 @@
+import { expect, test } from 'vitest';
+import { model } from './mocks.mjs';
+import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from './fake.mjs';
+import { issue, mine, person, stamped, stranger } from '../builders.mjs';
+
+const CARD = 5;
+const TRIAGED = stamped('triage', 'advance', 0.1);
+
+function implementCard(body) {
+	return issue(CARD, ['stage: implement', 'tier: contained'], body);
+}
+
+function otherCard(number) {
+	return issue(number, ['stage: triage'], 'other');
+}
+
+function implementAnswer() {
+	return modelAnswer({ section: '## Implementation\n\nasked', verdict: 'questions' }, 0.5);
+}
+
+test('a card is blocked by the open cards its body, a person or a stamp names as dependencies', async () => {
+	const cases = [
+		{ body: 'blocked-by: #6, #7', comments: [] },
+		{ body: 'x', comments: [person('blocked-by: #6')] },
+		{ body: 'x', comments: [mine('blocked-by: #6\n\n— team1-factory · implement · questions · $0.10')] },
+	];
+
+	for (const blocked of cases) {
+		setup();
+
+		const pass = await passOver({
+			issues: [implementCard(blocked.body), otherCard(6)],
+			comments: { [CARD]: [TRIAGED].concat(blocked.comments) },
+		}, CARD);
+
+		expect(pass.changed, blocked.body).toBe(false);
+		expect(pass.writes, blocked.body).toEqual([]);
+		expect(model.calls, blocked.body).toEqual([]);
+	}
+});
+
+test('a closed card, prose, a stranger\'s word or a far-off number is not a blocker', async () => {
+	const cases = [
+		{ body: 'blocked-by: #7', comments: [] },
+		{ body: 'depends on #5', comments: [] },
+		{ body: 'this depends on #6 landing first', comments: [] },
+		{ body: 'requires issue 6', comments: [] },
+		{ body: 'x', comments: [stranger('blocked-by: #6')] },
+		{ body: 'needs a rethink of the parser, the options table, the help text and the docs before #6', comments: [] },
+	];
+
+	for (const free of cases) {
+		setup();
+		model.answers.push(implementAnswer());
+
+		const pass = await passOver({
+			issues: [implementCard(free.body), otherCard(6)],
+			comments: { [CARD]: [TRIAGED].concat(free.comments) },
+		}, CARD);
+
+		expect(pass.changed, free.body).toBe(true);
+		expect(model.calls.length, free.body).toBe(1);
+	}
+});
+
+test('over budget diverts to needs: answers with the spend and the budget', async () => {
+	setup();
+
+	const pass = await passOver({
+		issues: [implementCard('x')],
+		comments: { [CARD]: [TRIAGED, stamped('implement', 'advance', 7), stamped('review', 'reject-local', 8)] },
+	}, CARD);
+
+	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
+	expect(pass.writes[0].body).toContain('This card has cost **$15.10**, over the $15 budget. Work has stopped.');
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · over-budget · $0.00 · total $15.10')).toBe(true);
+	expect(pass.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
+	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:over-budget']);
+	expect(model.calls).toEqual([]);
+});
+
+test('stalled: the stage ran maxRounds times since a person last spoke', async () => {
+	setup();
+
+	const rounds = [
+		TRIAGED,
+		stamped('implement', 'advance', 1), stamped('review', 'reject-local', 0.5),
+		stamped('implement', 'advance', 1), stamped('review', 'reject-local', 0.5),
+	];
+
+	const pass = await passOver({ issues: [implementCard('x')], comments: { [CARD]: rounds } }, CARD);
+
+	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
+	expect(pass.writes[0].body).toContain('This card has been through **implement** 2 times without settling.');
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · stalled · $0.00 · total $3.10')).toBe(true);
+	expect(pass.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
+	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:stalled']);
+	expect(model.calls).toEqual([]);
+
+	setup();
+	model.answers.push(implementAnswer());
+
+	const restarted = await passOver({
+		issues: [implementCard('x')],
+		comments: { [CARD]: rounds.concat([person('try the other approach')]) },
+	}, CARD);
+
+	expect(model.calls.length).toBe(1);
+	expect(restarted.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
+	expect(restarted.writes[0].body).toBe('## Implementation\n\nasked\n\n— team1-factory · implement · questions · $0.50 · total $3.60 · sonnet');
+});
+
+test('too big: the stage ran maxRoundsEver times across every answer', async () => {
+	setup();
+
+	const comments = [TRIAGED];
+	for (let round = 0; round < 4; round += 1) {
+		comments.push(stamped('implement', 'questions', 1), person('answer ' + round));
+	}
+
+	const pass = await passOver({ issues: [implementCard('x')], comments: { [CARD]: comments } }, CARD);
+
+	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
+	expect(pass.writes[0].body).toContain('**implement** has now run 4 times on this card, across every answer');
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · too-big · $0.00 · total $4.10')).toBe(true);
+	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:too-big']);
+});
+
+test('died: the stage failed maxRounds times without a verdict', async () => {
+	setup();
+
+	const pass = await passOver({
+		issues: [implementCard('x')],
+		comments: { [CARD]: [TRIAGED, stamped('implement', 'error', 0.2), stamped('implement', 'error', 0)] },
+	}, CARD);
+
+	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
+	expect(pass.writes[0].body).toContain('**implement** has died 2 times on this card — a budget ceiling or a fault');
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · died · $0.00 · total $0.30')).toBe(true);
+	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:died']);
+});
+
+test('a person can pick the model: the last "model:<model>[-effort]" in trusted text wins', async () => {
+	setup();
+	model.answers.push(implementAnswer());
+
+	await passOver({
+		issues: [implementCard('model:opus for this one')],
+		comments: { [CARD]: [TRIAGED, stranger('model:haiku'), person('actually model:sonnet-high')] },
+	}, CARD);
+
+	expect(model.calls[0].run.conversation.model).toBe('sonnet');
+	expect(model.calls[0].run.conversation.effort).toBe('high');
+
+	setup();
+	model.answers.push(implementAnswer());
+
+	await passOver({ issues: [implementCard('plain')], comments: { [CARD]: [TRIAGED] } }, CARD);
+
+	expect(model.calls[0].run.conversation.model).toBeUndefined();
+	expect(ledgerLines().length).toBe(2);
+});
+
+test('a note of ours edited to a cost that is not a number does not switch the budget off', async () => {
+	setup();
+
+	const edited = mine('## Review\n\nedited\n\n— team1-factory · review · reject-local · $lots');
+	const pass = await passOver({
+		issues: [implementCard('x')],
+		comments: { [CARD]: [TRIAGED, stamped('implement', 'advance', 7), edited, stamped('review', 'reject-local', 8)] },
+	}, CARD);
+
+	expect(pass.writes[0].body).toContain('This card has cost **$15.10**, over the $15 budget. Work has stopped.');
+	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:over-budget']);
+	expect(model.calls).toEqual([]);
+});
