@@ -65,7 +65,8 @@ a feature wearing a bug report is a person's decision. No evidence either way is
 **Exactly two headings, `## Plan` then `## Implementation`**, with `## Reply` before them only when
 a trusted card body or a person's comment asked Team1 a question, holding the answer and nothing
 else. No heading repeated, none nested. Both sections together are **under 120 words**, and for
-most cards under 40.
+most cards under 40. Team1 puts both sections on the pull request body, after `Closes #N` — the
+reviewer does not see them, so write for the person reading the pull request, not for review.
 
 **`## Plan` — one short paragraph.** What you are building and what you are assuming, from the
 user's point of view. If the card is one sentence, this is one sentence. Do not list files, do not

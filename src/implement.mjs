@@ -219,6 +219,7 @@ async function pushedOutcome(run, worktree, attempt) {
 	if (run.mates.length > 0) title += ' (+' + run.mates.length + ' more: ' + run.mateNumbers + ')';
 
 	const closes = run.batch.map(card => 'Closes #' + card.number);
+	const pullBody = closes.join('\n') + '\n\n' + attempt.reply.section;
 
 	const sha = await run.git.commitAndPush(worktree.root, run.branch, title + '\n\n' + closes.join('\n'));
 
@@ -226,7 +227,7 @@ async function pushedOutcome(run, worktree, attempt) {
 	let pullError = '';
 	try {
 		pull = await run.github.pullFor(run.branch);
-		if (pull === undefined) pull = await run.github.createPull(redactSecrets(title), run.branch, base, closes.join('\n'));
+		if (pull === undefined) pull = await run.github.createPull(redactSecrets(title), run.branch, base, redactSecrets(pullBody));
 	} catch (error) {
 		pullError = error.message;
 	}
@@ -251,7 +252,6 @@ async function pushedOutcome(run, worktree, attempt) {
 	const filedText = filed !== '' ? ' ' + filed : '';
 
 	const body = note(run, 'pushed', {
-		section: attempt.reply.section,
 		files: notes.join(' ') + '\n\n',
 		sha: sha,
 		branch: run.branch,

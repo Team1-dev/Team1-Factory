@@ -86,7 +86,7 @@ export function systemPrompt(run) {
 }
 
 // The reviewer judges the diff, not the author's account of it: the implement stamp's Plan and Implementation sections are cut before the review prompt sees it.
-function withholdAuthorSections(body) {
+export function withholdAuthorSections(body) {
 	const kept = [];
 	let skipping = false;
 	let cut = false;
