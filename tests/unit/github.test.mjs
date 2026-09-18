@@ -107,6 +107,7 @@ const ENDPOINTS = [
 	['pullFor', ['card/5-x'], 'GET', '/repos/acme/app/pulls?state=open&head=acme:card/5-x', ''],
 	['pull', [50], 'GET', '/repos/acme/app/pulls/50', ''],
 	['createPull', ['t', 'card/5-x', 'main', 'Closes #5'], 'POST', '/repos/acme/app/pulls', '{"title":"t","head":"card/5-x","base":"main","body":"Closes #5"}'],
+	['updatePull', [50, 'Closes #5'], 'PATCH', '/repos/acme/app/pulls/50', '{"body":"Closes #5"}'],
 	['labelPull', [50, 'attack'], 'POST', '/repos/acme/app/issues/50/labels', '{"labels":["attack"]}'],
 	['closePull', [50], 'PATCH', '/repos/acme/app/pulls/50', '{"state":"closed"}'],
 	['mergePull', [50], 'PUT', '/repos/acme/app/pulls/50/merge', '{"merge_method":"squash"}'],

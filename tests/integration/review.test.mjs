@@ -176,6 +176,26 @@ test('a runner-authored body shows, and with no extra commits there is no commit
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 });
 
+test('a pull body built from two rework rounds still withholds every round\'s Plan and Implementation', async () => {
+	setup();
+	answered('advance', {}, 0.4);
+
+	const pull = openPull(PULL, BRANCH);
+	pull.body = 'Closes #5\n\n## Plan\n\nParse the flag early.\n\n## Implementation\n\nDone in cli.mjs.'
+		+ '\n\n---\n\n## Plan\n\nAlso handle the alias.\n\n## Implementation\n\nAdded a --q alias.';
+
+	const pass = await passOver(underReview(pull), CARD);
+
+	const prompt = model.calls[0].prompt;
+	expect(prompt).toContain('Closes #5');
+	expect(prompt).toContain("_The author's own account of this change is withheld");
+	expect(prompt).not.toContain('Parse the flag early');
+	expect(prompt).not.toContain('Done in cli.mjs');
+	expect(prompt).not.toContain('Also handle the alias');
+	expect(prompt).not.toContain('Added a --q alias');
+	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
+});
+
 test('a person can ignore more paths with review-ignore', async () => {
 	setup();
 	answered('advance', {}, 0.4);

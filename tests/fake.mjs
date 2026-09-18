@@ -196,7 +196,14 @@ export function fakeGithub(given) {
 
 		writes.push({ name: 'createPull', title: title, branch: branch, base: target, body: body });
 
-		return openPull(77, branch);
+		const created = openPull(77, branch);
+		created.body = body;
+
+		return created;
+	}
+
+	async function updatePull(number, body) {
+		writes.push({ name: 'updatePull', number: number, body: body });
 	}
 
 	async function labelPull(number, name) {
@@ -269,6 +276,7 @@ export function fakeGithub(given) {
 		pullFor: pullFor,
 		pull: pull,
 		createPull: createPull,
+		updatePull: updatePull,
 		labelPull: labelPull,
 		closePull: closePull,
 		mergePull: mergePull,

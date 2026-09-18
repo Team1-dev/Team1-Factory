@@ -360,6 +360,38 @@ test('green gates: commit, push, open the pull, post findings, note the files an
 	expect(ledgerLines()[1].gatesPassed).toBe(true);
 });
 
+test('a rework round appends its section to the pull body instead of losing it', async () => {
+	setup();
+	answered('advance', {}, 0.5);
+	pushed(['src/cli.mjs']);
+
+	const given = { issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } };
+	const first = await passOver(given, CARD);
+
+	expect(callNames(first.writes)).toEqual(['createPull', 'comment', 'setLabels']);
+	expect(first.writes[0].body).toBe('Closes #5\n\n' + SECTION);
+
+	given.pulls = { [BRANCH]: openPull(77, BRANCH) };
+	given.pulls[BRANCH].body = first.writes[0].body;
+
+	const SECTION_2 = '## Implementation\n\nFixed the edge case a reviewer flagged.';
+	answered('advance', { section: SECTION_2 }, 0.25);
+	pushed(['src/cli.mjs']);
+
+	const second = await passOver(given, CARD);
+
+	expect(callNames(second.writes)).toEqual(['updatePull', 'comment', 'setLabels']);
+	expect(second.writes[0]).toEqual({ name: 'updatePull', number: 77, body: 'Closes #5\n\n' + SECTION + '\n\n---\n\n' + SECTION_2 });
+
+	given.pulls[BRANCH].body = second.writes[0].body;
+	answered('advance', { section: SECTION_2 }, 0.1);
+	pushed(['src/cli.mjs']);
+
+	const third = await passOver(given, CARD);
+
+	expect(callNames(third.writes)).toEqual(['comment', 'setLabels']);
+});
+
 test('a trivial change merges unreviewed unless it came from outside or touches project.md', async () => {
 	setup();
 	answered('advance', {}, 0.2);
@@ -371,8 +403,8 @@ test('a trivial change merges unreviewed unless it came from outside or touches 
 		pulls: { [BRANCH]: openPull(50, BRANCH) },
 	}, CARD);
 
-	expect(callNames(trusted.writes)).toEqual(['comment', 'setLabels']);
-	expect(trusted.writes[1].labels).toEqual(['tier: trivial', 'ready to merge']);
+	expect(callNames(trusted.writes)).toEqual(['updatePull', 'comment', 'setLabels']);
+	expect(trusted.writes[2].labels).toEqual(['tier: trivial', 'ready to merge']);
 
 	setup();
 	answered('advance', {}, 0.2);

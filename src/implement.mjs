@@ -7,7 +7,7 @@ import { install, runGates } from './gates.mjs';
 import { newestSession } from './ledger.mjs';
 import { fileFindings } from './findings.mjs';
 import { alreadyDone, batchOutcome, costTotal, hold, note, start, unreadableOutcome } from './outcomes.mjs';
-import { cardHeading, fragment, joinSections, resumeSince, systemPrompt, userPrompt } from './prompts.mjs';
+import { cardHeading, fragment, joinSections, resumeSince, RULE, systemPrompt, userPrompt } from './prompts.mjs';
 import { route } from './routes.mjs';
 import { verdictOutcome } from './verdict.mjs';
 import { backticked, pluralSuffix, redactSecrets } from './stringUtils.mjs';
@@ -264,7 +264,8 @@ async function pushedOutcome(run, worktree, attempt) {
 	if (run.mates.length > 0) title += ' (+' + run.mates.length + ' more: ' + run.mateNumbers + ')';
 
 	const closes = run.batch.map(card => 'Closes #' + card.number);
-	const pullBody = closes.join('\n') + '\n\n' + attempt.reply.section;
+	const section = redactSecrets(attempt.reply.section);
+	const pullBody = closes.join('\n') + '\n\n' + section;
 
 	const sha = await run.git.commitAndPush(worktree.root, run.branch, title + '\n\n' + closes.join('\n'), attempt.changes.files);
 
@@ -272,7 +273,12 @@ async function pushedOutcome(run, worktree, attempt) {
 	let pullError = '';
 	try {
 		pull = await run.github.pullFor(run.branch);
-		if (pull === undefined) pull = await run.github.createPull(redactSecrets(title), run.branch, base, redactSecrets(pullBody));
+		if (pull === undefined) {
+			pull = await run.github.createPull(redactSecrets(title), run.branch, base, pullBody);
+		} else {
+			const rounds = pull.body.split(RULE);
+			if (rounds[rounds.length - 1] !== section) await run.github.updatePull(pull.number, pull.body + RULE + section);
+		}
 	} catch (error) {
 		pullError = error.message;
 	}
