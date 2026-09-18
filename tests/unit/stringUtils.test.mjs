@@ -69,6 +69,18 @@ test('redactSecrets: a short root only matches its own path, not a word it happe
 	setRedactedRoots([]);
 });
 
+test('redactSecrets: a sibling directory that only shares our home dir as a prefix is left as written', () => {
+	setRedactedRoots([{ path: '/home/runner', replacement: '~' }]);
+
+	expect(redactSecrets('backup at /home/runner-2/thing')).toBe('backup at /home/runner-2/thing');
+	expect(redactSecrets('backup at /home/runner.bak/thing')).toBe('backup at /home/runner.bak/thing');
+	expect(redactSecrets('nested at /srv/home/runner/thing')).toBe('nested at /srv/home/runner/thing');
+	expect(redactSecrets('near miss at /home/runnerx/thing')).toBe('near miss at /home/runnerx/thing');
+	expect(redactSecrets('home at /home/runner/thing.')).toBe('home at ~/thing.');
+
+	setRedactedRoots([]);
+});
+
 test('decodeJsonStringLiteral: a quoted literal is parsed, every escape included; an unquoted line keeps its two escapes', () => {
 	expect(decodeJsonStringLiteral('"a\\\\b\\nc \\"d\\" \\u00e9"')).toBe('a\\b\nc "d" é');
 	expect(decodeJsonStringLiteral('line\\nnext \\"q\\"')).toBe('line\nnext "q"');

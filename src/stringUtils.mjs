@@ -128,14 +128,25 @@ function isWordCharacter(character) {
 	return character !== undefined && WORD_CHARACTERS.includes(character);
 }
 
-// A root only matches whole, not as a run inside a longer word: `work` must not catch `worktree` or `network`.
+// A hyphen or dot right before a word character continues the same path segment, the way `-2` continues `user` in `user-2` and
+// `.bak` continues `user` in `user.bak`; either sits at the end of a sentence or a path, so on its own it is a boundary.
+function continuesSegment(character, next) {
+	if (isWordCharacter(character)) return true;
+
+	return (character === '-' || character === '.') && isWordCharacter(next);
+}
+
+// A root only matches whole, not as a run inside a longer word or sibling path: `work` must not catch `worktree` or `network`,
+// and our home directory must not catch a sibling like `user-2` or `user.bak`.
 function redactRoot(text, root) {
 	let kept = '';
 	let from = 0;
 	let at = text.indexOf(root.path, from);
 	while (at !== -1) {
 		const end = at + root.path.length;
-		const boundary = !isWordCharacter(at > 0 ? text[at - 1] : undefined) && !isWordCharacter(text[end]);
+		const before = at > 0 ? continuesSegment(text[at - 1], text[at]) : false;
+		const after = continuesSegment(text[end], text[end + 1]);
+		const boundary = !before && !after;
 
 		kept += text.slice(from, at) + (boundary ? root.replacement : text.slice(at, end));
 		from = end;
