@@ -752,3 +752,13 @@ test('a fence that never closes, or an odd fenced sample, does not swallow the h
 
 	expect(await sectionPosted(titledUnclosed, 'advance')).toBe('## Plan\nreal plan');
 });
+
+test('a Plan heading quoted inside a fence that closes is left alone: the fence balances, so there is no real anchor to find', async () => {
+	const quoted = '# Notes\n\nprose\n\n```md\n## Plan\nan example, not the plan\n```\n\n## Implementation\n\nDone.';
+
+	expect(await sectionPosted(quoted, 'advance')).toBe(quoted);
+
+	const question = '# Notes\n\nWhich flag?\n\n```md\n## Plan\nan example\n```\n\nDoes that answer it?';
+
+	expect(await sectionPosted(question, 'questions')).toBe(question);
+});

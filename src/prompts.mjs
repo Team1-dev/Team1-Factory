@@ -167,7 +167,8 @@ export function userPrompt(lead, comments, situation, hideAuthor) {
 const HEADING_REGEX = /^(#{1,6})\s+(.+?)\s*$/;
 
 // Finds the first heading, and the first among cutOn if given, over lines. fenceAware skips headings inside a fenced code
-// block; a fence that never closes leaves it skipping to the end, which is what the fence-blind retry in sectionOf is for.
+// block. Also reports whether the scan ended inside a fence: only a fence left open (or made uneven by a fenced sample of
+// its own) can hide a real heading that way — a heading legitimately quoted inside a fence that closes is not one.
 function headingsIn(lines, cutOn, fenceAware) {
 	let fenced = false;
 	let firstHeading = -1;
@@ -188,20 +189,19 @@ function headingsIn(lines, cutOn, fenceAware) {
 		}
 	}
 
-	return { firstHeading: firstHeading, anchorAt: anchorAt };
+	return { firstHeading: firstHeading, anchorAt: anchorAt, unclosed: fenced };
 }
 
 // Cuts text to its first heading. When cutOn names a set of headings, the cut waits for the first of those instead, falling
 // back to the first heading of any kind when none of them appear — never empty just because the model's own heading isn't
 // one of them. After a cut on one of those names, every heading in normalize is rewritten to level two throughout what is
 // kept, so the contract's own headings never drift in level even when the model wrote them under a title of its own.
-// Headings inside a fenced code block are not headings — except a fence left open, or made uneven by a fenced sample of its
-// own, which would otherwise skip to the end and find nothing: a fence-blind retry is the last resort then.
+// Headings inside a fenced code block are not headings; a fence left open is retried fence-blind, since only that can hide
+// a real heading from the fence-aware scan.
 export function sectionOf(text, cutOn, normalize) {
 	const lines = text.split('\n');
 	let found = headingsIn(lines, cutOn, true);
-	const missed = cutOn !== undefined ? found.anchorAt === -1 : found.firstHeading === -1;
-	if (missed) found = headingsIn(lines, cutOn, false);
+	if (found.unclosed) found = headingsIn(lines, cutOn, false);
 
 	const cutAt = found.anchorAt !== -1 ? found.anchorAt : found.firstHeading;
 	if (cutAt === -1) return '';
