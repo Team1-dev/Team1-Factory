@@ -130,18 +130,19 @@ async function judgeProposal(run, diffText, section) {
 // lands once, so this is the only pass its proposals issue ever gets.
 export async function closeCoveredProposals(run, pull) {
 	let cost = 0;
+	let model;
 	try {
 		const title = proposalsTitle(run.lead);
 		const issue = run.board.cards.find(card => card.title === title);
 
-		if (issue === undefined) return cost;
+		if (issue === undefined) return { cost: cost, model: model };
 
 		const sections = [];
 		for (const comment of await run.github.comments(issue.number)) {
 			sections.push(...findingSections(run, comment));
 		}
 
-		if (sections.length === 0) return cost;
+		if (sections.length === 0) return { cost: cost, model: model };
 
 		const diffText = await run.github.diff(pull.number);
 
@@ -155,6 +156,7 @@ export async function closeCoveredProposals(run, pull) {
 				continue;
 			}
 
+			model = reading.model;
 			ledgerClassify(run, section.commentId, reading);
 			if (reading.verdict !== 'covered') {
 				allCovered = false;
@@ -170,7 +172,7 @@ export async function closeCoveredProposals(run, pull) {
 		console.log(run.tag + ': proposals issue not checked: ' + error.message);
 	}
 
-	return cost;
+	return { cost: cost, model: model };
 }
 
 // A card a person merged closes with no `merged` note from us, so its proposals issue never gets `closeCoveredProposals`'s one
@@ -204,8 +206,8 @@ export async function sweepMergedProposals(github, board) {
 			if (alreadySwept) continue;
 
 			const run = { repo: github.repo, tag: tag, github: github, lead: card, board: board, stage: { name: 'merge' }, area: undefined };
-			const cost = await closeCoveredProposals(run, pull);
-			const measured = { verdict: 'proposals-swept', cost: cost };
+			const proposals = await closeCoveredProposals(run, pull);
+			const measured = { verdict: 'proposals-swept', cost: proposals.cost, model: proposals.model };
 			const body = note(run, 'proposals-swept', { sha: pull.head.sha, number: pull.number }, measured);
 
 			await github.comment(proposalsIssue.number, redactSecrets(body));

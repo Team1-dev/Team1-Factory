@@ -311,7 +311,7 @@ test('merged: proposals read against the merged diff add their cost to the total
 	expect(pass.writes[1].number).toBe(900);
 	expect(pass.writes[1].body).toBe('Done — #50 already covers this: First proposal');
 	expect(pass.writes[2].number).toBe(CARD);
-	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.02** in total.\n\n— team1-factory · merge · merged · $0.02 · total $0.02');
+	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.02** in total.\n\n— team1-factory · merge · merged · $0.02 · total $0.02 · sonnet');
 });
 
 test('merged: a proposal reading that fails part way through still reports what was already paid for, including its own spend', async () => {
@@ -330,7 +330,7 @@ test('merged: a proposal reading that fails part way through still reports what 
 
 	const pass = await passOver(given, CARD);
 
-	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.04** in total.\n\n— team1-factory · merge · merged · $0.04 · total $0.04');
+	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.04** in total.\n\n— team1-factory · merge · merged · $0.04 · total $0.04 · sonnet');
 });
 
 test('merged: no proposals card, or one with nothing to read, still costs nothing', async () => {
