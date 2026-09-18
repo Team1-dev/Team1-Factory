@@ -6,6 +6,7 @@ import { client } from './github.mjs';
 import { exists } from './shell.mjs';
 import { STAGES } from './routes.mjs';
 import { loadBoard } from './board.mjs';
+import { sweepMergedProposals } from './findings.mjs';
 import { processCard } from './run.mjs';
 
 async function sleepCheckingHalt(ms) {
@@ -118,6 +119,12 @@ export async function processRepo(repo) {
 	}
 
 	await dropStaleWorktrees(repo, board.openNumbers);
+
+	try {
+		await sweepMergedProposals(github, board);
+	} catch (error) {
+		console.log(repo + ': proposals sweep failed: ' + error.message);
+	}
 
 	const perRepo = repoState(repo);
 	let changed = perRepo.fingerprint !== undefined && perRepo.fingerprint !== board.fingerprint;
