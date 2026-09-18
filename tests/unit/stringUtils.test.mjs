@@ -59,6 +59,16 @@ test('redactSecrets: the operator\'s work dir and home, longest first, are swapp
 	setRedactedRoots([]);
 });
 
+test('redactSecrets: a short root only matches its own path, not a word it happens to start or sit inside', () => {
+	setRedactedRoots([{ path: 'work', replacement: '<work>' }]);
+
+	expect(redactSecrets('the worktree is stale, rerun the network check')).toBe('the worktree is stale, rerun the network check');
+	expect(redactSecrets('cwd work exited 1')).toBe('cwd <work> exited 1');
+	expect(redactSecrets('cwd work/acme__app/5 exited 1')).toBe('cwd <work>/acme__app/5 exited 1');
+
+	setRedactedRoots([]);
+});
+
 test('decodeJsonStringLiteral: a quoted literal is parsed, every escape included; an unquoted line keeps its two escapes', () => {
 	expect(decodeJsonStringLiteral('"a\\\\b\\nc \\"d\\" \\u00e9"')).toBe('a\\b\nc "d" é');
 	expect(decodeJsonStringLiteral('line\\nnext \\"q\\"')).toBe('line\nnext "q"');

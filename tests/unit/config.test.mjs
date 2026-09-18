@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { childEnvironment, loadEnv, modelEnvironment, state, tokenNameFor } from '../../src/config.mjs';
 import { redactSecrets } from '../../src/stringUtils.mjs';
@@ -51,6 +51,14 @@ test('loadEnv: the work dir and the home directory are set as the paths every po
 	const message = 'git ls-files in ' + state.workDir + '/acme__app/5 exited 1: ' + homedir() + '/.claude/settings.json missing';
 
 	expect(redactSecrets(message)).toBe('git ls-files in <work>/acme__app/5 exited 1: ~/.claude/settings.json missing');
+});
+
+test('loadEnv: a relative WORK_DIR is registered resolved, the way a git failure prints its cwd', () => {
+	loadEnv({ WORK_DIR: 'work' });
+
+	const message = 'git ls-files in ' + resolve('work') + '/acme__app/5 exited 1';
+
+	expect(redactSecrets(message)).toBe('git ls-files in <work>/acme__app/5 exited 1');
 });
 
 test('loadEnv: a knob that is not a number and a malformed repo are refused at boot', () => {

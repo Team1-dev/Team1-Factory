@@ -122,10 +122,33 @@ export function setRedactedRoots(roots) {
 	redactedRoots = roots.filter(root => root.path !== '').sort((a, b) => b.path.length - a.path.length);
 }
 
+const WORD_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_';
+
+function isWordCharacter(character) {
+	return character !== undefined && WORD_CHARACTERS.includes(character);
+}
+
+// A root only matches whole, not as a run inside a longer word: `work` must not catch `worktree` or `network`.
+function redactRoot(text, root) {
+	let kept = '';
+	let from = 0;
+	let at = text.indexOf(root.path, from);
+	while (at !== -1) {
+		const end = at + root.path.length;
+		const boundary = !isWordCharacter(at > 0 ? text[at - 1] : undefined) && !isWordCharacter(text[end]);
+
+		kept += text.slice(from, at) + (boundary ? root.replacement : text.slice(at, end));
+		from = end;
+		at = text.indexOf(root.path, from);
+	}
+
+	return kept + text.slice(from);
+}
+
 function redactPaths(text) {
 	let clean = text;
 	for (const root of redactedRoots) {
-		clean = clean.split(root.path).join(root.replacement);
+		clean = redactRoot(clean, root);
 	}
 
 	return clean;

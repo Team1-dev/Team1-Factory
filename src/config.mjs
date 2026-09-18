@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { setRedactedRoots, splitCommaList } from './stringUtils.mjs';
 import { repository } from './git.mjs';
 
@@ -68,7 +68,7 @@ export function loadEnv(env) {
 	state.trustedLogins = splitCommaList(env.TRUSTED_LOGINS);
 	state.workDir = env.WORK_DIR ?? join(homedir(), '.team1', 'work');
 	state.ledgerPath = join(state.workDir, 'metrics.jsonl');
-	setRedactedRoots([{ path: state.workDir, replacement: '<work>' }, { path: homedir(), replacement: '~' }]);
+	setRedactedRoots([{ path: resolve(state.workDir), replacement: '<work>' }, { path: homedir(), replacement: '~' }]);
 
 	state.tokens = {};
 	state.knobs  = {};
