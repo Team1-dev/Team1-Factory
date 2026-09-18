@@ -46,7 +46,11 @@ async function settleUnpushed(run, worktree, attempt) {
 	if (outcome !== 'advance' && !attempt.changes.unpushed) {
 		const previous = run.conversation.newest.implement;
 
-		return verdictOutcome(run, reply, { metrics: measured, sameAsBefore: previous !== undefined ? previous.body : undefined });
+		return verdictOutcome(run, reply, {
+			metrics: measured,
+			sameAsBefore: previous !== undefined ? previous.body : undefined,
+			emptySection: verdict => fragment('_notes.md', 'implement-section-missing', { outcome: verdict }),
+		});
 	}
 
 	if (!attempt.changes.unpushed) {
@@ -284,8 +288,10 @@ async function pushedOutcome(run, worktree, attempt) {
 	let title = run.lead.title;
 	if (run.mates.length > 0) title += ' (+' + run.mates.length + ' more: ' + run.mateNumbers + ')';
 
+	const outcome = attempt.reply.output.verdict;
+	const rawSection = attempt.reply.section !== '' ? attempt.reply.section : fragment('_notes.md', 'implement-section-missing', { outcome: outcome });
+	const section = redactSecrets(rawSection);
 	const closes = run.batch.map(card => 'Closes #' + card.number);
-	const section = redactSecrets(attempt.reply.section);
 	const pullBody = closes.join('\n') + '\n\n' + section;
 
 	const sha = await run.git.commitAndPush(worktree.root, run.branch, title + '\n\n' + closes.join('\n'), attempt.changes.files);
@@ -324,7 +330,6 @@ async function pushedOutcome(run, worktree, attempt) {
 		filed: filedText,
 	}, { verdict: 'advance', cost: measured.cost, model: measured.model });
 
-	const outcome = attempt.reply.output.verdict;
 	measured.verdict     = outcome;
 	measured.gatesPassed = true;
 
