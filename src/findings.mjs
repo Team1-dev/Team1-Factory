@@ -8,7 +8,7 @@ import { fragment } from './prompts.mjs';
 import { redactSecrets } from './stringUtils.mjs';
 
 const ORIGIN_NOTES = ['proposal-origin-implement', 'proposal-origin-review'];
-const DIFF_LIMIT = 6000;
+const DIFF_LIMIT = 60000;
 
 function proposalsTitle(lead) {
 	return 'Proposals from #' + lead.number + ': ' + redactSecrets(lead.title);
