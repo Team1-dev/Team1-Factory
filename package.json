@@ -15,6 +15,7 @@
     "tick": "node --env-file-if-exists=.env src/poll.mjs --once",
     "test": "vitest run --project unit --project integration",
     "test:e2e": "vitest run --project e2e --reporter=verbose",
+    "test:eval": "vitest run --project eval --reporter=verbose",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
