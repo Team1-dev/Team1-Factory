@@ -1,6 +1,7 @@
 import { branchOf, readCard, readComment } from './cards.mjs';
 import { classify } from './classify.mjs';
 import { repoState, state } from './config.mjs';
+import { readConversation } from './conversation.mjs';
 import { ledgerClassify } from './ledger.mjs';
 import { note } from './outcomes.mjs';
 import { fragment } from './prompts.mjs';
@@ -190,8 +191,8 @@ export async function sweepMergedProposals(github, board) {
 
 			if (proposalsIssue === undefined) continue;
 
-			const cardComments = await github.comments(card.number);
-			const mergedByUs = cardComments.some(comment => readComment(comment, board.runnerLogin, state.trustedLogins).stamp?.verdict === 'merged');
+			const cardComments = (await github.comments(card.number)).map(comment => readComment(comment, board.runnerLogin, state.trustedLogins));
+			const mergedByUs = cardComments.some(comment => comment.stamp?.verdict === 'merged');
 
 			if (mergedByUs) continue;
 
@@ -205,7 +206,8 @@ export async function sweepMergedProposals(github, board) {
 
 			if (alreadySwept) continue;
 
-			const run = { repo: github.repo, tag: tag, github: github, lead: card, board: board, stage: { name: 'merge' }, area: undefined };
+			const conversation = readConversation(card, cardComments, 'merge');
+			const run = { repo: github.repo, tag: tag, github: github, lead: card, board: board, stage: { name: 'merge' }, area: undefined, conversation: conversation };
 			const proposals = await closeCoveredProposals(run, pull);
 			const measured = { verdict: 'proposals-swept', cost: proposals.cost, model: proposals.model };
 			const body = note(run, 'proposals-swept', { sha: pull.head.sha, number: pull.number }, measured);
