@@ -36,13 +36,13 @@ async function answerComments(run, pull, unanswered) {
 	let cost = 0;
 	for (const comment of unanswered) {
 		const reading = await classifyComment(run.tag, run.lead.title, comment);
+		cost += reading.cost;
 
-		if (reading === undefined) {
+		if (reading.verdict === undefined) {
 			return hold(run.repo, run.lead.number, 'could not read a comment on ' + pull.html_url
-				+ ' — held until it can be read');
+				+ ' — held until it can be read, $' + cost.toFixed(2) + ' spent reading so far');
 		}
 
-		cost += reading.cost;
 		if (newestReading === undefined) newestReading = reading;
 
 		if (reading.verdict === 'change-request') {
