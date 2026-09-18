@@ -239,10 +239,17 @@ export function repository(settings) {
 		await tryGit(store, ['branch', '-D', branch]);
 	}
 
+	// The pull's own diff, read from the clone instead of GitHub's rendered document: the same content, with no size limit
+	// and no download.
+	async function diff(root, base) {
+		return git(root, ['diff', 'origin/' + base + '...HEAD']);
+	}
+
 	return {
 		checkout: checkout,
 		changes: changes,
 		commitAndPush: commitAndPush,
+		diff: diff,
 		ensureGitignore: ensureGitignore,
 		listFiles: listFiles,
 		forcePush: forcePush,

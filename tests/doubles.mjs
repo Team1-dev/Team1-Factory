@@ -55,6 +55,12 @@ async function rebaseOnto(root, base, headSha) {
 	return git.given.rebase;
 }
 
+async function diff(root, base) {
+	git.calls.push({ name: 'diff', root: root, base: base });
+
+	return git.given.diff ?? '';
+}
+
 async function removeWorktree(root) {
 	git.calls.push({ name: 'removeWorktree', root: root });
 }
@@ -68,6 +74,7 @@ export function repository() {
 		checkout: checkout,
 		changes: changes,
 		commitAndPush: commitAndPush,
+		diff: diff,
 		ensureGitignore: ensureGitignore,
 		listFiles: listFiles,
 		forcePush: forcePush,

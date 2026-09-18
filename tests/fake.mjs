@@ -53,6 +53,7 @@ export function setup() {
 		tree: [],
 		resumed: false,
 		root: undefined,
+		diff: '',
 	};
 }
 

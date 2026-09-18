@@ -41,7 +41,9 @@ function answered(verdict, extra, cost) {
 }
 
 function underReview(pull) {
-	return { issues: [reviewCard([])], comments: { [CARD]: built() }, pulls: { [BRANCH]: pull }, diff: DIFF };
+	git.given.diff = DIFF;
+
+	return { issues: [reviewCard([])], comments: { [CARD]: built() }, pulls: { [BRANCH]: pull } };
 }
 
 test('no pull and nothing pushed: back to implement with the no-pull note', async () => {
@@ -101,6 +103,7 @@ test('the prompt: the pull, the files, the diff less generated files, added comm
 
 	expect(git.calls).toEqual([
 		{ name: 'checkout', root: REVIEW_ROOT, branch: BRANCH, readOnly: true },
+		{ name: 'diff', root: REVIEW_ROOT, base: 'main' },
 		{ name: 'removeWorktree', root: REVIEW_ROOT },
 	]);
 
@@ -355,7 +358,7 @@ test('a failed model call discards the clone and posts stage-failed', async () =
 
 	const pass = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
 
-	expect(callNames(git.calls)).toEqual(['checkout', 'removeWorktree']);
+	expect(callNames(git.calls)).toEqual(['checkout', 'diff', 'removeWorktree']);
 	expect(callNames(pass.writes)).toEqual(['comment']);
 	expect(pass.writes[0].body).toContain('**review** could not complete: the test queued no model answer for the judge role');
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:error']);
