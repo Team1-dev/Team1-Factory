@@ -128,13 +128,41 @@ function redactRoot(text, root) {
 	return text.split(root.path).join(root.replacement);
 }
 
+// The account name, the last segment of the home directory set by config.mjs. Unlike the roots above, this can appear anywhere on
+// the machine, so it is matched as a whole path segment - anchored by a slash or the start/end of the string on both sides - never
+// as a bare word, which would also catch it inside an unrelated word such as "network".
+let redactedAccountName = '';
+
+export function setRedactedAccountName(name) {
+	redactedAccountName = name;
+}
+
+function redactAccountName(text) {
+	if (redactedAccountName === '') return text;
+
+	let clean = '';
+	let from = 0;
+	for (let at = text.indexOf(redactedAccountName); at !== -1; at = text.indexOf(redactedAccountName, at + 1)) {
+		const before = at === 0 ? '' : text[at - 1];
+		const afterAt = at + redactedAccountName.length;
+		const after = afterAt >= text.length ? '' : text[afterAt];
+		if (before !== '' && before !== '/') continue;
+		if (after !== '' && after !== '/') continue;
+
+		clean += text.slice(from, at) + '<user>';
+		from = afterAt;
+	}
+
+	return clean + text.slice(from);
+}
+
 function redactPaths(text) {
 	let clean = text;
 	for (const root of redactedRoots) {
 		clean = redactRoot(clean, root);
 	}
 
-	return clean;
+	return redactAccountName(clean);
 }
 
 export function redactSecrets(text) {
