@@ -73,50 +73,58 @@ async function triageAll() {
 		const byNumber = {};
 		for (const card of board.cards) byNumber[card.number] = card;
 
-		return byNumber;
+		return { cards: byNumber, writes: github.writes };
 	})();
 
 	return batch;
 }
 
+function commentOn(writes, number) {
+	for (const write of writes) {
+		if (write.name === 'comment' && write.number === number) return write.body;
+	}
+
+	return undefined;
+}
+
 test('a colour change is trivial', async () => {
-	const cards = await triageAll();
+	const { cards } = await triageAll();
 
 	expect(cards[CARDS.colour.number].tier).toBe('trivial');
 });
 
 test('a pile of cosmetic edits in one view is trivial, not contained', async () => {
-	const cards = await triageAll();
+	const { cards } = await triageAll();
 
 	expect(cards[CARDS.cosmeticPile.number].tier).toBe('trivial');
 });
 
 test('a card that states the exact edit to make is trivial', async () => {
-	const cards = await triageAll();
+	const { cards } = await triageAll();
 
 	expect(cards[CARDS.statedEdit.number].tier).toBe('trivial');
 });
 
 test('one new feature in one area is contained', async () => {
-	const cards = await triageAll();
+	const { cards } = await triageAll();
 
 	expect(cards[CARDS.oneFeature.number].tier).toBe('contained');
 });
 
 test('renaming a stored field and everything that reads it is structural', async () => {
-	const cards = await triageAll();
+	const { cards } = await triageAll();
 
 	expect(cards[CARDS.renameField.number].tier).toBe('structural');
 });
 
 test('a vague ask that names no shape is contained, never structural', async () => {
-	const cards = await triageAll();
+	const { cards } = await triageAll();
 
 	expect(cards[CARDS.vagueArea.number].tier).toBe('contained');
 });
 
 test('two cards asking for the same feature come back as one advance and one duplicate pointing at its pair', async () => {
-	const cards = await triageAll();
+	const { cards, writes } = await triageAll();
 	const a = cards[CARDS.featureA.number];
 	const b = cards[CARDS.featureB.number];
 	const advanced = a.routingLabel === 'stage: implement' ? a : b;
@@ -124,10 +132,12 @@ test('two cards asking for the same feature come back as one advance and one dup
 
 	expect(advanced.routingLabel).toBe('stage: implement');
 	expect(duplicated.routingLabel).toBe('duplicate');
+	expect(commentOn(writes, duplicated.number)).toContain('#' + advanced.number);
 });
 
 test('a card a closed card already fixed is done, naming that card', async () => {
-	const cards = await triageAll();
+	const { cards, writes } = await triageAll();
 
 	expect(cards[CARDS.alreadyFixed.number].routingLabel).toBe('duplicate');
+	expect(commentOn(writes, CARDS.alreadyFixed.number)).toContain('#' + closedFixed.number);
 });
