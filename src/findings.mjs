@@ -119,18 +119,19 @@ async function judgeProposal(run, diffText, section) {
 // proposal gets its own comment naming the pull request, and the issue closes once none are left open. A card
 // lands once, so this is the only pass its proposals issue ever gets.
 export async function closeCoveredProposals(run, pull) {
+	let cost = 0;
 	try {
 		const title = proposalsTitle(run.lead);
 		const issue = run.board.cards.find(card => card.title === title);
 
-		if (issue === undefined) return;
+		if (issue === undefined) return cost;
 
 		const sections = [];
 		for (const comment of await run.github.comments(issue.number)) {
 			sections.push(...findingSections(run, comment));
 		}
 
-		if (sections.length === 0) return;
+		if (sections.length === 0) return cost;
 
 		const diffText = await run.github.diff(pull.number);
 
@@ -143,6 +144,7 @@ export async function closeCoveredProposals(run, pull) {
 				continue;
 			}
 
+			cost += reading.cost;
 			ledgerClassify(run, section.commentId, reading);
 			if (reading.verdict !== 'covered') {
 				allCovered = false;
@@ -157,4 +159,6 @@ export async function closeCoveredProposals(run, pull) {
 	} catch (error) {
 		console.log(run.tag + ': proposals issue not checked: ' + error.message);
 	}
+
+	return cost;
 }
