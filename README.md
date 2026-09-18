@@ -272,6 +272,28 @@ TRUSTED_LOGINS=alice,bob
 
 Content from other users is treated as information, not executable instructions.
 
+## Testing against a sandbox repo
+
+`npm run test:e2e` and the unit and integration suites (`npm test`, part of the gates) run against
+doubled GitHub, git and gates, so they cannot catch a card that goes wrong crossing a real pass
+boundary, or a real branch and pull request coming out wrong. `npm run sandbox` can: it files three
+real issues on a real GitHub repo and drives real `tick`-style passes over them until the board
+settles, then checks where each card ended up.
+
+Point it at a disposable repo — not one Team1 manages for real work — with its own
+`.agents/project.md` carrying `auto-merge: true` and gates that pass quickly (`gates: true` is
+enough). Then run:
+
+```sh
+SANDBOX_REPO=owner/sandbox npm run sandbox
+```
+
+It uses the same `GITHUB_TOKEN` as the rest of Team1, a temporary work directory it deletes no
+state from on exit, and never touches `REPOS` or the real board. It exits `0` and prints `PASS` for
+every check on a good branch, or exits `1` naming what `FAIL`ed — including a card still mid-stage
+when it gives up after five minutes (`SANDBOX_TIMEOUT_MS` to change that). One run costs about
+$0.30 in model calls and three to five minutes.
+
 ## Cost and observability
 
 Team1 records model activity, verdicts, and costs on issues and in:
