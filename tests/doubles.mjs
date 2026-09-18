@@ -11,6 +11,8 @@ export const githubMock = { client: undefined };
 async function checkout(relativeRoot, branch, readOnly) {
 	git.calls.push({ name: 'checkout', root: relativeRoot, branch: branch, readOnly: readOnly });
 
+	if (git.given.checkoutError !== undefined) throw new Error(git.given.checkoutError);
+
 	let root = relativeRoot;
 	if (git.given.root !== undefined) root = git.given.root;
 
