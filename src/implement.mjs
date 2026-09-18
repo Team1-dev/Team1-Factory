@@ -323,8 +323,8 @@ export async function handleImplement(run) {
 	worktree.cwd = join(worktree.root, run.area.path);
 	run.resumed = worktree.resumed;
 
-	const wroteGitignore = await run.git.ensureGitignore(worktree.root, run.area.path);
-	worktree.forceInclude = wroteGitignore ? ['.gitignore'] : [];
+	const forceGitignore = await run.git.ensureGitignore(worktree.root, run.area.path);
+	worktree.forceInclude = forceGitignore ? ['.gitignore'] : [];
 
 	const installed = await install(worktree.root, run.area);
 
