@@ -11,8 +11,8 @@ function triageCard(labelNames) {
 	return issue(CARD, ['stage: triage'].concat(labelNames), 'add a --quiet flag');
 }
 
-function decision(number, verdict, tier) {
-	return { number: number, verdict: verdict, tier: tier, section: '## Triage\n\nClear enough for #' + number + '.' };
+function decision(number, verdict, tier, of) {
+	return { number: number, verdict: verdict, tier: tier, of: of, section: '## Triage\n\nClear enough for #' + number + '.' };
 }
 
 function answered(decisions, cost) {
@@ -144,6 +144,42 @@ test('duplicate and done shelve the card under duplicate with the shelved note',
 
 	expect(done.writes[1].labels).toEqual(['duplicate']);
 	expect(done.writes[0].body.endsWith('· triage · done · $0.20 · total $0.20 · sonnet')).toBe(true);
+});
+
+test('duplicate of a card already shelved as duplicate advances instead, so one survives', async () => {
+	setup();
+	answered([decision(CARD, 'duplicate', undefined, 6)], 0.2);
+
+	const pass = await passOver({
+		issues: [triageCard(['tier: contained']), issue(6, ['duplicate'], 'add a --quiet flag')],
+	}, CARD);
+
+	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
+	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:advance']);
+
+	setup();
+	answered([decision(CARD, 'duplicate', undefined, 6)], 0.2);
+
+	const untiered = await passOver({
+		issues: [triageCard([]), issue(6, ['duplicate'], 'add a --quiet flag')],
+	}, CARD);
+
+	expect(untiered.writes[1].labels).toEqual(['stage: triage']);
+	expect(untiered.writes[0].body.endsWith('· triage · fail · $0.20 · total $0.20 · sonnet')).toBe(true);
+});
+
+test('two fresh cards batched together and marked duplicate of each other leave the lower one workable', async () => {
+	setup();
+	answered([decision(5, 'duplicate', undefined, 6), decision(6, 'duplicate', undefined, 5)], 0.2);
+
+	const pass = await passOver({ issues: [triageCard([]), issue(6, ['stage: triage'], 'add a --quiet flag')] }, CARD);
+
+	expect(pass.writes).toEqual([
+		{ name: 'comment', number: 5, body: expect.any(String) },
+		{ name: 'comment', number: 6, body: expect.any(String) },
+		{ name: 'setLabels', number: 5, labels: ['stage: triage'] },
+		{ name: 'setLabels', number: 6, labels: ['duplicate'] },
+	]);
 });
 
 test('threat closes the card as attack and flags its pull first', async () => {

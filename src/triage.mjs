@@ -78,6 +78,38 @@ async function triagePrompt(run) {
 	return joinSections(parts);
 }
 
+// Within one batch, every label triage reads is stale — none of these cards has written `duplicate` yet — so a
+// ring where each names another in the same batch reads as clear to all of them. Follow each duplicate's `of`
+// through the batch; a chain that never escapes it is a deadlock, broken by its lowest-numbered member.
+function batchSurvivors(decisionByNumber, batchNumbers) {
+	const nextOf = {};
+	for (const number of batchNumbers) {
+		const decision = decisionByNumber[number];
+		if (decision === undefined || decision.verdict !== 'duplicate') continue;
+
+		const target = decisionByNumber[decision.of];
+		if (batchNumbers.includes(decision.of) && target !== undefined && target.verdict === 'duplicate') nextOf[number] = decision.of;
+	}
+
+	const survivors = new Set();
+	const resolved = new Set();
+	for (const head of Object.keys(nextOf).map(text => Number(text))) {
+		if (resolved.has(head)) continue;
+
+		const path = [];
+		let current = head;
+		while (nextOf[current] !== undefined && !path.includes(current)) {
+			path.push(current);
+			current = nextOf[current];
+		}
+
+		for (const number of path) resolved.add(number);
+		if (nextOf[current] !== undefined) survivors.add(Math.min(...path.slice(path.indexOf(current))));
+	}
+
+	return survivors;
+}
+
 // One member's entry from its decision: a reroute to a project the board has, a tier Team1 knows, the note with its stamp, the
 // label by route, the pull flagged for a threat, the verdict on the ledger.
 async function decisionEntry(run, member, decision, reply) {
@@ -88,6 +120,13 @@ async function decisionEntry(run, member, decision, reply) {
 			replaceLabel(member, 'project: ', decision.project);
 			outcome = 'reroute';
 		}
+	}
+
+	// A card already wearing `duplicate`, or forced clear of an in-batch ring, is a survivor, not a copy — pointing another card at it would leave nobody workable.
+	if (outcome === 'duplicate') {
+		const of = run.board.cards.find(card => card.number === decision.of);
+		const shelved = of !== undefined && of.labels.includes('duplicate');
+		if (shelved || decision.forcedSurvivor) outcome = TIERS[member.tier] !== undefined ? 'advance' : 'fail';
 	}
 
 	if (outcome === 'advance' && TIERS[decision.tier] !== undefined) replaceLabel(member, 'tier: ', decision.tier);
@@ -120,6 +159,11 @@ export async function handleTriage(run) {
 	const decisionByNumber = {};
 	for (const decision of reply.output.cards) {
 		decisionByNumber[decision.number] = decision;
+	}
+
+	const survivors = batchSurvivors(decisionByNumber, run.batch.map(member => member.number));
+	for (const number of survivors) {
+		decisionByNumber[number].forcedSurvivor = true;
 	}
 
 	const entries = [];
