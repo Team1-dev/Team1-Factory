@@ -1,22 +1,38 @@
+<p align="center">
+  <a href="https://tryteam1.com/?utm_source=github&amp;utm_medium=referral&amp;utm_campaign=factory_readme&amp;utm_content=banner"><img src="assets/banner.png" alt="Team1 Software Factory: turn GitHub issues into shipped software. Issue, triage, plan, implement, review, merged." width="100%"></a>
+</p>
+
+<p align="center">
+  <a href="https://tryteam1.com/?utm_source=github&amp;utm_medium=referral&amp;utm_campaign=factory_readme&amp;utm_content=link_row"><strong>Website</strong></a>
+  ·
+  <a href="https://github.com/Team1-dev/Team1-demo">Demo</a>
+  ·
+  <a href="https://discord.gg/4S6MSBW48A">Discord</a>
+  ·
+  <a href="https://github.com/Team1-dev/Team1-Factory/discussions">Discussions</a>
+  ·
+  <a href="#setup">Quick start</a>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Team1-dev/Team1-Factory" alt="License: Apache-2.0"></a>
+  <a href="https://github.com/Team1-dev/Team1-Factory/releases/latest"><img src="https://img.shields.io/github/v/release/Team1-dev/Team1-Factory" alt="Latest release"></a>
+  <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2022.18-5FA04E?logo=nodedotjs&logoColor=white" alt="Node.js 22.18 or later"></a>
+</p>
+
 # Team1 Software Factory
 
 **Turn GitHub issues into shipped software.**
 
-Visit [tryteam1.com](https://tryteam1.com) for the latest updates, or join the [Discord](https://discord.gg/8GtxarKJy).
+Team1 is an open-source, self-hosted software factory for GitHub. Label an issue and Claude Code takes it through triage, plan, implementation, tests and review, then opens the pull request. It runs on your own server with your own Claude subscription, and nothing merges unless your test commands pass.
 
-Team1 is a local-first, agentic software factory for GitHub. Point it at your repositories and it runs:
+```mermaid
+flowchart LR
+    triage["stage: triage"] --> implement["stage: implement"] --> review["stage: review"] --> ready["ready to merge"] --> merged([merged])
+```
 
-**triage → plan → implement → test → review → pull request → merge**
-
-Claude Code agents do the engineering work while Team1 manages branches, worktrees, gates, reviews, and pull requests. You can stay in the loop for decisions or enable auto-merge.
-
-Team1 runs as a single process on infrastructure you control, using your Claude Code login and GitHub account.
-
-## See it work
-
-[Team1-demo](https://github.com/Team1-dev/Team1-demo) is a demo app repository that Team1-Factory is building one issue at a time. 
-Every [issue](https://github.com/Team1-dev/Team1-demo/issues?q=is%3Aissue) shows the stages as comments, from triage to merge with the total cost of each.
-Every [pull request](https://github.com/Team1-dev/Team1-demo/pulls?q=is%3Apr) was opened, reviewed and merged by Team1-Factory.
+**Team1 builds itself:** every [merged pull request](https://github.com/Team1-dev/Team1-Factory/pulls?q=is%3Apr+is%3Amerged) in this repo started as an issue Team1 triaged.<br>
+Watch one go from [issue](https://github.com/Team1-dev/Team1-demo/issues/24) to [merged PR](https://github.com/Team1-dev/Team1-demo/pull/30) on the [demo app](https://github.com/Team1-dev/Team1-demo).
 
 ---
 
@@ -224,11 +240,7 @@ Create an issue describing the desired outcome and add:
 stage: triage
 ```
 
-Team1 then moves it through:
-
-```text
-Issue → Triage → Plan → Implement → Gates → Review → PR → Merge
-```
+Team1 then moves it from label to label, as in the diagram at the top, until it is merged.
 
 Issues without `stage: triage` are ignored.
 
