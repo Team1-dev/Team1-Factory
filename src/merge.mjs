@@ -40,7 +40,7 @@ async function answerComments(run, pull, unanswered) {
 
 		if (reading.verdict === undefined) {
 			return hold(run.repo, run.lead.number, 'could not read a comment on ' + pull.html_url
-				+ ' — held until it can be read');
+				+ ' — held until it can be read, $' + cost.toFixed(2) + ' spent reading so far');
 		}
 
 		if (newestReading === undefined) newestReading = reading;
