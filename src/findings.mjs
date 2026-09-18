@@ -141,13 +141,13 @@ export async function closeCoveredProposals(run, pull) {
 		let allCovered = true;
 		for (const section of sections) {
 			const reading = await judgeProposal(run, diffText, section);
+			cost += reading.cost;
 
-			if (reading === undefined) {
+			if (reading.verdict === undefined) {
 				allCovered = false;
 				continue;
 			}
 
-			cost += reading.cost;
 			ledgerClassify(run, section.commentId, reading);
 			if (reading.verdict !== 'covered') {
 				allCovered = false;
