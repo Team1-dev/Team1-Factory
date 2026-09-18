@@ -26,7 +26,12 @@ export async function classify(tag, prompt, subject, verdicts) {
 			return undefined;
 		}
 
-		return { verdict: reply.output.verdict, reason: (reply.output.reason ?? '').slice(0, REASON_LIMIT), cost: reply.metrics.cost };
+		return {
+			verdict: reply.output.verdict,
+			reason: (reply.output.reason ?? '').slice(0, REASON_LIMIT),
+			cost: reply.metrics.cost,
+			model: reply.metrics.model,
+		};
 	} catch (error) {
 		// Only a model failure is a quiet unread; a fault of our own surfaces. Every model error carries a cost.
 		if (error.cost === undefined) throw error;

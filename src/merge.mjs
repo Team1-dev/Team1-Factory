@@ -208,9 +208,9 @@ async function landPull(run, pull) {
 		return backToImplement(run, 'merge-refused', { number: pull.number, why: why }, kind === 'conflict' ? 'conflict' : 'merge-refused');
 	}
 
-	const proposalsCost = await closeCoveredProposals(run, pull);
+	const proposals = await closeCoveredProposals(run, pull);
 
-	const measured = { verdict: 'merged', cost: proposalsCost };
+	const measured = { verdict: 'merged', cost: proposals.cost, model: proposals.model };
 
 	return landed(run, note(run, 'merged', { number: pull.number }, measured), measured, worktree.root);
 }

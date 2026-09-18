@@ -123,18 +123,19 @@ async function judgeProposal(run, diffText, section) {
 // lands once, so this is the only pass its proposals issue ever gets.
 export async function closeCoveredProposals(run, pull) {
 	let cost = 0;
+	let model;
 	try {
 		const title = proposalsTitle(run.lead);
 		const issue = run.board.cards.find(card => card.title === title);
 
-		if (issue === undefined) return cost;
+		if (issue === undefined) return { cost: cost, model: model };
 
 		const sections = [];
 		for (const comment of await run.github.comments(issue.number)) {
 			sections.push(...findingSections(run, comment));
 		}
 
-		if (sections.length === 0) return cost;
+		if (sections.length === 0) return { cost: cost, model: model };
 
 		const diffText = await run.github.diff(pull.number);
 
@@ -148,6 +149,7 @@ export async function closeCoveredProposals(run, pull) {
 			}
 
 			cost += reading.cost;
+			model = reading.model;
 			ledgerClassify(run, section.commentId, reading);
 			if (reading.verdict !== 'covered') {
 				allCovered = false;
@@ -163,5 +165,5 @@ export async function closeCoveredProposals(run, pull) {
 		console.log(run.tag + ': proposals issue not checked: ' + error.message);
 	}
 
-	return cost;
+	return { cost: cost, model: model };
 }
