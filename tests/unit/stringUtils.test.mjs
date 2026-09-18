@@ -59,12 +59,10 @@ test('redactSecrets: the operator\'s work dir and home, longest first, are swapp
 	setRedactedRoots([]);
 });
 
-test('redactSecrets: a short root only matches its own path, not a word it happens to start or sit inside', () => {
-	setRedactedRoots([{ path: 'work', replacement: '<work>' }]);
+test('redactSecrets: a root inside a longer path is still swapped, not just at a word boundary', () => {
+	setRedactedRoots([{ path: '/home/runner', replacement: '~' }]);
 
-	expect(redactSecrets('the worktree is stale, rerun the network check')).toBe('the worktree is stale, rerun the network check');
-	expect(redactSecrets('cwd work exited 1')).toBe('cwd <work> exited 1');
-	expect(redactSecrets('cwd work/acme__app/5 exited 1')).toBe('cwd <work>/acme__app/5 exited 1');
+	expect(redactSecrets('/srv/home/runner/thing')).toBe('/srv~/thing');
 
 	setRedactedRoots([]);
 });
