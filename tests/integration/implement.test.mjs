@@ -762,3 +762,13 @@ test('a Plan heading quoted inside a fence that closes is left alone: the fence 
 
 	expect(await sectionPosted(question, 'questions')).toBe(question);
 });
+
+test('a Plan quoted in a fence that closes is left alone even when the reply was cut off inside a later fence', async () => {
+	const truncated = '# Notes\n\n```md\n## Plan\nan example, not the plan\n```\n\nprose\n\n```js\nconst x = 1;';
+
+	expect(await sectionPosted(truncated, 'advance')).toBe(truncated);
+
+	const question = '## Question\n\nWhich board?\n\n```md\n## Plan\nan example\n```\n\n```sh\ncut off';
+
+	expect(await sectionPosted(question, 'questions')).toBe(question);
+});

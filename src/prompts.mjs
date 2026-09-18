@@ -166,20 +166,33 @@ export function userPrompt(lead, comments, situation, hideAuthor) {
 
 const HEADING_REGEX = /^(#{1,6})\s+(.+?)\s*$/;
 
-// Finds the first heading, and the first among cutOn if given, over lines. fenceAware skips headings inside a fenced code
-// block. Also reports whether the scan ended inside a fence: only a fence left open (or made uneven by a fenced sample of
-// its own) can hide a real heading that way — a heading legitimately quoted inside a fence that closes is not one.
-function headingsIn(lines, cutOn, fenceAware) {
-	let fenced = false;
-	let firstHeading = -1;
-	let anchorAt = -1;
+// The lines inside a fence that closes. A fence left open closes nothing and hides nothing: the reply was cut off there,
+// and a heading after it is still a heading.
+function fencedLines(lines) {
+	const fenced = new Set();
+	let openedAt = -1;
 	for (let index = 0; index < lines.length; index += 1) {
-		if (fenceAware && lines[index].trimStart().startsWith('```')) {
-			fenced = !fenced;
+		if (!lines[index].trimStart().startsWith('```')) continue;
+
+		if (openedAt === -1) {
+			openedAt = index;
 			continue;
 		}
 
-		if (fenced || !lines[index].startsWith('#')) continue;
+		for (let inside = openedAt; inside <= index; inside += 1) fenced.add(inside);
+		openedAt = -1;
+	}
+
+	return fenced;
+}
+
+// The first heading, and the first among cutOn if given. A heading quoted inside a fence that closes is not one.
+function headingsIn(lines, cutOn) {
+	const fenced = fencedLines(lines);
+	let firstHeading = -1;
+	let anchorAt = -1;
+	for (let index = 0; index < lines.length; index += 1) {
+		if (fenced.has(index) || !lines[index].startsWith('#')) continue;
 		if (firstHeading === -1) firstHeading = index;
 
 		const heading = lines[index].match(HEADING_REGEX);
@@ -189,19 +202,18 @@ function headingsIn(lines, cutOn, fenceAware) {
 		}
 	}
 
-	return { firstHeading: firstHeading, anchorAt: anchorAt, unclosed: fenced };
+	return { firstHeading: firstHeading, anchorAt: anchorAt };
 }
 
 // Cuts text to its first heading. When cutOn names a set of headings, the cut waits for the first of those instead, falling
 // back to the first heading of any kind when none of them appear — never empty just because the model's own heading isn't
 // one of them. After a cut on one of those names, every heading in normalize is rewritten to level two throughout what is
 // kept, so the contract's own headings never drift in level even when the model wrote them under a title of its own.
-// Headings inside a fenced code block are not headings; a fence left open is retried fence-blind, since only that can hide
-// a real heading from the fence-aware scan.
+// Headings inside a fenced code block are not headings, where the fence closes: a fence the reply was cut off inside hides
+// nothing.
 export function sectionOf(text, cutOn, normalize) {
 	const lines = text.split('\n');
-	let found = headingsIn(lines, cutOn, true);
-	if (found.unclosed) found = headingsIn(lines, cutOn, false);
+	const found = headingsIn(lines, cutOn);
 
 	const cutAt = found.anchorAt !== -1 ? found.anchorAt : found.firstHeading;
 	if (cutAt === -1) return '';
@@ -209,14 +221,9 @@ export function sectionOf(text, cutOn, normalize) {
 	const kept = lines.slice(cutAt);
 	if (found.anchorAt === -1 || normalize === undefined) return kept.join('\n').trim();
 
-	let fenced = false;
+	const fenced = fencedLines(kept);
 	for (let index = 0; index < kept.length; index += 1) {
-		if (kept[index].trimStart().startsWith('```')) {
-			fenced = !fenced;
-			continue;
-		}
-
-		if (fenced) continue;
+		if (fenced.has(index)) continue;
 
 		const heading = kept[index].match(HEADING_REGEX);
 		if (heading !== null && normalize.includes(heading[2])) kept[index] = '## ' + heading[2];
