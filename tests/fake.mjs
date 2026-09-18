@@ -47,7 +47,7 @@ export function setup() {
 	};
 	git.given = {
 		rebase: { moved: false, conflict: false },
-		changes: { unpushed: false, changed: [], untracked: [] },
+		changes: { unpushed: false, changed: [], round: [], untracked: [] },
 		wroteGitignore: false,
 		tree: [],
 		resumed: false,

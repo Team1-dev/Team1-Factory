@@ -37,7 +37,7 @@ function answered(verdict, extra, cost) {
 
 // The session left these tracked files changed and not yet pushed.
 function pushed(files) {
-	git.given.changes = { unpushed: true, changed: files, untracked: [] };
+	git.given.changes = { unpushed: true, changed: files, round: files, untracked: [] };
 }
 
 test('a card never triaged goes back to triage before anything runs', async () => {
@@ -331,7 +331,10 @@ test('green gates: commit, push, open the pull, post findings, note the files an
 		cards: [{ title: 'Help text is stale', body: 'The help text still lists --verbose.' }],
 	}, 0.5);
 	// A tracked change is the card's work whether the stage listed it or not; an untracked file only when the stage listed it.
-	git.given.changes = { unpushed: true, changed: ['src/cli.mjs', 'README.md'], untracked: ['tests/cli.test.mjs', 'node_modules/x/index.js'] };
+	git.given.changes = {
+		unpushed: true, changed: ['src/cli.mjs', 'README.md'], round: ['src/cli.mjs', 'README.md'],
+		untracked: ['tests/cli.test.mjs', 'node_modules/x/index.js'],
+	};
 
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
@@ -659,7 +662,9 @@ test('a .gitignore Team1 wrote itself is committed though the stage never listed
 	setup();
 	answered('advance', { touches: ['src/cli.mjs'] }, 0.5);
 	git.given.wroteGitignore = true;
-	git.given.changes = { unpushed: true, changed: ['src/cli.mjs'], untracked: ['.gitignore', 'node_modules/x/index.js'] };
+	git.given.changes = {
+		unpushed: true, changed: ['src/cli.mjs'], round: ['src/cli.mjs'], untracked: ['.gitignore', 'node_modules/x/index.js'],
+	};
 
 	const written = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
@@ -669,7 +674,7 @@ test('a .gitignore Team1 wrote itself is committed though the stage never listed
 
 	setup();
 	answered('advance', { touches: ['src/cli.mjs'] }, 0.5);
-	git.given.changes = { unpushed: true, changed: ['src/cli.mjs'], untracked: ['.gitignore'] };
+	git.given.changes = { unpushed: true, changed: ['src/cli.mjs'], round: ['src/cli.mjs'], untracked: ['.gitignore'] };
 
 	const found = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
@@ -712,6 +717,20 @@ test('more changed files outside the stage\'s own list than a card plausibly tou
 
 	expect(callNames(git.calls)).toContain('commitAndPush');
 	expect(atLimit.writes[2].labels).toEqual(['tier: contained', 'stage: review']);
+});
+
+test('a resumed round compares only this round\'s files: an earlier round\'s files read as neither unlisted nor untouched', async () => {
+	setup();
+	answered('advance', { touches: ['src/cli.mjs'] }, 0.5);
+
+	const earlier = changedFiles(5);
+	git.given.changes = { unpushed: true, changed: earlier.concat(['src/cli.mjs']), round: ['src/cli.mjs'], untracked: [] };
+
+	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(pass.writes[1].body).toContain('**Files changed (6):**');
+	expect(pass.writes[1].body).not.toContain('Not in the stage\'s own list');
+	expect(pass.writes[1].body).not.toContain('Listed but untouched');
 });
 
 // What the model wrote as its section, and the section Team1 posts: on the pull for a build, on the card for a question.

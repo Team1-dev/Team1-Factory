@@ -180,7 +180,12 @@ function committedChanges(raw, touches, areaPath, forceInclude) {
 		if (!files.includes(file)) files.push(file);
 	}
 
-	return { unpushed: raw.unpushed, files: files, leftOut: leftOut };
+	const round = [];
+	for (const file of raw.round.concat(touchedUntracked)) {
+		if (!round.includes(file)) round.push(file);
+	}
+
+	return { unpushed: raw.unpushed, files: files, round: round, leftOut: leftOut };
 }
 
 async function buildUntilGreen(run, worktree, prompts, options) {
@@ -255,8 +260,8 @@ async function pushedOutcome(run, worktree, attempt) {
 	const touches = attempt.reply.output.touches ?? [];
 
 	const outside = attempt.changes.files.filter(file => run.ownArea && !file.startsWith(run.area.path + '/'));
-	const unlisted = unmatched(attempt.changes.files, touches, run.area.path);
-	const untouched = unmatched(touches, attempt.changes.files, run.area.path);
+	const unlisted = unmatched(attempt.changes.round, touches, run.area.path);
+	const untouched = unmatched(touches, attempt.changes.round, run.area.path);
 
 	if (unlisted.length > state.knobs.MAX_UNLISTED_FILES) return tooManyFilesOutcome(run, attempt, unlisted);
 

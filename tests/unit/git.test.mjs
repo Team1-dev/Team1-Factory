@@ -54,18 +54,22 @@ test("a card branch starts from the default branch, is worked, pushed and resume
 	writeFileSync(join(root, 'new.txt'), 'new\n');
 	writeFileSync(join(root, 'stray.txt'), 'not the card\'s work\n');
 
-	expect(await o.repo.changes(root, 'card/5-x', 'main')).toEqual({ unpushed: true, changed: [], untracked: ['new.txt', 'stray.txt'] });
+	expect(await o.repo.changes(root, 'card/5-x', 'main')).toEqual({ unpushed: true, changed: [], round: [], untracked: ['new.txt', 'stray.txt'] });
 
 	const sha = await o.repo.commitAndPush(root, 'card/5-x', 'Card 5\n\nCloses #5', ['new.txt']);
 
 	expect(sha).toMatch(/^[0-9a-f]{7,}$/);
 	// Only the files named were committed; the stray one is still there, still untracked.
 	expect(await o.sh(root, ['show', '--name-only', '--format=', 'HEAD'])).toBe('new.txt');
-	expect(await o.repo.changes(root, 'card/5-x', 'main')).toMatchObject({ changed: ['new.txt'], untracked: ['stray.txt'] });
+	// A resumed round's own edit starts fresh at the pushed sha, so it alone shows in round though changed still counts the branch.
+	writeFileSync(join(root, 'more.txt'), 'more\n');
+	await o.sh(root, ['add', 'more.txt']);
+	await o.sh(root, ['-c', 'user.name=runner', '-c', 'user.email=runner@example.test', 'commit', '-qm', 'more']);
+	expect(await o.repo.changes(root, 'card/5-x', 'main')).toMatchObject({ changed: ['more.txt', 'new.txt'], round: ['more.txt'], untracked: ['stray.txt'] });
 
 	rmSync(join(root, 'stray.txt'));
 
-	expect(await o.repo.changes(root, 'card/5-x', 'main')).toEqual({ unpushed: false, changed: ['new.txt'], untracked: [] });
+	expect(await o.repo.changes(root, 'card/5-x', 'main')).toEqual({ unpushed: true, changed: ['more.txt', 'new.txt'], round: ['more.txt'], untracked: [] });
 	expect(await o.sh(root, ['log', '-1', '--format=%an <%ae>'])).toBe('runner <runner@example.test>');
 	expect(await o.sh(o.bare, ['rev-parse', '--short', 'card/5-x'])).toBe(sha.slice(0, 7));
 	expect(existsSync(join(o.home, 'hook-ran'))).toBe(false);

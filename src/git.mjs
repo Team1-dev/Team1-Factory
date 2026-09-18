@@ -155,18 +155,17 @@ export function repository(settings) {
 	}
 
 	// changed and untracked are kept apart: a changed tracked file is always the card's work, but an untracked one is only the
-	// card's work when the stage says it touched it, and the caller is the one who knows what the stage said.
+	// card's work when the stage says it touched it, and the caller is the one who knows what the stage said. changed counts the
+	// whole branch since the merge base; round is since this round started (the remote branch on a resumed card, else the same
+	// merge base), so a reworked card does not read its own earlier rounds as unlisted.
 	async function changes(root, branch, base) {
 		const mergeBase = await git(root, ['merge-base', 'HEAD', 'origin/' + base]);
+		const remoteBranch = await tryGit(root, ['rev-parse', '--verify', '--quiet', 'origin/' + branch]);
+		const pushedSha = remoteBranch.code === 0 ? remoteBranch.output.trim() : mergeBase;
 		let unpushed = true;
 		const clean = await isClean(root);
 
 		if (clean) {
-			let pushedSha = mergeBase;
-			const remoteBranch = await tryGit(root, ['rev-parse', '--verify', '--quiet', 'origin/' + branch]);
-
-			if (remoteBranch.code === 0) pushedSha = remoteBranch.output.trim();
-
 			const head = await git(root, ['rev-parse', 'HEAD']);
 
 			unpushed = head !== pushedSha;
@@ -174,10 +173,12 @@ export function repository(settings) {
 
 		const changedOutput = await git(root, ['diff', '--name-only', mergeBase]);
 		const changed = changedOutput === '' ? [] : changedOutput.split('\n');
+		const roundOutput = await git(root, ['diff', '--name-only', pushedSha]);
+		const round = roundOutput === '' ? [] : roundOutput.split('\n');
 		const untrackedOutput = await git(root, ['ls-files', '--others', '--exclude-standard']);
 		const untracked = untrackedOutput === '' ? [] : untrackedOutput.split('\n');
 
-		return { unpushed: unpushed, changed: changed, untracked: untracked };
+		return { unpushed: unpushed, changed: changed, round: round, untracked: untracked };
 	}
 
 	async function commitAndPush(root, branch, message, files) {
