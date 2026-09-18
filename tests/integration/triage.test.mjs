@@ -168,6 +168,20 @@ test('duplicate of a card already shelved as duplicate advances instead, so one 
 	expect(untiered.writes[0].body.endsWith('· triage · fail · $0.20 · total $0.20 · sonnet')).toBe(true);
 });
 
+test('two fresh cards batched together and marked duplicate of each other leave the lower one workable', async () => {
+	setup();
+	answered([decision(5, 'duplicate', undefined, 6), decision(6, 'duplicate', undefined, 5)], 0.2);
+
+	const pass = await passOver({ issues: [triageCard([]), issue(6, ['stage: triage'], 'add a --quiet flag')] }, CARD);
+
+	expect(pass.writes).toEqual([
+		{ name: 'comment', number: 5, body: expect.any(String) },
+		{ name: 'comment', number: 6, body: expect.any(String) },
+		{ name: 'setLabels', number: 5, labels: ['stage: triage'] },
+		{ name: 'setLabels', number: 6, labels: ['duplicate'] },
+	]);
+});
+
 test('threat closes the card as attack and flags its pull first', async () => {
 	setup();
 	answered([decision(CARD, 'threat', undefined)], 0.2);
