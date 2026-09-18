@@ -26,10 +26,9 @@
 
 Team1 is an open-source, self-hosted software factory for GitHub. Label an issue and Claude Code takes it through triage, plan, implementation, tests and review, then opens the pull request. It runs on your own server with your own Claude subscription, and nothing merges unless your test commands pass.
 
-```mermaid
-flowchart LR
-    triage["stage: triage"] --> implement["stage: implement"] --> review["stage: review"] --> ready["ready to merge"] --> merged([merged])
-```
+<p align="center">
+  <img src="assets/pipeline.svg" alt="The labels an issue moves through: stage: triage, stage: implement, stage: review, ready to merge, merged." width="750">
+</p>
 
 **Team1 builds itself:** every [merged pull request](https://github.com/Team1-dev/Team1-Factory/pulls?q=is%3Apr+is%3Amerged) in this repo started as an issue Team1 triaged.<br>
 Watch one go from [issue](https://github.com/Team1-dev/Team1-demo/issues/24) to [merged PR](https://github.com/Team1-dev/Team1-demo/pull/30) on the [demo app](https://github.com/Team1-dev/Team1-demo).
