@@ -27,7 +27,10 @@ async function proposalsCard(run, title) {
 		}
 	}
 
-	const issue = await run.github.createIssue(title, fragment('_shared.md', 'findings-card', { number: run.lead.number }), ['findings']);
+	const labels = ['findings'];
+	if (run.board.mono && run.area.name !== '') labels.push('project: ' + run.area.name);
+
+	const issue = await run.github.createIssue(title, fragment('_shared.md', 'findings-card', { number: run.lead.number }), labels);
 
 	perRepo.proposalsCards[run.lead.number] = issue.number;
 

@@ -613,6 +613,21 @@ test('a finding without a title is left out of what gets posted', async () => {
 	expect(pass.writes[2].body).not.toContain('no title here');
 });
 
+test('a finding filed from an area in a monorepo tags the proposals issue with that project label', async () => {
+	setup();
+	answered('advance', { cards: [{ title: 'Real one', body: 'x' }] }, 0.5);
+	pushed(['packages/lib/index.js']);
+
+	const pass = await passOver({
+		issues: [issue(CARD, ['stage: implement', 'tier: contained', 'project: lib'], 'x')],
+		comments: { [CARD]: [triaged()] },
+		files: MONO,
+	}, CARD);
+
+	const createIssue = pass.writes.find(write => write.name === 'createIssue');
+	expect(createIssue.labels).toEqual(['findings', 'project: lib']);
+});
+
 test('the files note compares paths as the repo root sees them: an area-relative touch matches, a missing one is listed as untouched', async () => {
 	setup();
 	answered('advance', { touches: ['index.js', 'packages/lib/other.js', 'gone.js'] }, 0.5);
