@@ -161,6 +161,7 @@ test('a card a person merged has its proposals read once, then nothing on a seco
 	expect(onProposals.length).toBe(2);
 	expect(onProposals[0].body).toBe('Done — #50 already covers this: First proposal');
 	expect(onProposals[1].body).toContain('Read against #50, merged by a person rather than through `handleMerge`, checked here against `deadbeef`.');
+	expect(onProposals[1].body.endsWith('· sonnet')).toBe(true);
 
 	// What GitHub would now show: the two comments Team1 just posted, alongside the original finding.
 	given.comments[900] = given.comments[900].concat([mine(onProposals[0].body), mine(onProposals[1].body)]);
