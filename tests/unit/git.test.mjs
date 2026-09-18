@@ -201,3 +201,25 @@ test('a resumed worktree with commits the remote has never seen stops rather tha
 	expect(await o.sh(root, ['log', '-1', '--format=%s'])).toBe('mine');
 	expect(await o.sh(o.bare, ['log', '--format=%s', 'card/5-x'])).not.toContain('mine');
 }, 30000);
+
+test('a resumed worktree ahead of a remote nobody moved keeps its unpushed commit and pushes it, rather than holding', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '5-card');
+	await o.repo.checkout(root, 'card/5-x', false);
+	writeFileSync(join(root, 'one.txt'), '1\n');
+	await o.repo.commitAndPush(root, 'card/5-x', 'one', ['one.txt']);
+
+	// A commit whose push never happened: the remote is exactly where the store left it.
+	writeFileSync(join(root, 'mine.txt'), 'mine\n');
+	await o.sh(root, ['add', '-A']);
+	await o.sh(root, ['-c', 'user.name=r', '-c', 'user.email=r@x', 'commit', '-qm', 'mine']);
+
+	const again = await o.repo.checkout(root, 'card/5-x', false);
+
+	expect(again).toEqual({ root: root, resumed: true });
+	expect(await o.sh(root, ['log', '-1', '--format=%s'])).toBe('mine');
+
+	await o.repo.commitAndPush(root, 'card/5-x', 'mine', []);
+
+	expect(await o.sh(o.bare, ['log', '--format=%s', 'card/5-x'])).toContain('mine');
+}, 30000);

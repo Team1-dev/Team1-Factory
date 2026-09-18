@@ -118,9 +118,10 @@ export function repository(settings) {
 		return git(root, ['rev-parse', '--short', 'HEAD']);
 	}
 
-	// True once HEAD is found to carry commits this store never saw reach the remote — a reset would force-push them away or
-	// bring back whatever a person deliberately dropped. HEAD level with what the store last fetched as the remote (simply
-	// behind, or exactly what a rewrite replaced) holds nothing of its own, so it resets and says false.
+	// True once HEAD is found to carry commits this store never saw reach the remote while the remote has moved under it — a
+	// reset would force-push them away or bring back whatever a person deliberately dropped. HEAD level with what the store
+	// last fetched as the remote (simply behind, or exactly what a rewrite replaced) holds nothing of its own, so it resets
+	// and says false; HEAD ahead of a remote still where the store left it is its own unpushed work, and says false too.
 	async function settleResumedBranch(root, from, previousRemote) {
 		const head = await git(root, ['rev-parse', 'HEAD']);
 		const target = await git(root, ['rev-parse', from.start]);
@@ -128,6 +129,10 @@ export function repository(settings) {
 		if (head === target) return false;
 
 		const previousRemoteSha = previousRemote.code === 0 ? previousRemote.output.trim() : undefined;
+
+		// The remote is still where the store last saw it and HEAD is ahead of it: its own commits, with nobody else's work
+		// to lose. A push that failed after its commit is pushed again next pass, not held for a person.
+		if (target === previousRemoteSha && (await tryGit(root, ['merge-base', '--is-ancestor', target, 'HEAD'])).code === 0) return false;
 
 		if (head !== previousRemoteSha) return true;
 
