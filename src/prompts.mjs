@@ -166,18 +166,14 @@ export function userPrompt(lead, comments, situation, hideAuthor) {
 
 const HEADING_REGEX = /^(#{1,6})\s+(.+?)\s*$/;
 
-// Cuts text to its first heading. When cutOn names a set of headings, the cut waits for the first of those instead, falling
-// back to the first heading of any kind when none of them appear — never empty just because the model's own heading isn't
-// one of them. After a cut on one of those names, every heading in normalize is rewritten to level two throughout what is
-// kept, so the contract's own headings never drift in level even when the model wrote them under a title of its own.
-// Headings inside a fenced code block are not headings.
-export function sectionOf(text, cutOn, normalize) {
-	const lines = text.split('\n');
+// Finds the first heading, and the first among cutOn if given, over lines. fenceAware skips headings inside a fenced code
+// block; a fence that never closes leaves it skipping to the end, which is what the fence-blind retry in sectionOf is for.
+function headingsIn(lines, cutOn, fenceAware) {
 	let fenced = false;
 	let firstHeading = -1;
 	let anchorAt = -1;
 	for (let index = 0; index < lines.length; index += 1) {
-		if (lines[index].trimStart().startsWith('```')) {
+		if (fenceAware && lines[index].trimStart().startsWith('```')) {
 			fenced = !fenced;
 			continue;
 		}
@@ -192,13 +188,27 @@ export function sectionOf(text, cutOn, normalize) {
 		}
 	}
 
-	const cutAt = anchorAt !== -1 ? anchorAt : firstHeading;
+	return { firstHeading: firstHeading, anchorAt: anchorAt };
+}
+
+// Cuts text to its first heading. When cutOn names a set of headings, the cut waits for the first of those instead, falling
+// back to the first heading of any kind when none of them appear — never empty just because the model's own heading isn't
+// one of them. After a cut on one of those names, every heading in normalize is rewritten to level two throughout what is
+// kept, so the contract's own headings never drift in level even when the model wrote them under a title of its own.
+// Headings inside a fenced code block are not headings — except a fence left open, or made uneven by a fenced sample of its
+// own, which would otherwise skip to the end and find nothing: a fence-blind retry is the last resort then.
+export function sectionOf(text, cutOn, normalize) {
+	const lines = text.split('\n');
+	let found = headingsIn(lines, cutOn, true);
+	if (found.firstHeading === -1) found = headingsIn(lines, cutOn, false);
+
+	const cutAt = found.anchorAt !== -1 ? found.anchorAt : found.firstHeading;
 	if (cutAt === -1) return '';
 
 	const kept = lines.slice(cutAt);
-	if (anchorAt === -1 || normalize === undefined) return kept.join('\n').trim();
+	if (found.anchorAt === -1 || normalize === undefined) return kept.join('\n').trim();
 
-	fenced = false;
+	let fenced = false;
 	for (let index = 0; index < kept.length; index += 1) {
 		if (kept[index].trimStart().startsWith('```')) {
 			fenced = !fenced;
