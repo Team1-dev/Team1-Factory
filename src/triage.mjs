@@ -90,6 +90,12 @@ async function decisionEntry(run, member, decision, reply) {
 		}
 	}
 
+	// A card already wearing `duplicate` is shelved, not a survivor — pointing another card at it would leave nobody workable.
+	if (outcome === 'duplicate') {
+		const of = run.board.cards.find(card => card.number === decision.of);
+		if (of !== undefined && of.labels.includes('duplicate')) outcome = TIERS[member.tier] !== undefined ? 'advance' : 'fail';
+	}
+
 	if (outcome === 'advance' && TIERS[decision.tier] !== undefined) replaceLabel(member, 'tier: ', decision.tier);
 
 	const label = route('triage', outcome, member.reviewed);
