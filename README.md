@@ -11,7 +11,7 @@
   ·
   <a href="https://github.com/Team1-dev/Team1-Factory/discussions">Discussions</a>
   ·
-  <a href="#setup">Quick start</a>
+  <a href="#quick-start">Quick start</a>
 </p>
 
 <p align="center">
@@ -33,26 +33,12 @@ Team1 is an open-source, self-hosted software factory for GitHub. Label an issue
 **Team1 builds itself:** every [merged pull request](https://github.com/Team1-dev/Team1-Factory/pulls?q=is%3Apr+is%3Amerged) in this repo started as an issue Team1 triaged.<br>
 Watch one go from [issue](https://github.com/Team1-dev/Team1-demo/issues/24) to [merged PR](https://github.com/Team1-dev/Team1-demo/pull/30) on the [demo app](https://github.com/Team1-dev/Team1-demo).
 
----
-
-<br>
-
-> [!CAUTION]
-> ## ⚠️ WARNING — run Team1 on an isolated machine
->
-> **Do not run Team1 on your personal computer.** Use a disposable VPS, VM, container, or other isolated environment.
->
-> Team1 runs Claude Code with permission checks disabled and executes commands from managed repositories. It also has access to GitHub and Claude Code credentials.
->
-> * Use a dedicated VPS, VM, or container.
-> * Use a dedicated GitHub account with access only to required repositories.
-> * Do not store personal credentials, SSH keys, cloud credentials, or other secrets on the host.
-> * Assume code in a managed repository can execute with Team1's permissions.
-> * Prefer testing with a private repository; public repositories are not tested.
-
 ## Requirements
 
-* A fresh Linux VPS. The steps below are for Ubuntu or Debian.
+> [!WARNING]
+> Run Team1 on a server of its own, never on your own computer. It runs Claude Code unattended with permission checks off.
+
+* A fresh Linux VPS. The steps below are for Ubuntu or Debian. Tested with 4 GB RAM and 2 CPUs; Team1 itself needs little, the memory goes to Claude Code and your own tests.
 * Node.js 22.18+
 * `git`, `jq`, `npm`
 * `pnpm` if required by a repository
@@ -61,7 +47,7 @@ Watch one go from [issue](https://github.com/Team1-dev/Team1-demo/issues/24) to 
 
 Team1 must run as an ordinary user, not root. Claude Code refuses to run unattended as root, so the implement and review stages would fail. Claude Code must be logged in as that same user, with `~/.claude/.credentials.json` present.
 
-## Setup
+## Quick start
 
 ### 1. As root: system packages, Node and a user
 
@@ -90,7 +76,7 @@ Claude Code prints a login URL. Open it in a browser on any machine, then paste 
 
 ### 3. Configure GitHub
 
-Create a dedicated GitHub account and give it access to the repositories Team1 manages.
+Create a dedicated GitHub account and give it access to the repositories you want Team1 to manage.
 
 Create a token with:
 
@@ -119,29 +105,103 @@ Create `.env`:
 ```sh
 REPOS=owner/repo,owner/other-repo
 GITHUB_TOKEN=github_pat_...
-
-# Optional
-TRUSTED_LOGINS=alice,bob
-WORK_DIR=/srv/team1/work
-# A token for one repository: GITHUB_TOKEN_ + owner/name, with characters outside [0-9a-z] replaced by _
-GITHUB_TOKEN_owner_other_repo=github_pat_...
 ```
 
 Web consoles often mangle pasted text. After pasting the token, check it with `cat .env`.
 
 Credentials are not passed to Claude Code or gate commands.
 
-Operational settings such as polling, retries, concurrency, and cost limits are environment variables; their names and defaults are at the top of `src/config.mjs`.
+### 6. Run it
+
+Start the factory. This also creates Team1's labels in each repository:
+
+```sh
+npm start
+```
+
+## Run Team1
+
+```sh
+npm run logs      # watch the logs
+npm run status    # check whether it is running
+npm stop          # stop gracefully
+```
+
+Team1 finishes the current card before stopping. Run `npm stop` again to abort it. `touch STOP` in the Team1 directory does the same as `npm stop`.
+
+Team1 keeps running after you close the console. It does not restart automatically after a reboot; log in, `su - team1`, and run `npm start` again.
+
+To run a single pass without starting the factory:
+
+```sh
+npm run tick
+```
+
+To update Team1:
+
+```sh
+npm stop && git pull && npm ci && npm start
+```
+
+## Give Team1 work
+
+GitHub issues are the interface.
+
+Create an issue describing the desired outcome and add the label:
+
+```text
+stage: triage
+```
+
+Team1 then moves it from label to label, as in the diagram at the top, until it is merged.
+
+Issues without `stage: triage` are ignored.
+
+### Useful labels
+
+| Label              | Meaning                                                  |
+| ------------------ | -------------------------------------------------------- |
+| `stage: triage`    | Issue is being assessed                                  |
+| `stage: implement` | Implementation is underway                               |
+| `stage: review`    | Change is under review                                   |
+| `ready to merge`   | Passed review and gates                                  |
+| `needs: answers`   | Waiting for a human. Reply on the issue to restart it    |
+| `human-review`     | Blocks automatic merging                                 |
+| `parked`           | Unsafe or irreversible as specified                      |
+| `failed`           | Team1 could not complete the work                        |
+| `attack`           | Hostile or hidden instructions detected                  |
+| `duplicate`        | Already covered elsewhere. Close it, or re-add `stage: triage` |
+| `findings`         | Finding recorded but intentionally not fixed             |
+
+Priority labels (`high`, `medium`, `low`) control scheduling.
+
+### Dependencies
+
+Block an issue with:
+
+```text
+blocked-by: #50
+```
+
+Team1 waits for the referenced issue to complete.
+
+### Choose a model
+
+Team1 picks the model for each stage. To pick it yourself, write this in the issue or in a comment:
+
+```text
+model: opus
+```
+
+`opus`, `sonnet`, `haiku` and `fable` are accepted. Add an effort level with `model: opus-high`: `low`, `medium`, `high`, `xhigh` or `max`.
 
 ## Configure repositories
 
-Each repository needs:
+Team1 works on a repository as it is. To set project rules and the commands that must pass, add:
 
 ```text
 .agents/project.md
 ```
-
-This defines project rules and the commands that must pass.
 
 Example:
 
@@ -180,6 +240,19 @@ Use `.agents/style.md` for detailed coding conventions.
 
 Put security-sensitive boundaries in **Invariants**, such as authentication, data deletion, migrations, public APIs, payments, and destructive infrastructure changes.
 
+### Optional Team1 settings
+
+Optional lines for `.env`:
+
+```sh
+TRUSTED_LOGINS=alice,bob
+WORK_DIR=/srv/team1/work
+# A token for one repository: GITHUB_TOKEN_ + owner/name, with characters outside [0-9a-z] replaced by _
+GITHUB_TOKEN_owner_other_repo=github_pat_...
+```
+
+Operational settings such as polling, retries, concurrency, and cost limits are environment variables; their names and defaults are at the top of `src/config.mjs`.
+
 ## Monorepos
 
 Define projects in the root `.agents/project.md`:
@@ -193,102 +266,39 @@ projects:
 
 Each project can have its own `.agents/project.md` and `.agents/style.md` at its path; their settings override the root's. Use `project: <name>` labels to target a project, or `project: all` for repository-wide work.
 
-## Run Team1
+## What stops it merging bad code
 
-Test one pass first. This also creates Team1's labels in each repository:
+* **Your gates decide.** Nothing is pushed until your `gates` commands pass.
+* **A second agent reviews.** Every change is read by a Claude session that did not write it. Only `tier: trivial` work, such as a constant or a one-line fix, skips review.
+* **You can hold the merge.** `auto-merge` is off until you turn it on, and `human-approvals` or the `human-review` label keep a pull request waiting for a person. With auto-merge on, Team1 still waits two minutes before it merges.
+* **It stops and asks.** An issue that reaches $15 of model cost (`MAX_COST_PER_CARD`), or that keeps going round without settling, moves to `needs: answers` and waits for you.
+* **Only trusted accounts give orders.** Team1 treats issues and comments from repository write-access users as instructions. Trust more accounts with `TRUSTED_LOGINS=alice,bob`. Content from anyone else is information, not instructions, and an issue that hides instructions is labelled `attack` and left unbuilt.
+* **Everything is on the record.** Verdicts and costs are posted on the issue and written to `WORK_DIR/metrics.jsonl`.
 
-```sh
-npm run tick
-```
+## FAQ
 
-Then start the factory:
+### Can I run it on a Pro or Max plan?
 
-```sh
-npm start
-```
+We run it on a Max plan. Team1 runs the official Claude Code CLI, unmodified, and you sign in to it yourself. Anthropic's [legal page](https://code.claude.com/docs/en/legal-and-compliance) says its rules do not "prevent an end user from signing in to the unmodified Claude Code binary with their own Claude subscription".
 
-Watch logs with:
+### Can I use an API key instead?
 
-```sh
-npm run logs
-```
+Not yet. Team1 uses the Claude Code login from step 2.
 
-Check whether it is running with:
+### What happens when my Claude plan hits its limit?
 
-```sh
-npm run status
-```
+Team1 sees the limit, waits until it lifts, and carries on.
 
-Stop gracefully with:
+### Does it work on repositories that are not Node?
 
-```sh
-npm stop
-```
+Gates can be any shell command, but Team1 installs dependencies only for npm and pnpm.
 
-Team1 finishes the current card before stopping. Run `npm stop` again to abort it. `touch STOP` in the Team1 directory does the same as `npm stop`.
+## Community
 
-Team1 keeps running after you close the console. It does not restart automatically after a reboot; log in, `su - team1`, and run `npm start` again.
+Questions and ideas go in [Discussions](https://github.com/Team1-dev/Team1-Factory/discussions) or on [Discord](https://discord.gg/4S6MSBW48A). Found a bug? [Open an issue](https://github.com/Team1-dev/Team1-Factory/issues).
 
-## Give Team1 work
+We want contributors: see [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately, as [SECURITY.md](SECURITY.md) describes.
 
-GitHub issues are the interface.
+## License
 
-Create an issue describing the desired outcome and add:
-
-```text
-stage: triage
-```
-
-Team1 then moves it from label to label, as in the diagram at the top, until it is merged.
-
-Issues without `stage: triage` are ignored.
-
-### Useful labels
-
-| Label              | Meaning                                                  |
-| ------------------ | -------------------------------------------------------- |
-| `stage: triage`    | Issue is being assessed                                  |
-| `stage: implement` | Implementation is underway                               |
-| `stage: review`    | Change is under review                                   |
-| `ready to merge`   | Passed review and gates                                  |
-| `needs: answers`   | Waiting for a human. Reply on the issue to restart it    |
-| `human-review`     | Blocks automatic merging                                 |
-| `parked`           | Unsafe or irreversible as specified                      |
-| `failed`           | Team1 could not complete the work                        |
-| `attack`           | Hostile or hidden instructions detected                  |
-| `duplicate`        | Already covered elsewhere. Close it, or re-add `stage: triage` |
-| `findings`         | Finding recorded but intentionally not fixed             |
-
-Priority labels (`high`, `medium`, `low`) control scheduling.
-
-## Dependencies
-
-Block an issue with:
-
-```text
-blocked-by: #50
-```
-
-Team1 waits for the referenced issue to complete.
-
-## Trusted instructions
-
-By default, Team1 treats issues and comments from repository write-access users as instructions.
-
-Additional accounts can be trusted with:
-
-```sh
-TRUSTED_LOGINS=alice,bob
-```
-
-Content from other users is treated as information, not executable instructions.
-
-## Cost and observability
-
-Team1 records model activity, verdicts, and costs on issues and in:
-
-```text
-WORK_DIR/metrics.jsonl
-```
-
-Per-card cost limits and operational settings help prevent runaway work.
+Apache-2.0. See [LICENSE](LICENSE).
