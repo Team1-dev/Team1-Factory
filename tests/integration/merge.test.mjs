@@ -1,8 +1,9 @@
 import { expect, test } from 'vitest';
 import { branchOf } from '../../src/cards.mjs';
+import { fragment } from '../../src/prompts.mjs';
 import { model, git, gates, timers } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
-import { OWNER, issue, openPull, person, review, stamped, stranger } from '../builders.mjs';
+import { OWNER, issue, mine, openPull, person, review, stamped, stranger } from '../builders.mjs';
 
 const CARD = 5;
 const PULL = 50;
@@ -287,6 +288,62 @@ test('merged: the note, the routing label cleared, the remote branch deleted, th
 	expect(callNames(git.calls)).toEqual(['checkout', 'rebaseOnto', 'removeWorktree', 'deleteLocalBranch']);
 	expect(git.calls[3]).toEqual({ name: 'deleteLocalBranch', branch: BRANCH });
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:merged']);
+});
+
+test('merged: proposals read against the merged diff add their cost to the total', async () => {
+	setup();
+	model.answers.push(modelAnswer({ verdict: 'covered', reason: 'done in the diff' }, 0.01), modelAnswer({ verdict: 'open', reason: 'still to do' }, 0.01));
+
+	const proposalsIssue = issue(900, ['findings'], 'proposals');
+	proposalsIssue.title = 'Proposals from #5: Card 5';
+
+	const origin = fragment('_notes.md', 'proposal-origin-implement', { number: CARD });
+	const findingsComment = mine('### First proposal\n\nDo X.\n\n### Second proposal\n\nDo Y.\n\n' + origin);
+
+	const given = withPull(openPull(PULL, BRANCH));
+	given.issues   = [readyCard([]), proposalsIssue];
+	given.comments = { [900]: [findingsComment] };
+
+	const pass = await passOver(given, CARD);
+
+	expect(callNames(pass.writes)).toEqual(['mergePull', 'comment', 'comment', 'setLabels', 'deleteBranch']);
+	expect(pass.writes[1].number).toBe(900);
+	expect(pass.writes[1].body).toBe('Done — #50 already covers this: First proposal');
+	expect(pass.writes[2].number).toBe(CARD);
+	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.02** in total.\n\n— team1-factory · merge · merged · $0.02 · total $0.02');
+});
+
+test('merged: a proposal reading that fails part way through still reports what was already paid for', async () => {
+	setup();
+	model.answers.push(modelAnswer({ verdict: 'covered', reason: 'done in the diff' }, 0.01));
+
+	const proposalsIssue = issue(900, ['findings'], 'proposals');
+	proposalsIssue.title = 'Proposals from #5: Card 5';
+
+	const origin = fragment('_notes.md', 'proposal-origin-implement', { number: CARD });
+	const findingsComment = mine('### First proposal\n\nDo X.\n\n### Second proposal\n\nDo Y.\n\n' + origin);
+
+	const given = withPull(openPull(PULL, BRANCH));
+	given.issues   = [readyCard([]), proposalsIssue];
+	given.comments = { [900]: [findingsComment] };
+
+	const pass = await passOver(given, CARD);
+
+	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.01** in total.\n\n— team1-factory · merge · merged · $0.01 · total $0.01');
+});
+
+test('merged: no proposals card, or one with nothing to read, still costs nothing', async () => {
+	setup();
+
+	const proposalsIssue = issue(900, ['findings'], 'proposals');
+	proposalsIssue.title = 'Proposals from #5: Card 5';
+
+	const given = withPull(openPull(PULL, BRANCH));
+	given.issues = [readyCard([]), proposalsIssue];
+
+	const pass = await passOver(given, CARD);
+
+	expect(pass.writes[1].body).toBe('Merged #50. This card cost **$0.00** in total.\n\n— team1-factory · merge · merged · $0.00 · total $0.00');
 });
 
 test('the repository name is compared ignoring case: a differently cased head is not a fork', async () => {
