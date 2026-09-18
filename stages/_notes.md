@@ -180,3 +180,7 @@ The branch conflicts with the base — it needs rebasing onto the current defaul
 Merged #{number}. This card cost **${total}** in total.
 
 {stamp}
+<!-- proposals-swept -->
+Read against #{number}, merged by a person rather than through `handleMerge`, checked here against `{sha}`.
+
+{stamp}

@@ -18,6 +18,7 @@ const EMPTY_GIVEN = {
 	commits: {},
 	closedIssues: [],
 	closedError: undefined,
+	closedPulls: {},
 	diff: '',
 	compare: undefined,
 	mergeError: undefined,
@@ -191,6 +192,10 @@ export function fakeGithub(given) {
 		return undefined;
 	}
 
+	async function closedPullsFor(branch) {
+		return given.closedPulls[branch] ?? [];
+	}
+
 	async function createPull(title, branch, target, body) {
 		if (given.pullError !== undefined) throw new Error(given.pullError);
 
@@ -275,6 +280,7 @@ export function fakeGithub(given) {
 		close: close,
 		pullFor: pullFor,
 		pull: pull,
+		closedPullsFor: closedPullsFor,
 		createPull: createPull,
 		updatePull: updatePull,
 		labelPull: labelPull,
