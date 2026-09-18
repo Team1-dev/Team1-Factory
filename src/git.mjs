@@ -103,16 +103,25 @@ export function repository(settings) {
 
 	// A node project with no .gitignore leaves node_modules untracked but not excluded: `git add -A` would stage it whole. A
 	// pattern with no leading slash matches at any depth, so one line at the root also covers a monorepo project's own node_modules.
+	// A generated file a prior pass stopped short of pushing is still untracked on this pass: force it in again rather than
+	// leaving it for `committedChanges` to read as someone else's leftover.
 	async function ensureGitignore(root, areaPath) {
 		let isNodeProject = await exists(join(root, 'package.json'));
 		if (!isNodeProject) isNodeProject = await exists(join(root, areaPath, 'package.json'));
 
+		if (!isNodeProject) return false;
+
 		const hasGitignore = await exists(join(root, '.gitignore'));
-		const willWrite = isNodeProject && !hasGitignore;
 
-		if (willWrite) await writeFile(join(root, '.gitignore'), 'node_modules\n');
+		if (!hasGitignore) {
+			await writeFile(join(root, '.gitignore'), 'node_modules\n');
 
-		return willWrite;
+			return true;
+		}
+
+		const tracked = await tryGit(root, ['ls-files', '--error-unmatch', '.gitignore']);
+
+		return tracked.code !== 0;
 	}
 
 	async function listFiles(directory) {

@@ -85,6 +85,24 @@ test("a card branch starts from the default branch, is worked, pushed and resume
 	expect(existsSync(join(root, 'new.txt'))).toBe(true);
 }, 30000);
 
+test('a generated .gitignore still untracked from a stopped pass is force-included again; a committed one, generated or not, is left alone', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '5-card');
+	await o.repo.checkout(root, 'card/5-x', false);
+	writeFileSync(join(root, 'package.json'), '{}\n');
+
+	expect(await o.repo.ensureGitignore(root, '.')).toBe(true);
+	expect(await o.sh(root, ['status', '--porcelain', '.gitignore'])).toBe('?? .gitignore');
+
+	// The pass that wrote it stopped before pushing: the next pass finds it already there, still untracked.
+	expect(await o.repo.ensureGitignore(root, '.')).toBe(true);
+
+	await o.sh(root, ['add', '.gitignore']);
+	await o.sh(root, ['-c', 'user.name=r', '-c', 'user.email=r@x', 'commit', '-qm', 'gitignore']);
+
+	expect(await o.repo.ensureGitignore(root, '.')).toBe(false);
+}, 30000);
+
 test('a read-only checkout is detached at the default branch; a rebase onto a moved base moves, and a conflict is aborted and reset', async () => {
 	const o = await origin();
 	const read = join(o.base, 'work', '5-read');
