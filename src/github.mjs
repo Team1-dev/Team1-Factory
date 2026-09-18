@@ -1,3 +1,5 @@
+import { repoState } from './config.mjs';
+
 const API = 'https://api.github.com';
 const PAGE_SIZE = 100;
 
@@ -87,8 +89,30 @@ export function client(repo, token, apiBase) {
 		return request('POST', base + '/issues', { title: title, body: body, labels: labelNames });
 	}
 
+	// A repeat call sends back the etag from the last one: unchanged since, GitHub answers 304 without spending against the rate
+	// limit, and the comments already read stand. An issue's own updated_at moves whenever a comment is added or edited, which
+	// is why this holds even across the comments a stranger left since the last read.
 	async function comments(number) {
-		return requestAll(base + '/issues/' + number + '/comments');
+		const url = base + '/issues/' + number + '/comments';
+		const cache = repoState(repo).commentsCache ??= {};
+		const cached = cache[url];
+		const conditionalHeaders = cached === undefined ? headers : { ...headers, 'If-None-Match': cached.etag };
+
+		const response = await fetch(url + '?per_page=' + PAGE_SIZE + '&page=1', { headers: conditionalHeaders });
+
+		if (response.status === 304) return cached.items;
+		if (!response.ok) throw new Error('GET ' + url + ' ' + response.status);
+
+		let items = await response.json();
+		let lastBatch = items;
+		for (let page = 2; lastBatch.length === PAGE_SIZE; page += 1) {
+			lastBatch = await request('GET', url + '?per_page=' + PAGE_SIZE + '&page=' + page);
+			items = items.concat(lastBatch);
+		}
+
+		cache[url] = { etag: response.headers.get('etag'), items: items };
+
+		return items;
 	}
 
 	async function comment(number, body) {
