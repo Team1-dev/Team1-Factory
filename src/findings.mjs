@@ -212,10 +212,9 @@ export async function sweepMergedProposals(github, board) {
 			const pulls = await github.closedPullsFor(branchOf(card));
 			const pull = pulls.find(candidate => candidate.merged_at !== null);
 
-			if (pull === undefined) {
-				swept[githubIssue.number] = true;
-				continue;
-			}
+			// Not a terminal state, unlike the other three exits: the card closed before its pull merged, which can still
+			// happen later, so this one is left out of the memory and checked again next pass.
+			if (pull === undefined) continue;
 
 			const proposalsComments = await github.comments(proposalsIssue.number);
 			const alreadySwept = proposalsComments.some(comment => comment.user?.login === board.runnerLogin && comment.body.includes(pull.head.sha));
