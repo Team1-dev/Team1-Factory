@@ -1,5 +1,5 @@
 const ASKING_VERDICTS = ['questions', 'stalled', 'died', 'over-budget', 'too-big'];
-const BOOKKEEPING_VERDICTS = ['stalled', 'died', 'too-big', 'over-budget', 'already-done', 'no-pull', 'comment-noted', 'research'];
+const BOOKKEEPING_VERDICTS = ['stalled', 'died', 'too-big', 'over-budget', 'already-done', 'no-pull', 'comment-noted'];
 
 // A stamp of the stage being run is a round, an error, or bookkeeping that counts as neither.
 function roundKind(stamp, stageName) {
