@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { decodeJsonStringLiteral, redactSecrets, stripInvisible, stripReferenceDefinitions } from '../../src/stringUtils.mjs';
+import { decodeJsonStringLiteral, redactSecrets, setRedactedRoots, stripInvisible, stripReferenceDefinitions } from '../../src/stringUtils.mjs';
 import { readText } from '../../src/trust.mjs';
 
 test('stripInvisible: the tag block, joiners and fillers go; an emoji\'s variation selector and a bidi mark stay', () => {
@@ -44,6 +44,19 @@ test('redactSecrets: keys of every shape the runner may meet are replaced', () =
 	}
 
 	expect(redactSecrets('a task-123 and skill-set and npm_short')).toBe('a task-123 and skill-set and npm_short');
+});
+
+test('redactSecrets: the operator\'s work dir and home, longest first, are swapped; an unrelated path is left as written', () => {
+	setRedactedRoots([
+		{ path: '/home/runner', replacement: '~' },
+		{ path: '/home/runner/.team1/work', replacement: '<work>' },
+	]);
+
+	expect(redactSecrets('git ls-files in /home/runner/.team1/work/acme__app/5 exited 1')).toBe('git ls-files in <work>/acme__app/5 exited 1');
+	expect(redactSecrets('config at /home/runner/.claude/settings.json')).toBe('config at ~/.claude/settings.json');
+	expect(redactSecrets('module not found: /usr/lib/node_modules/npm')).toBe('module not found: /usr/lib/node_modules/npm');
+
+	setRedactedRoots([]);
 });
 
 test('decodeJsonStringLiteral: a quoted literal is parsed, every escape included; an unquoted line keeps its two escapes', () => {

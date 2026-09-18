@@ -114,6 +114,23 @@ export function stripHiddenMarkup(text) {
 	return clean;
 }
 
+// The operator's own paths, set once by config.mjs when the work dir is known: the longest first, so the work dir wins over the
+// home directory it usually sits inside.
+let redactedRoots = [];
+
+export function setRedactedRoots(roots) {
+	redactedRoots = roots.filter(root => root.path !== '').sort((a, b) => b.path.length - a.path.length);
+}
+
+function redactPaths(text) {
+	let clean = text;
+	for (const root of redactedRoots) {
+		clean = clean.split(root.path).join(root.replacement);
+	}
+
+	return clean;
+}
+
 export function redactSecrets(text) {
 	const SECRET_REGEXES = [
 		/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
@@ -133,7 +150,7 @@ export function redactSecrets(text) {
 		clean = clean.replace(regex, '[redacted secret]');
 	}
 
-	return clean;
+	return redactPaths(clean);
 }
 
 export function squash(text, alphanumericOnly) {
