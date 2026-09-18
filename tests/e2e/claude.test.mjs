@@ -151,6 +151,22 @@ async function probe(root, settings) {
 	return result;
 }
 
+test('the model child is given a HOME of its own: the runner\'s real home directory is not reachable from the session', async () => {
+	boot();
+
+	const prompt = 'Run `ls -a "$HOME"` with Bash and put its exact output, verbatim, in the "listing" field of your answer.';
+	const schema = { type: 'object', properties: { verdict: { type: 'string', enum: ['advance'] }, listing: { type: 'string' } }, required: ['verdict', 'listing'] };
+
+	const reply = await promptClaude('classify', undefined, prompt, { tools: ['Bash'], schema: schema });
+
+	console.log('\n==== HOME probe\n' + reply.output.listing);
+
+	// The scoped HOME holds only the scratch dir's own files, config among them; the runner's real ~/.claude keeps its session
+	// history in a projects/ directory that a child given the real HOME would see.
+	expect(reply.output.listing).toContain('config');
+	expect(reply.output.listing).not.toContain('projects');
+});
+
 test.each(PLANTED_NAMES)('control: with project and local sources on, claude loads a planted %s and obeys it; our exclude patterns alone keep it out', async name => {
 	boot();
 
