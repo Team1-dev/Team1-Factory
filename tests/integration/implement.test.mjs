@@ -503,6 +503,19 @@ test('a resumed worktree is said so in the prompt and the ledger', async () => {
 	expect(ledgerLines()[1].resumed).toBe(true);
 });
 
+test('a worktree with commits the remote has never seen holds rather than building on top of them', async () => {
+	setup();
+	git.given.resumed = true;
+	git.given.diverged = true;
+
+	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(pass.changed).toBe(false);
+	expect(pass.writes).toEqual([]);
+	expect(model.calls).toEqual([]);
+	expect(callNames(git.calls)).toEqual(['checkout']);
+});
+
 test('output without a verdict posts stage-failed and leaves the label', async () => {
 	setup();
 	model.answers.push(modelAnswer({ section: SECTION }, 0.5));
