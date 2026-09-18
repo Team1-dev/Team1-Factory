@@ -146,3 +146,58 @@ test('a git command that fails throws with its command and the output tail; a re
 	expect(again).toEqual({ root: root, resumed: true });
 	expect(existsSync(join(root, 'two.txt'))).toBe(true);
 }, 30000);
+
+test('a resumed worktree that holds nothing of its own takes a rewritten remote branch instead of restoring what it dropped', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '5-card');
+	await o.repo.checkout(root, 'card/5-x', false);
+	writeFileSync(join(root, 'one.txt'), '1\n');
+	await o.repo.commitAndPush(root, 'card/5-x', 'one', ['one.txt']);
+	writeFileSync(join(root, 'two.txt'), '2\n');
+	await o.repo.commitAndPush(root, 'card/5-x', 'two', ['two.txt']);
+
+	// Someone rebases the remote branch to drop "two", as if cleaning it before a merge.
+	await o.sh(o.seed, ['fetch', '-q', 'origin', 'card/5-x']);
+	await o.sh(o.seed, ['checkout', '-q', '-B', 'card/5-x', 'origin/card/5-x~1']);
+	await o.sh(o.seed, ['push', '-q', '--force', 'origin', 'card/5-x']);
+
+	const again = await o.repo.checkout(root, 'card/5-x', false);
+
+	expect(again).toEqual({ root: root, resumed: true });
+	expect(existsSync(join(root, 'two.txt'))).toBe(false);
+
+	// The next push must not bring "two" back.
+	await o.sh(o.bare, ['fetch', '-q']);
+	writeFileSync(join(root, 'three.txt'), '3\n');
+	await o.repo.commitAndPush(root, 'card/5-x', 'three', ['three.txt']);
+
+	expect(await o.sh(o.bare, ['log', '--format=%s', 'card/5-x'])).not.toContain('two');
+}, 30000);
+
+test('a resumed worktree with commits the remote has never seen stops rather than force-pushing over a branch someone rewrote', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '5-card');
+	await o.repo.checkout(root, 'card/5-x', false);
+	writeFileSync(join(root, 'one.txt'), '1\n');
+	await o.repo.commitAndPush(root, 'card/5-x', 'one', ['one.txt']);
+
+	// Local work of its own, committed but never pushed anywhere.
+	writeFileSync(join(root, 'mine.txt'), 'mine\n');
+	await o.sh(root, ['add', '-A']);
+	await o.sh(root, ['-c', 'user.name=r', '-c', 'user.email=r@x', 'commit', '-qm', 'mine']);
+
+	// Someone else rewrites the remote branch independently, so the two histories diverge.
+	await o.sh(o.seed, ['fetch', '-q', 'origin', 'card/5-x']);
+	await o.sh(o.seed, ['checkout', '-q', '-B', 'card/5-x', 'origin/card/5-x']);
+	writeFileSync(join(o.seed, 'theirs.txt'), 'theirs\n');
+	await o.sh(o.seed, ['add', '-A']);
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'commit', '-qm', 'theirs']);
+	await o.sh(o.seed, ['push', '-q', '--force', 'origin', 'card/5-x']);
+
+	const again = await o.repo.checkout(root, 'card/5-x', false);
+
+	expect(again).toEqual({ root: root, resumed: true, diverged: true });
+	// The worktree's own commit is untouched, and nothing was pushed over the rewritten remote.
+	expect(await o.sh(root, ['log', '-1', '--format=%s'])).toBe('mine');
+	expect(await o.sh(o.bare, ['log', '--format=%s', 'card/5-x'])).not.toContain('mine');
+}, 30000);

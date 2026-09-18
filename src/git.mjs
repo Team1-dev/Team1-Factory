@@ -75,17 +75,6 @@ export function repository(settings) {
 		return status === '';
 	}
 
-	async function isBehind(root, reference) {
-		const head = await git(root, ['rev-parse', 'HEAD']);
-		const target = await git(root, ['rev-parse', reference]);
-
-		if (head === target) return false;
-
-		const ancestry = await tryGit(root, ['merge-base', '--is-ancestor', 'HEAD', reference]);
-
-		return ancestry.code === 0;
-	}
-
 	// False once the store's repository has been recreated: the worktree's history and the fresh remote share no commit.
 	async function hasCommonHistory(root, reference) {
 		const mergeBase = await tryGit(root, ['merge-base', 'HEAD', reference]);
@@ -129,8 +118,29 @@ export function repository(settings) {
 		return git(root, ['rev-parse', '--short', 'HEAD']);
 	}
 
+	// True once HEAD is found to carry commits this store never saw reach the remote — a reset would force-push them away or
+	// bring back whatever a person deliberately dropped. HEAD level with what the store last fetched as the remote (simply
+	// behind, or exactly what a rewrite replaced) holds nothing of its own, so it resets and says false.
+	async function settleResumedBranch(root, from, previousRemote) {
+		const head = await git(root, ['rev-parse', 'HEAD']);
+		const target = await git(root, ['rev-parse', from.start]);
+
+		if (head === target) return false;
+
+		const previousRemoteSha = previousRemote.code === 0 ? previousRemote.output.trim() : undefined;
+
+		if (head !== previousRemoteSha) return true;
+
+		await git(root, ['reset', '--hard', from.start]);
+
+		return false;
+	}
+
 	async function checkout(relativeRoot, branch, readOnly) {
 		const root = resolve(relativeRoot);
+		// Read before the fetch below moves it: what the worktree last saw as the remote, so a diverged HEAD that still
+		// matches it is known to hold nothing beyond what was already shared, never a guess made from the rewritten branch.
+		const previousRemote = await tryGit(store, ['rev-parse', '--verify', '--quiet', 'origin/' + branch]);
 		await ensureStore();
 
 		const from = await startPoint(branch);
@@ -143,7 +153,9 @@ export function repository(settings) {
 		}
 
 		if (await worktreeOnBranch(root, branch) && await hasCommonHistory(root, from.start)) {
-			if (from.resumed && await isClean(root) && await isBehind(root, from.start)) await git(root, ['reset', '--hard', from.start]);
+			if (from.resumed && await isClean(root) && await settleResumedBranch(root, from, previousRemote)) {
+				return { root: root, resumed: true, diverged: true };
+			}
 
 			return { root: root, resumed: true };
 		}

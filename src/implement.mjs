@@ -6,7 +6,7 @@ import { filesNamedOnCards, inlineFiles } from './files.mjs';
 import { install, runGates } from './gates.mjs';
 import { newestSession } from './ledger.mjs';
 import { fileFindings } from './findings.mjs';
-import { alreadyDone, batchOutcome, costTotal, note, start, unreadableOutcome } from './outcomes.mjs';
+import { alreadyDone, batchOutcome, costTotal, hold, note, start, unreadableOutcome } from './outcomes.mjs';
 import { cardHeading, fragment, joinSections, resumeSince, systemPrompt, userPrompt } from './prompts.mjs';
 import { route } from './routes.mjs';
 import { verdictOutcome } from './verdict.mjs';
@@ -357,6 +357,12 @@ export async function handleImplement(run) {
 	if (run.mates.length > 0) await labelBatch(run);
 
 	const worktree = await run.git.checkout(run.batchRoot, run.branch, false);
+
+	if (worktree.diverged) {
+		return hold(run.repo, run.lead.number, '`' + run.branch + '` has moved on the remote and this worktree has commits '
+			+ 'of its own that were never pushed — holding rather than force-pushing over whichever side would lose. '
+			+ 'A person reconciles the branch by hand.');
+	}
 
 	worktree.cwd = join(worktree.root, run.area.path);
 	run.resumed = worktree.resumed;

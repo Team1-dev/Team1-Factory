@@ -14,7 +14,7 @@ async function checkout(relativeRoot, branch, readOnly) {
 	let root = relativeRoot;
 	if (git.given.root !== undefined) root = git.given.root;
 
-	return { root: root, branch: branch, resumed: git.given.resumed };
+	return { root: root, branch: branch, resumed: git.given.resumed, diverged: git.given.diverged };
 }
 
 async function changes(root, branch, base) {
