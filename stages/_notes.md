@@ -148,6 +148,10 @@ No open pull request for `{branch}`, which is {ahead} commit(s) ahead of `{base}
 {stamp}
 <!-- objection-path -->
 On `{path}`.
+<!-- comment-unreadable -->
+Could not read a comment on #{number} — held until it can be read. This card has cost **${total}** so far.
+
+{stamp}
 <!-- comment-noted -->
 @{author} said "{quote}" on #{number}{earlier} — read as {reading}{reason} It asks for no change, so it does not stop the merge.
 

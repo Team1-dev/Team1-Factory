@@ -1,4 +1,4 @@
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 import { branchOf } from '../../src/cards.mjs';
 import { failure } from '../../src/claude.mjs';
 import { fragment } from '../../src/prompts.mjs';
@@ -420,8 +420,10 @@ test('a comment the classifier cannot read holds the merge; two unanswered comme
 
 	const held = await passOver(given, CARD);
 
-	expect(held.changed).toBe(false);
-	expect(held.writes).toEqual([]);
+	expect(held.changed).toBe(true);
+	expect(callNames(held.writes)).toEqual(['comment']);
+	expect(held.writes[0].body).toContain('Could not read a comment on #50 — held until it can be read.');
+	expect(held.card.labels).toEqual(['ready to merge', 'tier: contained']);
 
 	setup();
 	model.answers.push(modelAnswer({ verdict: 'approval', reason: 'fine' }, 0.01), modelAnswer({ verdict: 'other', reason: 'chat' }, 0.01));
@@ -436,20 +438,18 @@ test('a comment the classifier cannot read holds the merge; two unanswered comme
 	expect(noted.writes[0].body).toContain('@owner said "the newer one" on #50, with 1 earlier comment(s) — read as approval: fine');
 });
 
-test('a comment read that fails after an earlier one already spent still logs the spend when it holds', async () => {
+test('a comment read that fails after an earlier one already spent still counts the spend when it holds', async () => {
 	setup();
-	model.answers.push(modelAnswer({ verdict: 'approval', reason: 'fine' }, 0.01));
+	model.answers.push(modelAnswer({ verdict: 'approval', reason: 'fine' }, 0.01), modelAnswer({}, 0.02));
 
 	const given = withPull(openPull(PULL, BRANCH));
 	given.comments = { [PULL]: [person('the older one'), person('the newer one')] };
 
-	const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+	const pass = await passOver(given, CARD);
 
-	await passOver(given, CARD);
-
-	expect(log.mock.calls.some(call => call[0].includes('held until it can be read, $0.01 spent reading so far'))).toBe(true);
-
-	log.mockRestore();
+	expect(pass.writes[0].body).toContain('This card has cost **$0.03** so far.');
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · unreadable-comment · $0.03 · total $0.03')).toBe(true);
+	expect(ledgerLines()[1].cost).toBe(0.03);
 });
 
 test('no pull and the comparison unavailable: the no-pull note says nothing was pushed', async () => {
