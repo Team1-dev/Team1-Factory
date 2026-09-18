@@ -205,12 +205,25 @@ function headingsIn(lines, cutOn) {
 	return { firstHeading: firstHeading, anchorAt: anchorAt };
 }
 
+// Whether any line carries content of its own — anything but a heading or blank. Headings with nothing under them are the
+// same as no section at all.
+function hasContent(lines) {
+	for (const line of lines) {
+		if (line.trim() === '') continue;
+		if (HEADING_REGEX.test(line)) continue;
+
+		return true;
+	}
+
+	return false;
+}
+
 // Cuts text to its first heading. When cutOn names a set of headings, the cut waits for the first of those instead, falling
 // back to the first heading of any kind when none of them appear — never empty just because the model's own heading isn't
 // one of them. After a cut on one of those names, every heading in normalize is rewritten to level two throughout what is
 // kept, so the contract's own headings never drift in level even when the model wrote them under a title of its own.
 // Headings inside a fenced code block are not headings, where the fence closes: a fence the reply was cut off inside hides
-// nothing.
+// nothing. A result that is headings with nothing under them is treated as no section, not published as one.
 export function sectionOf(text, cutOn, normalize) {
 	const lines = text.split('\n');
 	const found = headingsIn(lines, cutOn);
@@ -219,6 +232,8 @@ export function sectionOf(text, cutOn, normalize) {
 	if (cutAt === -1) return '';
 
 	const kept = lines.slice(cutAt);
+	if (!hasContent(kept)) return '';
+
 	if (found.anchorAt === -1 || normalize === undefined) return kept.join('\n').trim();
 
 	const fenced = fencedLines(kept);

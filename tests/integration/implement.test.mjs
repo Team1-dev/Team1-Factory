@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { state } from '../../src/config.mjs';
 import { PLAN_CUT, PLAN_NORMALIZE } from '../../src/implement.mjs';
 import { branchOf, stampLine } from '../../src/cards.mjs';
+import { fragment } from '../../src/prompts.mjs';
 import { model, git, gates } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { REPO, issue, mine, openPull, person, stamped } from '../builders.mjs';
@@ -163,6 +164,17 @@ test('a verdict other than advance with nothing pushed posts the section and rou
 	const parked = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
 	expect(parked.writes[1].labels).toEqual(['tier: contained', 'parked']);
+});
+
+test('a section that is only headings still leaves a readable comment for a person to answer', async () => {
+	setup();
+	model.answers.push(modelAnswer({ section: '', verdict: 'questions' }, 0.5));
+
+	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(pass.writes[0].body).toBe(fragment('_notes.md', 'implement-section-missing', { outcome: 'questions' })
+		+ '\n\n— team1-factory · implement · questions · $0.50 · total $0.60 · sonnet');
+	expect(pass.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
 });
 
 test('the same long section as the previous round is replaced by the same-as-before line', async () => {
@@ -411,6 +423,19 @@ test('a pull with no description takes the round\'s section as its whole body, n
 
 	expect(callNames(pass.writes)).toEqual(['updatePull', 'comment', 'setLabels']);
 	expect(pass.writes[0]).toEqual({ name: 'updatePull', number: 77, body: SECTION });
+});
+
+test('a section that is only headings does not reach the pull as a bare Closes line', async () => {
+	setup();
+	model.answers.push(modelAnswer({ touches: ['src/cli.mjs'], section: '', verdict: 'advance' }, 0.5));
+	pushed(['src/cli.mjs']);
+
+	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(pass.writes[0]).toEqual({
+		name: 'createPull', title: 'Card 5', branch: BRANCH, base: 'main',
+		body: 'Closes #5\n\n' + fragment('_notes.md', 'implement-section-missing', { outcome: 'advance' }),
+	});
 });
 
 test('a trivial change merges unreviewed unless it came from outside or touches project.md', async () => {
