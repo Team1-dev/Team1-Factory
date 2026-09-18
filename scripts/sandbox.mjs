@@ -43,31 +43,45 @@ async function cardState(github, number) {
 	return { open: issue.state === 'open', label: routingLabelOf(issue.labels.map(entry => entry.name)) };
 }
 
+// A card's pull is only findable by branch while it is open (src/github.mjs pullFor queries open pulls only) — the same
+// window merge.mjs itself relies on. drive() catches its number here, before merging closes it, for checkLanded to read by
+// number afterwards. track.branches maps a card number to its branch, track.pulls collects the numbers found.
+async function capturePulls(github, track) {
+	for (const number of Object.keys(track.branches)) {
+		if (track.pulls[number] !== undefined) continue;
+
+		const pull = await github.pullFor(track.branches[number]);
+		if (pull !== undefined) track.pulls[number] = pull.number;
+	}
+}
+
 // Drives real passes until every tracked card is out of the queues (landed, or holding on a terminal or waiting label), or
 // the deadline passes. A card still mid-stage when the deadline passes is left for the caller to report as a failure.
-async function drive(repo, github, numbers, deadline) {
+async function drive(repo, github, numbers, track) {
 	const DONE_LABELS = ['needs: answers', 'duplicate', 'failed', 'parked', 'attack'];
 	for (;;) {
+		await capturePulls(github, track);
+
 		const states = [];
 		for (const number of numbers) {
 			states.push(await cardState(github, number));
 		}
 
 		const settled = states.every(entry => !entry.open || DONE_LABELS.includes(entry.label));
-		if (settled || Date.now() > deadline) return settled;
+		if (settled || Date.now() > track.deadline) return settled;
 
 		const changed = await processRepo(repo);
 		if (!changed) await sleep(3000);
 	}
 }
 
-async function checkLanded(github, number, title) {
+async function checkLanded(github, number, pullNumber) {
 	const issue = await findIssue(github, number);
 	report('#' + number + ' closed', issue !== undefined && issue.state === 'closed');
 
-	const pull = await github.pullFor(branchOf({ number: number, title: title, batch: '' }));
-	if (pull === undefined) return report('#' + number + ' has a pull request', false);
+	if (pullNumber === undefined) return report('#' + number + ' has a pull request', false);
 
+	const pull = await github.pull(pullNumber);
 	report('#' + number + ' pull merged', pull.merged === true);
 	report('#' + number + ' pull body starts with Closes #' + number, pull.body.startsWith('Closes #' + number));
 
@@ -117,16 +131,22 @@ async function main() {
 
 	console.log(repo + ': filed #' + plain.number + ' (plain) and #' + question.number + ' (question)');
 
-	await drive(repo, github, [plain.number, question.number], deadline);
+	const track = {
+		branches: { [plain.number]: branchOf({ number: plain.number, title: plain.title, batch: '' }) },
+		pulls: {},
+		deadline: deadline,
+	};
+
+	await drive(repo, github, [plain.number, question.number], track);
 
 	const duplicate = await github.createIssue(plain.title, plain.body, ['stage: triage']);
 	console.log(repo + ': filed #' + duplicate.number + ' (repeat of #' + plain.number + ')');
 
-	const settled = await drive(repo, github, [plain.number, question.number, duplicate.number], deadline);
+	const settled = await drive(repo, github, [plain.number, question.number, duplicate.number], track);
 
 	if (!settled) report('every card settled before the ' + Math.round(TIMEOUT_MS / 60000) + ' minute deadline', false);
 
-	await checkLanded(github, plain.number, plain.title);
+	await checkLanded(github, plain.number, track.pulls[plain.number]);
 	await checkLabel(github, question.number, 'needs: answers');
 	await checkLabel(github, duplicate.number, 'duplicate');
 
