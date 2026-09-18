@@ -19,16 +19,22 @@ async function proposalsCard(run, title) {
 	perRepo.proposalsCards ??= {};
 	if (perRepo.proposalsCards[run.lead.number] !== undefined) return perRepo.proposalsCards[run.lead.number];
 
+	const projectLabel = 'project: ' + run.area.name;
+
 	for (const card of run.board.cards) {
 		if (card.title === title) {
 			perRepo.proposalsCards[run.lead.number] = card.number;
+
+			if (run.board.mono && run.area.name !== '' && !card.labels.includes(projectLabel)) {
+				await run.github.labelPull(card.number, projectLabel);
+			}
 
 			return card.number;
 		}
 	}
 
 	const labels = ['findings'];
-	if (run.board.mono && run.area.name !== '') labels.push('project: ' + run.area.name);
+	if (run.board.mono && run.area.name !== '') labels.push(projectLabel);
 
 	const issue = await run.github.createIssue(title, fragment('_shared.md', 'findings-card', { number: run.lead.number }), labels);
 
