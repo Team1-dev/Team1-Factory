@@ -110,11 +110,9 @@ async function cardOutcome(run) {
 	try {
 		return await HANDLERS[run.stage.name](run);
 	} catch (error) {
-		if (error.cost === undefined) throw error;
-
 		console.log(run.tag + ': stage failed: ' + error.message);
 
-		return failedOutcome(run, error.message, { verdict: 'error', cost: error.cost, sessionId: error.sessionId }, noteExhaustion(error) || error.aborted);
+		return failedOutcome(run, error.message, { verdict: 'error', cost: error.cost ?? 0, sessionId: error.sessionId }, noteExhaustion(error) || error.aborted);
 	}
 }
 

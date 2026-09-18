@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { model } from '../doubles.mjs';
+import { git, model } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { issue, mine, person, stamped, stranger } from '../builders.mjs';
 
@@ -138,6 +138,53 @@ test('died: the stage failed maxRounds times without a verdict', async () => {
 	expect(pass.writes[0].body).toContain('**implement** has died 2 times on this card — a budget ceiling or a fault');
 	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · died · $0.00 · total $0.30')).toBe(true);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:died']);
+});
+
+test('a bug that throws on every pass ends the card died, not stuck silent', async () => {
+	setup();
+	git.given.checkoutError = 'ENOENT: stale worktree';
+
+	const first = await passOver({ issues: [implementCard('x')], comments: { [CARD]: [TRIAGED] } }, CARD);
+
+	expect(callNames(first.writes)).toEqual(['comment']);
+	expect(first.writes[0].body).toContain('**implement** could not complete: ENOENT: stale worktree');
+
+	const second = await passOver({
+		issues: [implementCard('x')],
+		comments: { [CARD]: [TRIAGED, mine(first.writes[0].body)] },
+	}, CARD);
+
+	expect(callNames(second.writes)).toEqual(['comment']);
+	expect(second.writes[0].body).toContain('**implement** could not complete: ENOENT: stale worktree');
+
+	const third = await passOver({
+		issues: [implementCard('x')],
+		comments: { [CARD]: [TRIAGED, mine(first.writes[0].body), mine(second.writes[0].body)] },
+	}, CARD);
+
+	expect(callNames(third.writes)).toEqual(['comment', 'setLabels']);
+	expect(third.writes[0].body).toContain('**implement** has died 2 times on this card');
+	expect(third.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
+});
+
+test('a bug that throws once and works the next pass is unaffected', async () => {
+	setup();
+	git.given.checkoutError = 'ENOENT: stale worktree';
+
+	const first = await passOver({ issues: [implementCard('x')], comments: { [CARD]: [TRIAGED] } }, CARD);
+
+	expect(first.writes[0].body).toContain('could not complete: ENOENT: stale worktree');
+
+	setup();
+	model.answers.push(implementAnswer());
+
+	const second = await passOver({
+		issues: [implementCard('x')],
+		comments: { [CARD]: [TRIAGED, mine(first.writes[0].body)] },
+	}, CARD);
+
+	expect(model.calls.length).toBe(1);
+	expect(second.writes[0].body).toBe('## Implementation\n\nasked\n\n— team1-factory · implement · questions · $0.50 · total $0.60 · sonnet');
 });
 
 test('a person can pick the model: the last "model:<model>[-effort]" in trusted text wins', async () => {
