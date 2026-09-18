@@ -719,11 +719,11 @@ test('more changed files outside the stage\'s own list than a card plausibly tou
 	expect(atLimit.writes[2].labels).toEqual(['tier: contained', 'stage: review']);
 });
 
-test('a resumed round compares only this round\'s files: an earlier round\'s files read as neither unlisted nor untouched', async () => {
+test('a rework round listing every file its branch changed reports nothing unlisted and nothing untouched', async () => {
 	setup();
-	answered('advance', { touches: ['src/cli.mjs'] }, 0.5);
 
 	const earlier = changedFiles(5);
+	answered('advance', { touches: earlier.concat(['src/cli.mjs']) }, 0.5);
 	git.given.changes = { unpushed: true, changed: earlier.concat(['src/cli.mjs']), round: ['src/cli.mjs'], untracked: [] };
 
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
@@ -731,6 +731,16 @@ test('a resumed round compares only this round\'s files: an earlier round\'s fil
 	expect(pass.writes[1].body).toContain('**Files changed (6):**');
 	expect(pass.writes[1].body).not.toContain('Not in the stage\'s own list');
 	expect(pass.writes[1].body).not.toContain('Listed but untouched');
+});
+
+test('a file named on the stage\'s list that the branch never changed still reports as untouched', async () => {
+	setup();
+	answered('advance', { touches: ['src/cli.mjs', 'src/help.mjs'] }, 0.5);
+	git.given.changes = { unpushed: true, changed: ['src/cli.mjs'], round: ['src/cli.mjs'], untracked: [] };
+
+	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(pass.writes[1].body).toContain('**Listed but untouched:** `src/help.mjs`.');
 });
 
 // What the model wrote as its section, and the section Team1 posts: on the pull for a build, on the card for a question.
