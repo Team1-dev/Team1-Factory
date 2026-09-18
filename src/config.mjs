@@ -88,7 +88,9 @@ export function loadEnv(env) {
 	state.modelEnvironment = {};
 	for (const name of Object.keys(env)) {
 		if (childAllowed(name)) state.childEnvironment[name] = env[name];
-		if (childAllowed(name) || name.startsWith(MODEL_ENVIRONMENT_PREFIX)) state.modelEnvironment[name] = env[name];
+		// HOME is left out of the model child's own environment: claude.mjs gives it a HOME and a CLAUDE_CONFIG_DIR of its own,
+		// scoped to the one credential it needs, instead of the runner's real home directory.
+		if ((childAllowed(name) && name !== 'HOME') || name.startsWith(MODEL_ENVIRONMENT_PREFIX)) state.modelEnvironment[name] = env[name];
 	}
 
 	state.childAbort       = new AbortController();

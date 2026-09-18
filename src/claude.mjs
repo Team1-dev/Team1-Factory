@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -200,6 +200,17 @@ export function readResult(output, model, call, sessionId) {
 	};
 }
 
+// A directory of the child's own, holding nothing but a symlink to the runner's credential file: the child authenticates
+// through it without ever being handed the runner's home directory. The symlink means a refresh claude writes through it
+// lands on the real file, so the credential does not go stale the way a copy would.
+async function childConfigDir(scratch) {
+	const dir = join(scratch, 'config');
+	await mkdir(dir);
+	await symlink(join(process.env.HOME, '.claude', '.credentials.json'), join(dir, '.credentials.json'));
+
+	return dir;
+}
+
 async function claudeOnce(model, call) {
 	const sinceLast = Date.now() - state.lastClaudeCallAt;
 	if (sinceLast < MODEL_CALL_GAP_MS) await sleep(MODEL_CALL_GAP_MS - sinceLast);
@@ -213,9 +224,10 @@ async function claudeOnce(model, call) {
 
 	const sessionId = call.priorSession ?? randomUUID();
 
-	// The flags and the config dir come after the caller's variables so no call can switch them off.
-	// The operator's own ~/.claude: one login, refreshed in place. A private copy of the credentials goes stale on the first refresh.
-	const environment = { ...modelEnvironment(), ...call.env, ...CHILD_FLAGS, CLAUDE_CONFIG_DIR: join(process.env.HOME, '.claude') };
+	const configDir = await childConfigDir(scratch);
+
+	// The flags, HOME and the config dir come after the caller's variables so no call can switch them off.
+	const environment = { ...modelEnvironment(), ...call.env, ...CHILD_FLAGS, HOME: scratch, CLAUDE_CONFIG_DIR: configDir };
 	if (call.cacheTtl !== undefined) environment.CLAUDE_CODE_PROMPT_CACHE_TTL = call.cacheTtl;
 
 	const cwd = call.cwd ?? scratch;

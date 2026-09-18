@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { state } from '../../src/config.mjs';
 import { realPromptClaude } from './mocks.mjs';
 import { shell, timers } from '../doubles.mjs';
@@ -52,7 +52,10 @@ test('one classify call: the child gets the role model, effort, budget and cache
 	expect(JSON.parse(after(call.args, '--settings')).claudeMdExcludes).toEqual([WORK + '/**/CLAUDE.md', WORK + '/**/CLAUDE.local.md', WORK + '/**/.claude/rules/**']);
 	expect(call.options.input).toBe('hello');
 	expect(call.options.environment.CLAUDE_CODE_PROMPT_CACHE_TTL).toBe('5m');
-	expect(call.options.environment.CLAUDE_CONFIG_DIR).toBe(WORK + '/.claude');
+	// A scratch directory of the child's own, not the runner's real $HOME/.claude.
+	expect(call.options.environment.CLAUDE_CONFIG_DIR.endsWith('/config')).toBe(true);
+	expect(call.options.environment.HOME).toBe(dirname(call.options.environment.CLAUDE_CONFIG_DIR));
+	expect(call.options.environment.HOME).not.toBe(WORK);
 	expect(call.options.environment.DISABLE_TELEMETRY).toBe('1');
 	expect(call.options.environment.CLAUDE_CODE_OAUTH_TOKEN).toBe('secret');
 	expect(reply.output).toEqual({ verdict: 'placeholder', reason: 'r' });
@@ -71,7 +74,8 @@ test('a caller cannot switch the child flags or its config dir off through env',
 	const environment = shell.calls[0].options.environment;
 
 	expect(environment.DISABLE_TELEMETRY).toBe('1');
-	expect(environment.CLAUDE_CONFIG_DIR).toBe(WORK + '/.claude');
+	expect(environment.CLAUDE_CONFIG_DIR.endsWith('/config')).toBe(true);
+	expect(environment.HOME).toBe(dirname(environment.CLAUDE_CONFIG_DIR));
 	expect(environment.CLAUDE_PROJECT_DIR).toBe('/p');
 });
 

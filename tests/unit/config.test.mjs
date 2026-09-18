@@ -45,6 +45,13 @@ test('loadEnv: a claude variable reaches the model child only; the gates never s
 	expect(modelEnvironment()).toEqual({ PATH: '/bin', LC_ALL: 'C', CLAUDE_CODE_OAUTH_TOKEN: 'secret' });
 });
 
+test('loadEnv: HOME reaches the gates but not the model child, which claude.mjs gives a scoped HOME of its own', () => {
+	loadEnv({ PATH: '/bin', HOME: '/home/runner' });
+
+	expect(childEnvironment()).toEqual({ PATH: '/bin', HOME: '/home/runner' });
+	expect(modelEnvironment()).toEqual({ PATH: '/bin' });
+});
+
 test('loadEnv: the work dir and the home directory are set as the paths every posted message gets scrubbed of', () => {
 	loadEnv({ WORK_DIR: join(homedir(), '.team1', 'work') });
 
