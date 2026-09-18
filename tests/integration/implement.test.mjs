@@ -392,6 +392,24 @@ test('a rework round appends its section to the pull body instead of losing it',
 	expect(callNames(third.writes)).toEqual(['comment', 'setLabels']);
 });
 
+test('a pull with no description takes the round\'s section as its whole body, no leading rule', async () => {
+	setup();
+	answered('advance', {}, 0.5);
+	pushed(['src/cli.mjs']);
+
+	const pull = openPull(77, BRANCH);
+	pull.body = null;
+
+	const pass = await passOver({
+		issues: [implementCard([], 'x')],
+		comments: { [CARD]: [triaged()] },
+		pulls: { [BRANCH]: pull },
+	}, CARD);
+
+	expect(callNames(pass.writes)).toEqual(['updatePull', 'comment', 'setLabels']);
+	expect(pass.writes[0]).toEqual({ name: 'updatePull', number: 77, body: SECTION });
+});
+
 test('a trivial change merges unreviewed unless it came from outside or touches project.md', async () => {
 	setup();
 	answered('advance', {}, 0.2);

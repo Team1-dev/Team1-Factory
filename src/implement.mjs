@@ -249,6 +249,22 @@ function tooManyFilesOutcome(run, attempt, unlisted) {
 	return batchOutcome(run.batch, body, 'failed', measured);
 }
 
+// An open pull's body gets this round's section under a rule, in order; a body GitHub returns as `null` (no description) takes
+// the section as its whole body, with no leading rule. A round identical to the last one appended is not appended twice. An
+// `updatePull` failure — an over-long body, a passing 5xx — is logged rather than left to silently drop the section.
+async function appendRound(run, pull, section) {
+	const existingBody = pull.body ?? '';
+	const rounds = existingBody.split(RULE);
+	if (rounds[rounds.length - 1] === section) return;
+
+	const updatedBody = existingBody === '' ? section : existingBody + RULE + section;
+	try {
+		await run.github.updatePull(pull.number, updatedBody);
+	} catch (error) {
+		console.log(run.tag + ': updatePull #' + pull.number + ' failed: ' + error.message);
+	}
+}
+
 async function pushedOutcome(run, worktree, attempt) {
 	const base = run.board.defaultBranch;
 	const measured = attempt.measured;
@@ -273,12 +289,8 @@ async function pushedOutcome(run, worktree, attempt) {
 	let pullError = '';
 	try {
 		pull = await run.github.pullFor(run.branch);
-		if (pull === undefined) {
-			pull = await run.github.createPull(redactSecrets(title), run.branch, base, pullBody);
-		} else {
-			const rounds = pull.body.split(RULE);
-			if (rounds[rounds.length - 1] !== section) await run.github.updatePull(pull.number, pull.body + RULE + section);
-		}
+		if (pull === undefined) pull = await run.github.createPull(redactSecrets(title), run.branch, base, pullBody);
+		else await appendRound(run, pull, section);
 	} catch (error) {
 		pullError = error.message;
 	}
