@@ -1,3 +1,5 @@
+import { repoState } from './config.mjs';
+
 const API = 'https://api.github.com';
 const PAGE_SIZE = 100;
 
@@ -87,8 +89,33 @@ export function client(repo, token, apiBase) {
 		return request('POST', base + '/issues', { title: title, body: body, labels: labelNames });
 	}
 
+	// A repeat call sends back the etag from the last one: unchanged since, GitHub answers 304 without spending against the rate
+	// limit, and the comments already read stand. The etag is per page, not per issue, so this only trusts a single page: a
+	// cache is kept, and a conditional request sent, only when the whole comment list fit on page one last time — an issue that
+	// spills onto a second page is always read fresh, since its first page can answer 304 while page two grew underneath it.
 	async function comments(number) {
-		return requestAll(base + '/issues/' + number + '/comments');
+		const url = base + '/issues/' + number + '/comments';
+		const cache = repoState(repo).commentsCache ??= {};
+		const cached = cache[url];
+		const conditionalHeaders = cached === undefined ? headers : { ...headers, 'If-None-Match': cached.etag };
+
+		const response = await fetch(url + '?per_page=' + PAGE_SIZE + '&page=1', { headers: conditionalHeaders });
+
+		if (response.status === 304) return cached.items;
+		if (!response.ok) throw new Error('GET ' + url + ' ' + response.status);
+
+		let items = await response.json();
+		const singlePage = items.length < PAGE_SIZE;
+		let lastBatch = items;
+		for (let page = 2; lastBatch.length === PAGE_SIZE; page += 1) {
+			lastBatch = await request('GET', url + '?per_page=' + PAGE_SIZE + '&page=' + page);
+			items = items.concat(lastBatch);
+		}
+
+		if (singlePage) cache[url] = { etag: response.headers.get('etag'), items: items };
+		else delete cache[url];
+
+		return items;
 	}
 
 	async function comment(number, body) {

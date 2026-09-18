@@ -134,6 +134,63 @@ function emptyGitHub(request, response) {
 	return response.end(LISTED_REGEX.test(path) && request.method === 'GET' ? '[]' : '{"number":1}');
 }
 
+test('comments() revalidates a single-page issue by etag and serves the cache on a 304', async () => {
+	let calls = 0;
+	const github = await listen((request, response) => {
+		calls += 1;
+		if (calls === 1) {
+			response.writeHead(200, { 'Content-Type': 'application/json', ETag: 'W/"first"' });
+
+			return response.end(JSON.stringify([{ id: 1 }, { id: 2 }]));
+		}
+
+		expect(request.headers['if-none-match']).toBe('W/"first"');
+		response.writeHead(304);
+
+		return response.end();
+	});
+	const api = client('acme/single-page', 'tok', github.base);
+
+	const first = await api.comments(10);
+	const second = await api.comments(10);
+
+	expect(first).toEqual([{ id: 1 }, { id: 2 }]);
+	expect(second).toEqual(first);
+	expect(calls).toBe(2);
+	github.close();
+});
+
+test('comments() never caches an issue that spills onto a second page, so a comment landing there is not missed', async () => {
+	let secondCallItems = 21;
+	const github = await listen((request, response) => {
+		const url = new URL(request.url, 'http://x');
+		const page = Number(url.searchParams.get('page'));
+
+		if (page === 1) {
+			expect(request.headers['if-none-match']).toBeUndefined();
+			response.writeHead(200, { 'Content-Type': 'application/json', ETag: 'W/"page1"' });
+
+			return response.end(JSON.stringify(Array.from({ length: 100 }, (_, index) => ({ id: index }))));
+		}
+
+		response.writeHead(200, { 'Content-Type': 'application/json' });
+
+		return response.end(JSON.stringify(Array.from({ length: secondCallItems }, (_, index) => ({ id: 100 + index }))));
+	});
+	const api = client('acme/two-pages', 'tok', github.base);
+
+	const first = await api.comments(20);
+
+	expect(first.length).toBe(121);
+
+	secondCallItems = 22;
+
+	const second = await api.comments(20);
+
+	expect(second.length).toBe(122);
+	github.close();
+});
+
 test('every function of the client sends the method, path and body GitHub expects', async () => {
 	const github = await listen(emptyGitHub);
 	const api = client('acme/app', 'tok', github.base);

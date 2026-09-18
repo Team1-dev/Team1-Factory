@@ -177,33 +177,51 @@ export async function closeCoveredProposals(run, pull, diffText) {
 
 // A card a person merged closes with no `merged` note from us, so its proposals issue never gets `closeCoveredProposals`'s one
 // pass over the landed diff. Swept from the recently closed cards instead: a card already carrying our `merged` note landed
-// through handleMerge and was checked there. The proposals issue is stamped with the sha it was read against, so a second sweep
-// over the same merge spends nothing.
+// through handleMerge and was checked there. Once a closed card is fully resolved here — swept or found to need nothing — its
+// number goes into this process's own memory, so a later pass over the same `closedIssues` window skips it without a single
+// call; only a restart pays for that card again.
 export async function sweepMergedProposals(github, board) {
+	const perRepo = repoState(github.repo);
+	perRepo.sweptProposals ??= {};
+
+	const swept = perRepo.sweptProposals;
+
 	for (const githubIssue of await github.closedIssues(40)) {
 		if (githubIssue.pull_request !== undefined) continue;
+		if (swept[githubIssue.number]) continue;
 
 		const tag = github.repo + ' #' + githubIssue.number;
 		try {
 			const card = readCard(githubIssue, board.runnerLogin, state.trustedLogins);
 			const proposalsIssue = board.cards.find(existing => existing.title === proposalsTitle(card));
 
-			if (proposalsIssue === undefined) continue;
+			if (proposalsIssue === undefined) {
+				swept[githubIssue.number] = true;
+				continue;
+			}
 
 			const cardComments = (await github.comments(card.number)).map(comment => readComment(comment, board.runnerLogin, state.trustedLogins));
 			const mergedByUs = cardComments.some(comment => comment.stamp?.verdict === 'merged');
 
-			if (mergedByUs) continue;
+			if (mergedByUs) {
+				swept[githubIssue.number] = true;
+				continue;
+			}
 
 			const pulls = await github.closedPullsFor(branchOf(card));
 			const pull = pulls.find(candidate => candidate.merged_at !== null);
 
+			// Not a terminal state, unlike the other three exits: the card closed before its pull merged, which can still
+			// happen later, so this one is left out of the memory and checked again next pass.
 			if (pull === undefined) continue;
 
 			const proposalsComments = await github.comments(proposalsIssue.number);
 			const alreadySwept = proposalsComments.some(comment => comment.user?.login === board.runnerLogin && comment.body.includes(pull.head.sha));
 
-			if (alreadySwept) continue;
+			if (alreadySwept) {
+				swept[githubIssue.number] = true;
+				continue;
+			}
 
 			const conversation = readConversation(card, cardComments, 'merge');
 			const run = { repo: github.repo, tag: tag, github: github, lead: card, board: board, stage: { name: 'merge' }, area: undefined, conversation: conversation };
@@ -213,6 +231,7 @@ export async function sweepMergedProposals(github, board) {
 			const body = note(run, 'proposals-swept', { sha: pull.head.sha, number: pull.number }, measured);
 
 			await github.comment(proposalsIssue.number, redactSecrets(body));
+			swept[githubIssue.number] = true;
 		} catch (error) {
 			console.log(tag + ': proposals sweep failed: ' + error.message);
 		}
