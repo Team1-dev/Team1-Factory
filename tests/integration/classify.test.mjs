@@ -27,22 +27,22 @@ test('classify: the schema names the reader\'s verdicts and requires a reason; a
 	expect(read.reason.length).toBe(300);
 });
 
-test('classify: a model failure or a reply without a verdict is an unread; a fault of our own is thrown', async () => {
-	expect(await classify('t', 'prompt', 'thing', VERDICTS)).toBeUndefined();
+test('classify: a model failure or a reply without a verdict is an unread that still carries its cost; a fault of our own is thrown', async () => {
+	expect(await classify('t', 'prompt', 'thing', VERDICTS)).toEqual({ verdict: undefined, reason: '', cost: 0 });
 
 	model.answers.push(modelAnswer({}, 0.01));
 
-	expect(await classify('t', 'prompt', 'thing', VERDICTS)).toBeUndefined();
+	expect(await classify('t', 'prompt', 'thing', VERDICTS)).toEqual({ verdict: undefined, reason: '', cost: 0.01 });
 
 	model.answers.push(new TypeError('our bug'));
 
 	await expect(classify('t', 'prompt', 'thing', VERDICTS)).rejects.toThrow('our bug');
 });
 
-test('an account limit inside a reading is noted for the process and the reading is an unread', async () => {
-	model.answers.push(failure('Claude AI usage limit reached|1760000000', {}));
+test('an account limit inside a reading is noted for the process and the reading is an unread that still carries its cost', async () => {
+	model.answers.push(failure('Claude AI usage limit reached|1760000000', { cost: 0.03 }));
 
-	expect(await classify('t', 'prompt', 'thing', VERDICTS)).toBeUndefined();
+	expect(await classify('t', 'prompt', 'thing', VERDICTS)).toEqual({ verdict: undefined, reason: '', cost: 0.03 });
 	expect(state.exhaustedUntil).toBe((1760000000 * 1000) + 60000);
 });
 

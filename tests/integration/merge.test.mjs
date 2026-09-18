@@ -1,5 +1,6 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { branchOf } from '../../src/cards.mjs';
+import { failure } from '../../src/claude.mjs';
 import { fragment } from '../../src/prompts.mjs';
 import { model, git, gates, timers } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
@@ -313,9 +314,9 @@ test('merged: proposals read against the merged diff add their cost to the total
 	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.02** in total.\n\n— team1-factory · merge · merged · $0.02 · total $0.02 · sonnet');
 });
 
-test('merged: a proposal reading that fails part way through still reports what was already paid for', async () => {
+test('merged: a proposal reading that fails part way through still reports what was already paid for, including its own spend', async () => {
 	setup();
-	model.answers.push(modelAnswer({ verdict: 'covered', reason: 'done in the diff' }, 0.01));
+	model.answers.push(modelAnswer({ verdict: 'covered', reason: 'done in the diff' }, 0.01), failure('a fault', { cost: 0.03 }));
 
 	const proposalsIssue = issue(900, ['findings'], 'proposals');
 	proposalsIssue.title = 'Proposals from #5: Card 5';
@@ -329,7 +330,7 @@ test('merged: a proposal reading that fails part way through still reports what 
 
 	const pass = await passOver(given, CARD);
 
-	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.01** in total.\n\n— team1-factory · merge · merged · $0.01 · total $0.01 · sonnet');
+	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.04** in total.\n\n— team1-factory · merge · merged · $0.04 · total $0.04 · sonnet');
 });
 
 test('merged: no proposals card, or one with nothing to read, still costs nothing', async () => {
@@ -433,6 +434,22 @@ test('a comment the classifier cannot read holds the merge; two unanswered comme
 	expect(model.calls[0].prompt).toContain('the newer one');
 	expect(model.calls[1].prompt).toContain('the older one');
 	expect(noted.writes[0].body).toContain('@owner said "the newer one" on #50, with 1 earlier comment(s) — read as approval: fine');
+});
+
+test('a comment read that fails after an earlier one already spent still logs the spend when it holds', async () => {
+	setup();
+	model.answers.push(modelAnswer({ verdict: 'approval', reason: 'fine' }, 0.01));
+
+	const given = withPull(openPull(PULL, BRANCH));
+	given.comments = { [PULL]: [person('the older one'), person('the newer one')] };
+
+	const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+	await passOver(given, CARD);
+
+	expect(log.mock.calls.some(call => call[0].includes('held until it can be read, $0.01 spent reading so far'))).toBe(true);
+
+	log.mockRestore();
 });
 
 test('no pull and the comparison unavailable: the no-pull note says nothing was pushed', async () => {

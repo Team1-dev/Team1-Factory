@@ -19,11 +19,11 @@ function readingSchema(verdicts) {
 export async function classify(tag, prompt, subject, verdicts) {
 	try {
 		const reply = await promptClaude('classify', undefined, prompt, { tools: [], schema: readingSchema(verdicts) });
-		// A reply can come back with no structured output at all; that is an unread, never a verdict.
+		// A reply can come back with no structured output at all; that is an unread, never a verdict. Its cost still counts.
 		if (reply.output.verdict === undefined) {
 			console.log(tag + ': ' + subject + ' reading gave no verdict');
 
-			return undefined;
+			return { verdict: undefined, reason: '', cost: reply.metrics.cost };
 		}
 
 		return {
@@ -39,7 +39,7 @@ export async function classify(tag, prompt, subject, verdicts) {
 		console.log(tag + ': ' + subject + ' reading failed: ' + error.message);
 		noteExhaustion(error);
 
-		return undefined;
+		return { verdict: undefined, reason: '', cost: error.cost };
 	}
 }
 
@@ -64,14 +64,15 @@ export async function hiddenInstruction(run, comment, commentId) {
 		hidden: blockquote(comment.hidden.join('\n\n---\n\n'), HIDDEN_LIMIT),
 	}), 'hidden text', ['placeholder', 'instruction']);
 
-	if (reading === undefined) {
+	finding.cost = reading.cost;
+
+	if (reading.verdict === undefined) {
 		finding.unread = true;
 
 		return finding;
 	}
 
 	finding.instruction = reading.verdict === 'instruction';
-	finding.cost        = reading.cost;
 	if (finding.instruction) finding.why = reading.reason;
 
 	state.hiddenReadings[key] = finding;

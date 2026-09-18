@@ -64,6 +64,8 @@ Nothing will work on this while `duplicate` is on. A person confirms: close it, 
 _Review reached `{outcome}` but its section did not arrive — the model wrote the verdict in a message of its own, and Team1 is given only the last one. The verdict stands; the reasoning behind it is lost._
 <!-- implement-section-missing -->
 _Implement reached `{outcome}` but wrote nothing under its headings — no plan or implementation notes to show._
+<!-- review-not-delivered -->
+_Review said `advance`, but {reason} Sent back to implement instead of merge._
 <!-- stale-base -->
 #{number} no longer merges cleanly with the default branch. Sending it back to rebase before it is reviewed — a diff against a stale base is not the change that would land.
 
@@ -178,5 +180,9 @@ Could not merge #{number}.
 The branch conflicts with the base — it needs rebasing onto the current default branch before this can land.
 <!-- merged -->
 Merged #{number}. This card cost **${total}** in total.
+
+{stamp}
+<!-- proposals-swept -->
+Read against #{number}, merged by a person rather than through `handleMerge`, checked here against `{sha}`.
 
 {stamp}

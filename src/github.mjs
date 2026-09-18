@@ -117,6 +117,10 @@ export function client(repo, token, apiBase) {
 		return request('GET', base + '/pulls/' + number);
 	}
 
+	async function closedPullsFor(branch) {
+		return requestAll(base + '/pulls?state=closed&head=' + owner + ':' + branch);
+	}
+
 	async function createPull(title, branch, target, body) {
 		return request('POST', base + '/pulls', { title: title, head: branch, base: target, body: body });
 	}
@@ -186,6 +190,7 @@ export function client(repo, token, apiBase) {
 		close: close,
 		pullFor: pullFor,
 		pull: pull,
+		closedPullsFor: closedPullsFor,
 		createPull: createPull,
 		updatePull: updatePull,
 		labelPull: labelPull,

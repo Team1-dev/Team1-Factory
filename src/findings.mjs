@@ -1,5 +1,6 @@
+import { branchOf, readCard, readComment } from './cards.mjs';
 import { classify } from './classify.mjs';
-import { repoState } from './config.mjs';
+import { repoState, state } from './config.mjs';
 import { ledgerClassify } from './ledger.mjs';
 import { note } from './outcomes.mjs';
 import { fragment } from './prompts.mjs';
@@ -142,13 +143,13 @@ export async function closeCoveredProposals(run, pull) {
 		let allCovered = true;
 		for (const section of sections) {
 			const reading = await judgeProposal(run, diffText, section);
+			cost += reading.cost;
 
-			if (reading === undefined) {
+			if (reading.verdict === undefined) {
 				allCovered = false;
 				continue;
 			}
 
-			cost += reading.cost;
 			model = reading.model;
 			ledgerClassify(run, section.commentId, reading);
 			if (reading.verdict !== 'covered') {
@@ -166,4 +167,46 @@ export async function closeCoveredProposals(run, pull) {
 	}
 
 	return { cost: cost, model: model };
+}
+
+// A card a person merged closes with no `merged` note from us, so its proposals issue never gets `closeCoveredProposals`'s one
+// pass over the landed diff. Swept from the recently closed cards instead: a card already carrying our `merged` note landed
+// through handleMerge and was checked there. The proposals issue is stamped with the sha it was read against, so a second sweep
+// over the same merge spends nothing.
+export async function sweepMergedProposals(github, board) {
+	for (const githubIssue of await github.closedIssues(40)) {
+		if (githubIssue.pull_request !== undefined) continue;
+
+		const tag = github.repo + ' #' + githubIssue.number;
+		try {
+			const card = readCard(githubIssue, board.runnerLogin, state.trustedLogins);
+			const proposalsIssue = board.cards.find(existing => existing.title === proposalsTitle(card));
+
+			if (proposalsIssue === undefined) continue;
+
+			const cardComments = await github.comments(card.number);
+			const mergedByUs = cardComments.some(comment => readComment(comment, board.runnerLogin, state.trustedLogins).stamp?.verdict === 'merged');
+
+			if (mergedByUs) continue;
+
+			const pulls = await github.closedPullsFor(branchOf(card));
+			const pull = pulls.find(candidate => candidate.merged_at !== null);
+
+			if (pull === undefined) continue;
+
+			const proposalsComments = await github.comments(proposalsIssue.number);
+			const alreadySwept = proposalsComments.some(comment => comment.user?.login === board.runnerLogin && comment.body.includes(pull.head.sha));
+
+			if (alreadySwept) continue;
+
+			const run = { repo: github.repo, tag: tag, github: github, lead: card, board: board, stage: { name: 'merge' }, area: undefined };
+			const proposals = await closeCoveredProposals(run, pull);
+			const measured = { verdict: 'proposals-swept', cost: proposals.cost, model: proposals.model };
+			const body = note(run, 'proposals-swept', { sha: pull.head.sha, number: pull.number }, measured);
+
+			await github.comment(proposalsIssue.number, redactSecrets(body));
+		} catch (error) {
+			console.log(tag + ': proposals sweep failed: ' + error.message);
+		}
+	}
 }
