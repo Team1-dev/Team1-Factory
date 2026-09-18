@@ -39,8 +39,12 @@ async function answerComments(run, pull, unanswered) {
 		cost += reading.cost;
 
 		if (reading.verdict === undefined) {
-			return hold(run.repo, run.lead.number, 'could not read a comment on ' + pull.html_url
-				+ ' — held until it can be read, $' + cost.toFixed(2) + ' spent reading so far');
+			start(run);
+
+			const measured = { verdict: 'unreadable-comment', cost: cost };
+			const body = note(run, 'comment-unreadable', { number: pull.number }, measured);
+
+			return batchOutcome(run.batch, body, undefined, measured);
 		}
 
 		if (newestReading === undefined) newestReading = reading;
