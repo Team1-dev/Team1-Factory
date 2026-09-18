@@ -6,7 +6,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { branchOf, ROUTING_LABELS } from '../src/cards.mjs';
 import { loadEnv, state, tokenNameFor } from '../src/config.mjs';
 import { client } from '../src/github.mjs';
-import { processRepo } from '../src/run.mjs';
+import { processRepo } from '../src/poll.mjs';
 
 // A person runs this on a branch, against a real sandbox repo, to catch what the doubled unit and integration suites cannot:
 // a card crossing more than one pass, a real branch and pull request, and the board a card actually ends up on. Costs real
