@@ -154,7 +154,10 @@ function redactAccountName(text) {
 		const afterAt = at + redactedAccountName.length;
 		const after = afterAt >= text.length ? '' : text[afterAt];
 		if (before !== '' && before !== '/') continue;
-		if (after !== '' && continuesSegment(after)) continue;
+		// A `.`, `-` or `_` continues the segment only where something follows it: a name with `.bak` after it is another
+		// directory, while a name ending a sentence is this account with a full stop after it.
+		const beyond = afterAt + 1 >= text.length ? '' : text[afterAt + 1];
+		if (after !== '' && continuesSegment(after) && (/[A-Za-z0-9]/.test(after) || continuesSegment(beyond))) continue;
 
 		clean += text.slice(from, at) + '<user>';
 		from = afterAt;
