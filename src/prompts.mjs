@@ -200,7 +200,8 @@ function headingsIn(lines, cutOn, fenceAware) {
 export function sectionOf(text, cutOn, normalize) {
 	const lines = text.split('\n');
 	let found = headingsIn(lines, cutOn, true);
-	if (found.firstHeading === -1) found = headingsIn(lines, cutOn, false);
+	const missed = cutOn !== undefined ? found.anchorAt === -1 : found.firstHeading === -1;
+	if (missed) found = headingsIn(lines, cutOn, false);
 
 	const cutAt = found.anchorAt !== -1 ? found.anchorAt : found.firstHeading;
 	if (cutAt === -1) return '';

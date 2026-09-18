@@ -747,4 +747,8 @@ test('a fence that never closes, or an odd fenced sample, does not swallow the h
 	const oddSample = '```md\n```\n```\n\n## Plan\nthe plan';
 
 	expect(await sectionPosted(oddSample, 'advance')).toBe('## Plan\nthe plan');
+
+	const titledUnclosed = '# Notes\n\nSome text\n\n```sh\nsome command\n\n## Plan\nreal plan';
+
+	expect(await sectionPosted(titledUnclosed, 'advance')).toBe('## Plan\nreal plan');
 });
