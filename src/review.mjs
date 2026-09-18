@@ -40,9 +40,8 @@ function undelivered(files, output) {
 
 // The pull's diff less generated files, a read clone of the branch, and the commit messages; or the finding that stops it.
 async function changeUnderReview(run, pull, pullText) {
-	const diffText = await run.github.diff(pull.number);
 	const commits = await run.github.pullCommits(pull.number);
-	const change = { number: pull.number, body: pullText.body.trim(), root: undefined, diff: parseDiff(diffText, run.area.reviewIgnores), messages: [], finding: undefined };
+	const change = { number: pull.number, body: pullText.body.trim(), root: undefined, diff: undefined, messages: [], finding: undefined };
 	for (const commit of commits) {
 		const text = commitText(run, commit);
 		const finding = await hiddenInstruction(run, text, 'commit ' + commit.sha);
@@ -59,6 +58,9 @@ async function changeUnderReview(run, pull, pullText) {
 	const worktree = await readClone(run, '-review');
 
 	change.root = worktree.root;
+
+	const diffText = await run.git.diff(worktree.root, pull.base.ref);
+	change.diff = parseDiff(diffText, run.area.reviewIgnores);
 
 	return change;
 }

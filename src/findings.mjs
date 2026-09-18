@@ -128,8 +128,9 @@ async function judgeProposal(run, diffText, section) {
 
 // Once a card lands, its own proposals issue is read for what the merged diff already covers: each covered
 // proposal gets its own comment naming the pull request, and the issue closes once none are left open. A card
-// lands once, so this is the only pass its proposals issue ever gets.
-export async function closeCoveredProposals(run, pull) {
+// lands once, so this is the only pass its proposals issue ever gets. diffText is the caller's own — the merged
+// clone when it has one, the rendered document from GitHub when it does not.
+export async function closeCoveredProposals(run, pull, diffText) {
 	let cost = 0;
 	let model;
 	try {
@@ -144,8 +145,6 @@ export async function closeCoveredProposals(run, pull) {
 		}
 
 		if (sections.length === 0) return { cost: cost, model: model };
-
-		const diffText = await run.github.diff(pull.number);
 
 		let allCovered = true;
 		for (const section of sections) {
@@ -208,7 +207,8 @@ export async function sweepMergedProposals(github, board) {
 
 			const conversation = readConversation(card, cardComments, 'merge');
 			const run = { repo: github.repo, tag: tag, github: github, lead: card, board: board, stage: { name: 'merge' }, area: undefined, conversation: conversation };
-			const proposals = await closeCoveredProposals(run, pull);
+			const diffText = await github.diff(pull.number);
+			const proposals = await closeCoveredProposals(run, pull, diffText);
 			const measured = { verdict: 'proposals-swept', cost: proposals.cost, model: proposals.model };
 			const body = note(run, 'proposals-swept', { sha: pull.head.sha, number: pull.number }, measured);
 

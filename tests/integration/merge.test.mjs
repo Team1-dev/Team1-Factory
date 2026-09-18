@@ -286,8 +286,8 @@ test('merged: the note, the routing label cleared, the remote branch deleted, th
 	expect(pass.writes[3]).toEqual({ name: 'deleteBranch', branch: BRANCH });
 	expect(pass.card.labels).toEqual(['tier: contained', 'priority: high']);
 	expect(pass.card.routingLabel).toBe('');
-	expect(callNames(git.calls)).toEqual(['checkout', 'rebaseOnto', 'removeWorktree', 'deleteLocalBranch']);
-	expect(git.calls[3]).toEqual({ name: 'deleteLocalBranch', branch: BRANCH });
+	expect(callNames(git.calls)).toEqual(['checkout', 'rebaseOnto', 'diff', 'removeWorktree', 'deleteLocalBranch']);
+	expect(git.calls[4]).toEqual({ name: 'deleteLocalBranch', branch: BRANCH });
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:merged']);
 });
 

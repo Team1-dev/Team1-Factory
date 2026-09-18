@@ -212,7 +212,8 @@ async function landPull(run, pull) {
 		return backToImplement(run, 'merge-refused', { number: pull.number, why: why }, kind === 'conflict' ? 'conflict' : 'merge-refused');
 	}
 
-	const proposals = await closeCoveredProposals(run, pull);
+	const diffText = await run.git.diff(worktree.root, base);
+	const proposals = await closeCoveredProposals(run, pull, diffText);
 
 	const measured = { verdict: 'merged', cost: proposals.cost, model: proposals.model };
 

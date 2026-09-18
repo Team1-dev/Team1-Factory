@@ -147,6 +147,16 @@ test('a read-only checkout is detached at the default branch; a rebase onto a mo
 	expect(await o.sh(root, ['status', '--porcelain'])).toBe('');
 }, 30000);
 
+test('diff reads the branch against its base straight from the clone, with no size limit and no download', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '5-card');
+	await o.repo.checkout(root, 'card/5-x', false);
+	writeFileSync(join(root, 'feature.txt'), 'feature\n');
+	await o.repo.commitAndPush(root, 'card/5-x', 'feature', ['feature.txt']);
+
+	expect(await o.repo.diff(root, 'main')).toContain('+feature');
+}, 30000);
+
 test('a git command that fails throws with its command and the output tail; a resumed worktree behind its remote is reset to it', async () => {
 	const o = await origin();
 	const root = join(o.base, 'work', '5-card');
