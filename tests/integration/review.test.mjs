@@ -32,7 +32,7 @@ function built() {
 }
 
 function answered(verdict, extra, cost) {
-	const output = { section: SECTION, verdict: verdict };
+	const output = { section: SECTION, verdict: verdict, delivers: true, where: 'src/cli.mjs' };
 	for (const name of Object.keys(extra)) {
 		output[name] = extra[name];
 	}
@@ -233,6 +233,39 @@ test('advance posts the section and moves to ready to merge; a trivial card gets
 	expect(model.calls[0].role).toBe('trivial');
 });
 
+test('advance is not enough on its own: a where outside the diff, or delivers: false, routes back to implement', async () => {
+	setup();
+	answered('advance', { where: 'src/other.mjs' }, 0.4);
+
+	const wrongFile = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
+
+	expect(wrongFile.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
+	expect(wrongFile.writes[0].body).toContain('but it named `src/other.mjs` as doing it, but the diff never touches that file.');
+	expect(wrongFile.writes[0].body.endsWith('· review · reject-local · $0.40 · total $1.50 · sonnet')).toBe(true);
+
+	setup();
+	answered('advance', { delivers: false }, 0.4);
+
+	const notDelivered = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
+
+	expect(notDelivered.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
+	expect(notDelivered.writes[0].body).toContain('the review found the change does not do what the card asked.');
+});
+
+test('a where is read generously: backticks, a leading ./, a trailing :line, a sentence around it, or a bare basename all name the file', async () => {
+	for (const where of [
+		'src/cli.mjs', '`src/cli.mjs`', 'src/cli.mjs:42', './src/cli.mjs', 'cli.mjs',
+		'src/cli.mjs (the parseDuration helper)', 'the new helper in src/cli.mjs',
+	]) {
+		setup();
+		answered('advance', { where: where }, 0.4);
+
+		const pass = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
+
+		expect(pass.writes[1].labels).toEqual(['tier: contained', 'ready to merge']);
+	}
+});
+
 test('reject-local goes back to implement, reject-shape to triage, no verdict is fail and stays', async () => {
 	setup();
 	answered('reject-local', {}, 0.4);
@@ -309,7 +342,7 @@ test('findings are posted to the card\'s proposals issue as one comment, a blank
 test('a missing section is said so and the verdict stands', async () => {
 	setup();
 
-	model.answers.push(modelAnswer({ section: '', verdict: 'advance' }, 0.4));
+	model.answers.push(modelAnswer({ section: '', verdict: 'advance', delivers: true, where: 'src/cli.mjs' }, 0.4));
 
 	const pass = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
 

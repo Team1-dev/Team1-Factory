@@ -23,20 +23,25 @@ export const READ_TOOLS = ['Read', 'Grep', 'Glob'];
 // Sent to claude as --json-schema. Its validator runs ajv in strict mode: every `properties` needs
 // `type: 'object'` and every `items` needs `type: 'array'`, or the call is rejected before it starts.
 // The stage's verdicts are an enum, so the validator holds the model to them and a verdict is read, not checked.
-export function verdictSchema(verdicts) {
-	return {
-		type: 'object',
-		properties: {
-			section: { type: 'string' },
-			verdict: { type: 'string', enum: verdicts },
-			touches: { type: 'array', items: { type: 'string' } },
-			cards: {
-				type: 'array',
-				items: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' } } },
-			},
+export function verdictSchema(verdicts, options) {
+	const properties = {
+		section: { type: 'string' },
+		verdict: { type: 'string', enum: verdicts },
+		touches: { type: 'array', items: { type: 'string' } },
+		cards: {
+			type: 'array',
+			items: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' } } },
 		},
-		required: ['section', 'verdict'],
 	};
+	const required = ['section', 'verdict'];
+
+	if (options?.delivery) {
+		properties.delivers = { type: 'boolean' };
+		properties.where = { type: 'string' };
+		required.push('delivers', 'where');
+	}
+
+	return { type: 'object', properties: properties, required: required };
 }
 
 const MODEL_CALL_GAP_MS = 1500;

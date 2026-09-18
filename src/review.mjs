@@ -20,6 +20,24 @@ function commitText(run, commit) {
 	return readComment({ id: commit.sha, user: commit.author ?? null, body: commit.commit.message }, run.board.runnerLogin, state.trustedLogins);
 }
 
+// Whether `where` names one of the pull's own changed files, read generously: the model may wrap the path in backticks, a
+// leading `./`, a trailing `:line`, or a sentence around it, so a match is a changed file appearing anywhere in the text, or
+// the text naming a changed file by its final path segment.
+function namesChangedFile(files, where) {
+	if (typeof where !== 'string' || where === '') return false;
+
+	return files.some(file => where.includes(file) || file.endsWith('/' + where));
+}
+
+// Whether an `advance` really delivers what the card asked, checked without a model: `where` has to name one of the pull's own
+// changed files, or the claim is unproven. Returns the reason it does not, or undefined when it holds up.
+function undelivered(files, output) {
+	if (output.delivers !== true) return 'the review found the change does not do what the card asked.';
+	if (!namesChangedFile(files, output.where)) return 'it named `' + output.where + '` as doing it, but the diff never touches that file.';
+
+	return undefined;
+}
+
 // The pull's diff less generated files, a read clone of the branch, and the commit messages; or the finding that stops it.
 async function changeUnderReview(run, pull, pullText) {
 	const diffText = await run.github.diff(pull.number);
@@ -99,9 +117,17 @@ export async function handleReview(run) {
 		system: systemPrompt(run),
 		cwd: change.root,
 		tools: READ_TOOLS,
-		schema: verdictSchema(run.stage.verdicts),
+		schema: verdictSchema(run.stage.verdicts, { delivery: true }),
 		permissionMode: 'bypassPermissions',
 	});
+
+	if (reply.output.verdict === 'advance') {
+		const reason = undelivered(change.diff.files, reply.output);
+		if (reason !== undefined) {
+			reply.output.verdict = 'reject-local';
+			reply.section = joinSections([reply.section, fragment('_notes.md', 'review-not-delivered', { reason: reason })]);
+		}
+	}
 
 	return verdictOutcome(run, reply, {
 		defaultVerdict: 'fail',
