@@ -137,6 +137,13 @@ export function setRedactedAccountName(name) {
 	redactedAccountName = name;
 }
 
+// A path segment continues with a letter, digit, `-`, `_` or `.`, so those after the name mean it is a longer segment
+// (`me-backup`, `me.bak`) rather than this account; anything else - a slash, a space, a quote, punctuation, end of string -
+// cannot continue a segment, so the name ends there.
+function continuesSegment(character) {
+	return /[A-Za-z0-9._-]/.test(character);
+}
+
 function redactAccountName(text) {
 	if (redactedAccountName === '') return text;
 
@@ -147,7 +154,7 @@ function redactAccountName(text) {
 		const afterAt = at + redactedAccountName.length;
 		const after = afterAt >= text.length ? '' : text[afterAt];
 		if (before !== '' && before !== '/') continue;
-		if (after !== '' && after !== '/') continue;
+		if (after !== '' && continuesSegment(after)) continue;
 
 		clean += text.slice(from, at) + '<user>';
 		from = afterAt;

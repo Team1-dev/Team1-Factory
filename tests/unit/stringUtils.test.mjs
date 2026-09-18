@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { decodeJsonStringLiteral, redactSecrets, setRedactedRoots, stripInvisible, stripReferenceDefinitions } from '../../src/stringUtils.mjs';
+import { decodeJsonStringLiteral, redactSecrets, setRedactedAccountName, setRedactedRoots, stripInvisible, stripReferenceDefinitions } from '../../src/stringUtils.mjs';
 import { readText } from '../../src/trust.mjs';
 
 test('stripInvisible: the tag block, joiners and fillers go; an emoji\'s variation selector and a bidi mark stay', () => {
@@ -65,6 +65,22 @@ test('redactSecrets: a root inside a longer path is still swapped, not just at a
 	expect(redactSecrets('/srv/home/runner/thing')).toBe('/srv~/thing');
 
 	setRedactedRoots([]);
+});
+
+test('redactSecrets: the account name is redacted as a path segment anywhere, not just under the registered roots', () => {
+	setRedactedAccountName('me');
+
+	expect(redactSecrets('/var/lib/me/thing')).toBe('/var/lib/<user>/thing');
+	expect(redactSecrets('/srv/me')).toBe('/srv/<user>');
+	expect(redactSecrets('git ls-files in /var/lib/me exited 1')).toBe('git ls-files in /var/lib/<user> exited 1');
+	expect(redactSecrets('(/var/lib/me)')).toBe('(/var/lib/<user>)');
+	expect(redactSecrets('"/var/lib/me"')).toBe('"/var/lib/<user>"');
+	expect(redactSecrets('/var/lib/me,')).toBe('/var/lib/<user>,');
+	expect(redactSecrets('let me explain')).toBe('let me explain');
+	expect(redactSecrets('/srv/me-backup')).toBe('/srv/me-backup');
+	expect(redactSecrets('/var/lib/me.bak')).toBe('/var/lib/me.bak');
+
+	setRedactedAccountName('');
 });
 
 test('decodeJsonStringLiteral: a quoted literal is parsed, every escape included; an unquoted line keeps its two escapes', () => {
