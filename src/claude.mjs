@@ -158,7 +158,7 @@ export function readResult(output, model, call, sessionId) {
 		// claude sometimes hands the section back double-encoded: one line with literal \n in it. A section with no real newline is that case.
 		if (sectionText.indexOf('\n') === -1) sectionText = decodeJsonStringLiteral(sectionText);
 
-		section = sectionOf(sectionText);
+		section = sectionOf(sectionText, call.cutOn, call.normalize);
 	}
 
 	const answer = {};
@@ -168,7 +168,7 @@ export function readResult(output, model, call, sessionId) {
 		answer[name] = structured[name];
 	}
 
-	if (section === '') section = sectionOf(text);
+	if (section === '') section = sectionOf(text, call.cutOn, call.normalize);
 
 	let usedModel = model;
 	// modelUsage is keyed by the model that answered, as a full id where we passed an alias.
