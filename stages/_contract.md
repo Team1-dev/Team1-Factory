@@ -32,6 +32,9 @@ text before or after. Its fields:
 - **`verdict`** — always required. One of the verdicts your stage's prompt names; the schema you
   answer with lists them.
 - **`touches`**, **`cards`** — only where your stage asks for them.
+- **`delivers`**, **`where`** — only where your stage's schema asks for them. `delivers` is whether
+  the change does what the card asked; `where` is the one file, as a path from the repository root,
+  that does it.
 
 ```json
 {

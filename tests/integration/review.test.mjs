@@ -252,6 +252,20 @@ test('advance is not enough on its own: a where outside the diff, or delivers: f
 	expect(notDelivered.writes[0].body).toContain('the review found the change does not do what the card asked.');
 });
 
+test('a where is read generously: backticks, a leading ./, a trailing :line, a sentence around it, or a bare basename all name the file', async () => {
+	for (const where of [
+		'src/cli.mjs', '`src/cli.mjs`', 'src/cli.mjs:42', './src/cli.mjs', 'cli.mjs',
+		'src/cli.mjs (the parseDuration helper)', 'the new helper in src/cli.mjs',
+	]) {
+		setup();
+		answered('advance', { where: where }, 0.4);
+
+		const pass = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
+
+		expect(pass.writes[1].labels).toEqual(['tier: contained', 'ready to merge']);
+	}
+});
+
 test('reject-local goes back to implement, reject-shape to triage, no verdict is fail and stays', async () => {
 	setup();
 	answered('reject-local', {}, 0.4);
