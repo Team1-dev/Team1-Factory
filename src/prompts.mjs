@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { pluralSuffix } from './stringUtils.mjs';
 
-const RULE = '\n\n---\n\n';
+export const RULE = '\n\n---\n\n';
 
 const stageFiles = {};
 

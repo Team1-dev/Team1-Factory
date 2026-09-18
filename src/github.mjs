@@ -121,6 +121,10 @@ export function client(repo, token, apiBase) {
 		return request('POST', base + '/pulls', { title: title, head: branch, base: target, body: body });
 	}
 
+	async function updatePull(number, body) {
+		return request('PATCH', base + '/pulls/' + number, { body: body });
+	}
+
 	async function labelPull(number, name) {
 		return request('POST', base + '/issues/' + number + '/labels', { labels: [name] });
 	}
@@ -183,6 +187,7 @@ export function client(repo, token, apiBase) {
 		pullFor: pullFor,
 		pull: pull,
 		createPull: createPull,
+		updatePull: updatePull,
 		labelPull: labelPull,
 		closePull: closePull,
 		mergePull: mergePull,
