@@ -58,7 +58,7 @@ Your stage's prompt says which of these it may return.
 | `questions` | blocked on a fact that is not in your inputs and cannot be read or measured |
 | `reject-local` | a defect the author can fix without rethinking the shape |
 | `reject-shape` | the shape is wrong — re-derive it, do not patch it |
-| `park` | irreversible: money, deletion, migration, or an external side effect |
+| `park` | breaks an invariant `project.md` states |
 | `fail` | you could not proceed at all. Say exactly where you stopped |
 
 ## Rules
