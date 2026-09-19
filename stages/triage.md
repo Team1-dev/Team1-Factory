@@ -109,14 +109,14 @@ plus `tier` on `advance`, `of` on `duplicate` or `done`, and `project` on `rerou
 ```
 
 Each `section` starts at `## Triage`, **25 words maximum**. For a card advanced with no questions
-and nothing irreversible, the whole of it is:
+and no invariant broken, the whole of it is:
 
 ```
 Ask: <the question, one line>
 Tier: `contained` — <the words that decided it>
 ```
 
-Add questions, anything irreversible, and assumptions only where they exist. **Do not say how the
+Add questions, an invariant the ask would break, and assumptions only where they exist. **Do not say how the
 work should be done** — not the shape, the files, the approach or the name of anything; the next
 stage plans it with the code in front of it. **Say nothing about the codebase**: you have not read a
 line of it. Your assumptions are about intent and scope.
