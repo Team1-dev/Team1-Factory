@@ -1,4 +1,6 @@
 import { expect, test } from 'vitest';
+import { failure } from '../../src/claude.mjs';
+import { state } from '../../src/config.mjs';
 import { git, model } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { issue, mine, person, stamped, stranger } from '../builders.mjs';
@@ -206,6 +208,31 @@ test('a person can pick the model: the last "model:<model>[-effort]" in trusted 
 
 	expect(model.calls[0].run.conversation.model).toBeUndefined();
 	expect(ledgerLines().length).toBe(2);
+});
+
+test('an expired claude login gets one plain note, no error stamp, and halts the runner instead of dying the card', async () => {
+	setup();
+	model.answers.push(failure('Failed to authenticate: OAuth session expired and could not be refreshed', {}));
+
+	const first = await passOver({ issues: [implementCard('x')], comments: { [CARD]: [TRIAGED] } }, CARD);
+
+	expect(callNames(first.writes)).toEqual(['comment']);
+	expect(first.writes[0].body).toContain('log back in');
+	expect(first.writes[0].body).not.toContain('· error ·');
+	expect(first.writes[0].body.endsWith('\n\n— team1-factory · implement · login-expired · $0.00 · total $0.10')).toBe(true);
+	expect(state.haltAsked).toBe(true);
+	expect(state.haltReason).toContain('log back in');
+
+	setup();
+	model.answers.push(failure('Failed to authenticate: OAuth session expired and could not be refreshed', {}));
+
+	const second = await passOver({
+		issues: [implementCard('x')],
+		comments: { [CARD]: [TRIAGED, mine(first.writes[0].body)] },
+	}, CARD);
+
+	expect(second.writes).toEqual([]);
+	expect(state.haltAsked).toBe(true);
 });
 
 test('a note of ours edited to a cost that is not a number does not switch the budget off', async () => {

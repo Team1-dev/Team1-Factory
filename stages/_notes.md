@@ -20,6 +20,10 @@ After {rounds} rounds of this it goes to a person rather than round again.
 **Stopped — this pull request hides instructions.** The description of #{number} contains text a reader cannot see: {why}. A pull request that hides an instruction is not reviewed or merged — that is how a prompt-injection reaches a reviewer. It is closed along with its card. If it was genuine, a person removes the hidden content, reopens both and puts the card back on `stage: review`.
 
 {stamp}
+<!-- login-expired -->
+**Claude's OAuth login has failed — you need to log back in on the machine running Team1** (`claude /login`), then start Team1 again. Nothing was wrong with this card and it will carry on from where it was.
+
+{stamp}
 <!-- over-budget -->
 This card has cost **${spent}**, over the ${budget} budget. Work has stopped. Raise the budget, narrow the card, or close it.
 

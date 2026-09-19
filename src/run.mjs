@@ -1,12 +1,12 @@
 import { batchFor, collectBlockers } from './board.mjs';
 import { branchOf, readComment } from './cards.mjs';
-import { noteExhaustion } from './claude.mjs';
+import { noteExhaustion, noteLoginExpired } from './claude.mjs';
 import { hiddenInstruction } from './classify.mjs';
 import { repositoryFor, sayOnce, state, workDirectory } from './config.mjs';
 import { readConversation } from './conversation.mjs';
 import { handleImplement } from './implement.mjs';
 import { handleMerge } from './merge.mjs';
-import { apply, divert, failedOutcome } from './outcomes.mjs';
+import { apply, divert, failedOutcome, loginExpiredOutcome } from './outcomes.mjs';
 import { ledgerStart } from './ledger.mjs';
 import { fragment } from './prompts.mjs';
 import { handleReview } from './review.mjs';
@@ -110,6 +110,8 @@ async function cardOutcome(run) {
 	try {
 		return await HANDLERS[run.stage.name](run);
 	} catch (error) {
+		if (noteLoginExpired(error)) return loginExpiredOutcome(run, { verdict: 'login-expired', cost: error.cost ?? 0 });
+
 		console.log(run.tag + ': stage failed: ' + error.message);
 
 		return failedOutcome(run, error.message, { verdict: 'error', cost: error.cost ?? 0, sessionId: error.sessionId }, noteExhaustion(error) || error.aborted);

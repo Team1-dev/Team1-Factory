@@ -86,6 +86,16 @@ export function failedOutcome(run, message, measured, silent) {
 	return { cards: cards, measured: measured };
 }
 
+// One note per card, however many times the same expired login is hit: the label is left alone, so the newest stamp
+// for this stage stays 'login-expired' until something else happens to the card, and that is the sign not to say it again.
+export function loginExpiredOutcome(run, measured) {
+	const already = run.conversation.newest[run.stage.name]?.stamp.verdict === 'login-expired';
+	const entry = { card: run.lead };
+	if (!already) entry.body = note(run, 'login-expired', {}, measured);
+
+	return { cards: [entry], measured: measured };
+}
+
 export function unreadableOutcome(run, metrics) {
 	metrics.verdict = 'unparseable';
 

@@ -37,6 +37,7 @@ export const state = {
 	modelEnvironment: {},
 	childAbort: undefined,
 	haltAsked: false,
+	haltReason: undefined,
 	onceOnly: false,
 	runnerLogins: {},
 	runnerEmails: {},
@@ -96,6 +97,7 @@ export function loadEnv(env) {
 
 	state.childAbort       = new AbortController();
 	state.haltAsked        = false;
+	state.haltReason       = undefined;
 	state.onceOnly         = false;
 	state.runnerLogins     = {};
 	state.runnerEmails     = {};

@@ -160,6 +160,7 @@ async function processRepos() {
 }
 
 async function haltReason() {
+	if (state.haltReason !== undefined) return state.haltReason;
 	if (state.haltAsked) return 'halt asked';
 	if (await exists('STOP')) return 'STOP file present';
 
