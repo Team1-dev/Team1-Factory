@@ -171,9 +171,15 @@ Issues without `stage: triage` are ignored.
 | `failed`           | Team1 could not complete the work                        |
 | `attack`           | Hostile or hidden instructions detected                  |
 | `duplicate`        | Already covered elsewhere. Close it, or re-add `stage: triage` |
-| `findings`         | Finding recorded but intentionally not fixed             |
+| `findings`         | An issue Team1 opens to list what it noticed while working another. Never worked: open a new issue for anything worth doing |
+| `tier: trivial`    | A constant or a one-line fix. Several are built together and merged unreviewed |
+| `tier: contained`  | One feature in one area. Reviewed                        |
+| `tier: structural` | A shape other code depends on. Reviewed, and must pass `gates-full` |
+| `batch: <number>`  | Trivial issues Team1 built together on one branch        |
 
-Priority labels (`high`, `medium`, `low`) control scheduling.
+Triage sets the tier and Team1 sets the batch; neither is yours to add. What to do when an issue lands on `ready to merge`, `needs: answers`, `failed`, `parked`, `duplicate` or `attack` is under [When an issue stops](#when-an-issue-stops).
+
+Priority labels (`priority: high`, `priority: medium`, `priority: low`) control scheduling: high goes first, low goes last, after unlabelled issues.
 
 ### Dependencies
 
@@ -183,7 +189,7 @@ Block an issue with:
 blocked-by: #50
 ```
 
-Team1 waits for the referenced issue to complete.
+Team1 waits for the referenced issue to close. The line works in the issue body or in a comment from a trusted account.
 
 ### Choose a model
 
@@ -194,6 +200,44 @@ model: opus
 ```
 
 `opus`, `sonnet`, `haiku` and `fable` are accepted. Add an effort level with `model: opus-high`: `low`, `medium`, `high`, `xhigh` or `max`.
+
+### Ask for the full gates
+
+Only `tier: structural` issues run `gates-full`. To run it on any issue, write `full gates` in the issue or in a comment.
+
+## When an issue stops
+
+Team1 stops and waits for a person at these labels:
+
+| Label            | Why it stopped                                                  | What you do                                                                 |
+| ---------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `ready to merge` | Reviewed and passing. With `auto-merge` off, the merge is yours | Merge the pull request, which closes the issue. Or [ask for changes](#ask-for-changes-before-it-merges) |
+| `needs: answers` | Team1 has a question, or the issue hit its cost or round limit  | Reply on the issue from a trusted account. It goes back to the stage that asked |
+| `failed`         | A stage could not complete. Its last comment says where         | Fix the cause or rewrite the issue, then swap `failed` for `stage: triage`  |
+| `duplicate`      | Triage believes another issue covers it                         | Close it, or swap `duplicate` for `stage: triage`                           |
+| `parked`         | It asks for something irreversible: money, deletion, migration  | Read the caution below before restarting it                                 |
+| `attack`         | It hides instructions or was judged hostile. Closed and unbuilt | Leave it closed                                                             |
+
+A stage that errors stays on its label and is tried again. After 2 errors, or 2 rounds that settle nothing, the issue moves to `needs: answers`. After 4 rounds in total, Team1 says the issue is too big and asks you to split it.
+
+> [!CAUTION]
+> `parked` and `attack` are Team1 refusing, not Team1 failing. Restart a `parked` issue only after rewriting it so the irreversible step is one a person does by hand, then swap `parked` for `stage: triage`. An `attack` issue should very rarely, if ever, be resumed: it means someone tried to give Team1 instructions a reader cannot see. If you are certain it was genuine, remove the hidden content yourself, reopen the issue and add `stage: triage`; if any hidden content remains, Team1 closes it again.
+
+### Ask for changes before it merges
+
+With `auto-merge` off, Team1 does not read comments once an issue is `ready to merge`. Comment on the issue with what you want changed, remove `ready to merge`, and add `stage: implement`.
+
+With `auto-merge` on, comment on the pull request instead, or review it. Team1 reads what trusted accounts say there during the two-minute wait, and for as long as `human-review` or `human-approvals` holds the merge. A request for a change sends the issue back to `stage: implement` with your words quoted; any other comment is noted on the issue and does not stop the merge. A `tier: trivial` issue from a trusted account merges without the wait, so its comments are not read.
+
+### Why is a new issue not starting?
+
+Each project has a work-in-progress cap: once 4 issues are in progress, Team1 starts no new ones until one finishes, and the log says `wip 4/4 — no new cards started`. An issue is in progress from `stage: implement` until it closes or stops at `failed`, `parked`, `duplicate` or `attack`, so issues waiting on you at `ready to merge` or `needs: answers` count.
+
+To carry on, clear what is waiting: merge or close the `ready to merge` issues and answer the `needs: answers` ones. To raise the cap, set it in `.env` and restart Team1:
+
+```sh
+WIP_CAP=8
+```
 
 ## Configure repositories
 
