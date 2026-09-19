@@ -26,8 +26,7 @@ function reviewCard(labelNames) {
 function built() {
 	return [
 		stamped('triage', 'advance', 0.1),
-		mine('## Plan\n\nParse the flag early.\n\n## Implementation\n\nDone in cli.mjs.\n\n---\n\n**Files changed (1):**'
-			+ ' `src/cli.mjs`.\n\nPushed `abc1234` to `' + BRANCH + '`. url\n\n' + stampLine('implement', 'advance', 1, { total: 1.1 })),
+		mine('Implemented on url.\n\n' + stampLine('implement', 'advance', 1, { total: 1.1 })),
 	];
 }
 
@@ -96,7 +95,10 @@ test('the prompt: the pull, the files, the diff less generated files, added comm
 	setup();
 	answered('advance', {}, 0.4);
 
-	const given = underReview(openPull(PULL, BRANCH));
+	const pull = openPull(PULL, BRANCH);
+	pull.body = 'Closes #5\n\n## Plan\n\nParse the flag early.\n\n## Implementation\n\nDone in cli.mjs.';
+
+	const given = underReview(pull);
 	given.files = { '.agents/style.md': 'No comments.\n' };
 
 	await passOver(given, CARD);
@@ -123,7 +125,7 @@ test('the prompt: the pull, the files, the diff less generated files, added comm
 	expect(call.prompt).toContain('// parse the quiet flag');
 	expect(call.prompt).toContain('# The card\n\n## Ask\n\nCard 5\n\nadd a --quiet flag');
 	expect(call.prompt).toContain("_The author's own account of this change is withheld");
-	expect(call.prompt).toContain('**@runner:**\n---\n\n**Files changed (1):**');
+	expect(call.prompt).toContain('**@runner:**\nImplemented on url.');
 	expect(call.prompt).not.toContain('Parse the flag early');
 });
 

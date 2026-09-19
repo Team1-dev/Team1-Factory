@@ -286,7 +286,7 @@ test('red gates that the session turns green: pushed as usual, one fix round on 
 	expect(callNames(gates.calls)).toEqual(['install', 'runGates', 'runGates']);
 	expect(callNames(git.calls)).toEqual(['checkout', 'ensureGitignore', 'listFiles', 'changes', 'changes', 'commitAndPush']);
 	expect(callNames(pass.writes)).toEqual(['createPull', 'comment', 'setLabels']);
-	expect(pass.writes[1].body).toContain('Pushed `abc1234`');
+	expect(pass.writes[1].body).toContain('Implemented on https://github.com/acme/app/pull/');
 	expect(pass.writes[1].body).not.toContain('Gates failed');
 	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · implement · advance · $0.75 · total $0.85 · sonnet')).toBe(true);
 	expect(pass.writes[2].labels).toEqual(['tier: contained', 'stage: review']);
@@ -364,11 +364,9 @@ test('green gates: commit, push, open the pull, post findings, note the files an
 	expect(pass.writes[2].number).toBe(902);
 	expect(pass.writes[2].body).toBe('### Help text is stale\n\nThe help text still lists --verbose.\n\nNoticed by implement while building #5,'
 		+ ' outside what that card asked for.\n\n— team1-factory · implement · proposed · $0.00 · total $0.10');
-	expect(pass.writes[3].body).toBe('**Files changed (3):** `src/cli.mjs`, `README.md`, `tests/cli.test.mjs`.'
-		+ ' **Not in the stage\'s own list:** `README.md`. **Listed but untouched:** `src/help.mjs`.'
+	expect(pass.writes[3].body).toBe('Implemented on https://github.com/acme/app/pull/77. Noted on the findings card: #902.'
+		+ '\n\n**Not in the stage\'s own list:** `README.md`. **Listed but untouched:** `src/help.mjs`.'
 		+ ' **Left out of the commit, untracked and not in the stage\'s own list:** `node_modules/x/index.js`.'
-		+ '\n\nPushed `abc1234` to `' + BRANCH + '` — the plan and implementation notes are on the pull request.'
-		+ ' https://github.com/acme/app/pull/77 Noted on the findings card: #902.'
 		+ '\n\n— team1-factory · implement · advance · $0.50 · total $0.60 · sonnet');
 	expect(pass.writes[4].labels).toEqual(['tier: contained', 'stage: review']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:advance']);
@@ -634,9 +632,9 @@ test('in a monorepo the area is the working directory and its dependents are nam
 		'createLabel', 'createLabel', 'createLabel', 'createPull', 'comment', 'setLabels',
 	]);
 	expect(pass.writes[0]).toEqual({ name: 'createLabel', label: 'project: app', color: 'bfd4f2', description: '' });
-	expect(pass.writes[4].body).toContain('**Files changed (2):** `packages/lib/index.js`, `packages/app/main.js`.'
-		+ ' **Outside `packages/lib/`:** `packages/app/main.js`.'
+	expect(pass.writes[4].body).toContain('**Outside `packages/lib/`:** `packages/app/main.js`.'
 		+ ' **Not in the stage\'s own list:** `packages/app/main.js`.');
+	expect(pass.writes[4].body).not.toContain('Files changed');
 	expect(ledgerLines()[1].area).toBe('lib');
 });
 
@@ -718,7 +716,8 @@ test('the files note compares paths as the repo root sees them: an area-relative
 	}, CARD);
 
 	const body = pass.writes[4].body;
-	expect(body).toContain('**Files changed (2):** `packages/lib/index.js`, `packages/lib/other.js`. **Listed but untouched:** `gone.js`.');
+	expect(body).toContain('**Listed but untouched:** `gone.js`.');
+	expect(body).not.toContain('packages/lib/index.js');
 	expect(body).not.toContain('Not in the stage');
 	expect(body).not.toContain('Outside');
 });
@@ -757,7 +756,7 @@ test('a pull that cannot be opened is said so on the pushed note and the card st
 
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] }, pullError: 'rate limited' }, CARD);
 
-	expect(pass.writes[0].body).toContain('(no PR: rate limited)');
+	expect(pass.writes[0].body).toContain('Pushed to `' + BRANCH + '`, but the pull request could not be opened: rate limited.');
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: review']);
 });
 
@@ -831,7 +830,9 @@ test('a rework round listing every file its branch changed reports nothing unlis
 
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
-	expect(pass.writes[1].body).toContain('**Files changed (6):**');
+	expect(pass.writes[1].body).toMatch(
+		/^Implemented on https:\/\/github\.com\/acme\/app\/pull\/\d+\.\n\n— team1-factory · implement · advance · \$0\.50 · total \$0\.60 · sonnet$/,
+	);
 	expect(pass.writes[1].body).not.toContain('Not in the stage\'s own list');
 	expect(pass.writes[1].body).not.toContain('Listed but untouched');
 });

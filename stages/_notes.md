@@ -105,11 +105,13 @@ in `{path}`
 
 {stamp}
 <!-- pushed -->
-{files}Pushed `{sha}` to `{branch}` — the plan and implementation notes are on the pull request. {url}{filed}
+Implemented on {url}.{filed}{exceptions}
 
 {stamp}
-<!-- files-changed -->
-**Files changed ({count}):** {files}.
+<!-- pushed-no-pull -->
+Pushed to `{branch}`, but the pull request could not be opened: {error}.{filed}{exceptions}
+
+{stamp}
 <!-- files-outside -->
 **Outside `{path}/`:** {files}.
 <!-- files-unlisted -->

@@ -25,7 +25,7 @@ body — not to save typing arguments. A constant used once is written where it 
 <!-- file-truncated -->
 _(truncated — open the rest with Read.)_
 <!-- withheld -->
-_The author's own account of this change is withheld — see your prompt. What Team1 measured about it is below._
+_The author's own account of this change is withheld — see your prompt._
 <!-- superseded -->
 _{count} superseded comment{plural} — earlier rounds of stages that have since run again — are not shown. What stands is below._
 <!-- untrusted -->

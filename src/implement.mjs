@@ -294,7 +294,7 @@ async function pushedOutcome(run, worktree, attempt) {
 	const closes = run.batch.map(card => 'Closes #' + card.number);
 	const pullBody = closes.join('\n') + '\n\n' + section;
 
-	const sha = await run.git.commitAndPush(worktree.root, run.branch, title + '\n\n' + closes.join('\n'), attempt.changes.files);
+	await run.git.commitAndPush(worktree.root, run.branch, title + '\n\n' + closes.join('\n'), attempt.changes.files);
 
 	let pull;
 	let pullError = '';
@@ -306,12 +306,10 @@ async function pushedOutcome(run, worktree, attempt) {
 		pullError = error.message;
 	}
 
-	const url = pull !== undefined ? pull.html_url : '(no PR: ' + pullError + ')';
-
 	const filed = await fileFindings(run, attempt.reply.output.cards, run.stage.proposals, 'proposal-origin-implement');
 
-	const changedFiles = { count: attempt.changes.files.length, files: backticked(attempt.changes.files) };
-	const notes = [fragment('_notes.md', 'files-changed', changedFiles)];
+	// Only what is wrong with the file list reaches the card; the list itself is on the pull request, beside the change it describes.
+	const notes = [];
 	if (outside.length > 0) notes.push(fragment('_notes.md', 'files-outside', { path: run.area.path, files: backticked(outside) }));
 
 	if (unlisted.length > 0) notes.push(fragment('_notes.md', 'files-unlisted', { files: backticked(unlisted) }));
@@ -322,11 +320,11 @@ async function pushedOutcome(run, worktree, attempt) {
 
 	const filedText = filed !== '' ? ' ' + filed : '';
 
-	const body = note(run, 'pushed', {
-		files: notes.join(' ') + '\n\n',
-		sha: sha,
+	const body = note(run, pull !== undefined ? 'pushed' : 'pushed-no-pull', {
+		exceptions: notes.length > 0 ? '\n\n' + notes.join(' ') : '',
+		url: pull?.html_url,
 		branch: run.branch,
-		url: url,
+		error: pullError,
 		filed: filedText,
 	}, { verdict: 'advance', cost: measured.cost, model: measured.model });
 

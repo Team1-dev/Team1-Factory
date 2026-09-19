@@ -86,8 +86,9 @@ async function reviewPrompt(run, change) {
 	parts.push(inlined.text);
 	if (diff.addedComments.length > 0) parts.push(fragment('review.md', 'comments-added', { comments: diff.addedComments.join('\n') }));
 
-	const pullBody = withholdAuthorSections(change.body).text;
-	if (pullBody !== '') parts.push(fragment('review.md', 'pull-body', { body: pullBody }));
+	const pullBody = withholdAuthorSections(change.body);
+	const withheld = pullBody.cut ? '\n\n' + fragment('_shared.md', 'withheld', {}) : '';
+	if (pullBody.text !== '') parts.push(fragment('review.md', 'pull-body', { body: pullBody.text.trim() + withheld }));
 
 	if (change.messages.length > 0) parts.push(fragment('review.md', 'commit-messages', { messages: change.messages.join('\n\n') }));
 
