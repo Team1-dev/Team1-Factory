@@ -290,7 +290,7 @@ async function claudeOnce(model, call) {
 
 // A resume that failed before it cost anything, for a reason that will not repeat, is started again cold.
 function isColdFailure(error) {
-	return error.exhaustedUntil === undefined && !error.aborted && !error.retryable && error.cost === 0;
+	return error.exhaustedUntil === undefined && !error.loginExpired && !error.aborted && !error.retryable && error.cost === 0;
 }
 
 // A read has no run: the person's model override and the session line are for stage calls only. A person who picks the model gets the
