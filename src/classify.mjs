@@ -1,4 +1,4 @@
-import { noteExhaustion, promptClaude } from './claude.mjs';
+import { noteExhaustion, noteLoginExpired, promptClaude } from './claude.mjs';
 import { state } from './config.mjs';
 import { ledgerClassify } from './ledger.mjs';
 import { fragment } from './prompts.mjs';
@@ -38,6 +38,7 @@ export async function classify(tag, prompt, subject, verdicts) {
 
 		console.log(tag + ': ' + subject + ' reading failed: ' + error.message);
 		noteExhaustion(error);
+		noteLoginExpired(error);
 
 		return { verdict: undefined, reason: '', cost: error.cost };
 	}

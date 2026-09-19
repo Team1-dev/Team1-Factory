@@ -2,12 +2,13 @@ import { expect, test } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { failure } from '../../src/claude.mjs';
 import { loadEnv, repoState, state, workDirectory } from '../../src/config.mjs';
 import { loop, processRepo } from '../../src/poll.mjs';
 import { fragment } from '../../src/prompts.mjs';
 import { model, githubMock, timers } from '../doubles.mjs';
 import { fakeGithub, modelAnswer, setup } from '../fake.mjs';
-import { REPO, issue, mine } from '../builders.mjs';
+import { REPO, issue, mine, stamped } from '../builders.mjs';
 
 // One pass over one repo with the board faked at the client: the loop's own rules, not a card's.
 function pass(given, knobs) {
@@ -132,6 +133,21 @@ test('the loop: one pass with --once; a quiet pass backs off by the poll interva
 	}
 
 	expect(timers.waits).toEqual([]);
+});
+
+test('an expired claude login halts the loop before any other card in the repo is attempted', async () => {
+	const p = pass({
+		issues: [issue(5, ['stage: implement', 'tier: contained'], 'x'), issue(6, ['stage: implement', 'tier: contained'], 'y')],
+		comments: { 5: [stamped('triage', 'advance', 0.1)], 6: [stamped('triage', 'advance', 0.1)] },
+	});
+
+	model.answers.push(failure('Failed to authenticate: OAuth session expired and could not be refreshed', {}));
+
+	await loop();
+
+	expect(model.calls.length).toBe(1);
+	expect(p.github.writes.some(write => write.number === 6)).toBe(false);
+	expect(state.haltReason).toContain('log back in');
 });
 
 test('a card a person merged has its proposals read once, then nothing on a second sweep', async () => {

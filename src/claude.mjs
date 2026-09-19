@@ -93,11 +93,33 @@ export function noteExhaustion(error) {
 	return true;
 }
 
+export const LOGIN_EXPIRED_MESSAGE = "Claude's OAuth login has failed — log back in on the machine running Team1 "
+	+ '(`claude /login`), then start Team1 again.';
+
+const LOGIN_EXPIRED_TEXT = 'oauth session expired';
+
+// No amount of waiting fixes an expired login, unlike the account limit above: the runner halts rather than sleeping.
+export function noteLoginExpired(error) {
+	if (!error.loginExpired) return false;
+
+	if (!state.haltAsked) console.log(LOGIN_EXPIRED_MESSAGE);
+
+	state.haltAsked  = true;
+	state.haltReason = LOGIN_EXPIRED_MESSAGE;
+
+	return true;
+}
+
 export function failure(message, fields) {
 	const error = Object.assign(new Error(message), { cost: 0 }, fields);
 
 	error.exhaustedUntil = exhaustionEnd(message);
 	if (error.exhaustedUntil !== undefined) error.retryable = false;
+
+	if (message.toLowerCase().includes(LOGIN_EXPIRED_TEXT)) {
+		error.loginExpired = true;
+		error.retryable    = false;
+	}
 
 	return error;
 }
@@ -268,7 +290,7 @@ async function claudeOnce(model, call) {
 
 // A resume that failed before it cost anything, for a reason that will not repeat, is started again cold.
 function isColdFailure(error) {
-	return error.exhaustedUntil === undefined && !error.aborted && !error.retryable && error.cost === 0;
+	return error.exhaustedUntil === undefined && !error.loginExpired && !error.aborted && !error.retryable && error.cost === 0;
 }
 
 // A read has no run: the person's model override and the session line are for stage calls only. A person who picks the model gets the

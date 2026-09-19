@@ -108,6 +108,14 @@ test('a resume that dies before it costs anything is started cold with the origi
 	expect(shell.calls[1].options.input).toBe('hello');
 });
 
+test('an expired login on a resumed session is not retried cold', async () => {
+	shell.given.push(died('Failed to authenticate: OAuth session expired and could not be refreshed'));
+
+	await expect(realPromptClaude('classify', undefined, 'hello', { tools: [], priorSession: 'old' })).rejects
+		.toMatchObject({ loginExpired: true, retryable: false });
+	expect(shell.calls.length).toBe(1);
+});
+
 test('an account limit stops after one child, is never retried, and lifts a minute past the limit', async () => {
 	const limit = { is_error: true, result: 'Claude AI usage limit reached|1760000000', total_cost_usd: 0, subtype: 'error' };
 	shell.given.push({ code: 1, stdout: JSON.stringify(limit), stderr: '', timedOut: false });
