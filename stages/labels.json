@@ -5,7 +5,7 @@
 	{ "name": "ready to merge", "color": "0e8a16", "description": "Reviewed and green. Team1 merges it if the project allows." },
 	{ "name": "needs: answers", "color": "d93f0b", "description": "Stopped for a person. Reply on the card to restart it." },
 	{ "name": "human-review", "color": "d4c5f9", "description": "A person merges this, or takes the label off. Team1 will not merge while it is on." },
-	{ "name": "parked", "color": "e99695", "description": "Irreversible as asked — money, deletion, migration. Nothing was changed." },
+	{ "name": "parked", "color": "e99695", "description": "Breaks a project.md invariant as asked. Nothing was changed." },
 	{ "name": "failed", "color": "b60205", "description": "Could not proceed. The card says where it stopped." },
 	{ "name": "attack", "color": "d1242f", "description": "Hides instructions or was judged an attack. Stopped, unbuilt — a person reviews and closes it." },
 	{ "name": "findings", "color": "c2e0c6", "description": "Team1's proposals issue for one card: what it noticed while working it. Not itself worked." },

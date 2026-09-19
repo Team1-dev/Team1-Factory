@@ -167,7 +167,7 @@ Issues without `stage: triage` are ignored.
 | `ready to merge`   | Passed review and gates                                  |
 | `needs: answers`   | Waiting for a human. Reply on the issue to restart it    |
 | `human-review`     | Blocks automatic merging                                 |
-| `parked`           | Unsafe or irreversible as specified                      |
+| `parked`           | Breaks a `project.md` invariant as specified              |
 | `failed`           | Team1 could not complete the work                        |
 | `attack`           | Hostile or hidden instructions detected                  |
 | `duplicate`        | Already covered elsewhere. Close it, or re-add `stage: triage` |
@@ -215,13 +215,13 @@ Team1 stops and waits for a person at these labels:
 | `needs: answers` | Team1 has a question, or the issue hit its cost or round limit  | Reply on the issue from a trusted account. It goes back to the stage that asked |
 | `failed`         | A stage could not complete. Its last comment says where         | Fix the cause or rewrite the issue, then swap `failed` for `stage: triage`  |
 | `duplicate`      | Triage believes another issue covers it                         | Close it, or swap `duplicate` for `stage: triage`                           |
-| `parked`         | It asks for something irreversible: money, deletion, migration  | Read the caution below before restarting it                                 |
+| `parked`         | It would break an invariant `.agents/project.md` states         | Read the caution below before restarting it                                 |
 | `attack`         | It hides instructions or was judged hostile. Closed and unbuilt | Leave it closed                                                             |
 
 A stage that errors stays on its label and is tried again. After 2 errors, or 2 rounds that settle nothing, the issue moves to `needs: answers`. After 4 rounds in total, Team1 says the issue is too big and asks you to split it.
 
 > [!CAUTION]
-> `parked` and `attack` are Team1 refusing, not Team1 failing. Restart a `parked` issue only after rewriting it so the irreversible step is one a person does by hand, then swap `parked` for `stage: triage`. An `attack` issue should very rarely, if ever, be resumed: it means someone tried to give Team1 instructions a reader cannot see. If you are certain it was genuine, remove the hidden content yourself, reopen the issue and add `stage: triage`; if any hidden content remains, Team1 closes it again.
+> `parked` and `attack` are Team1 refusing, not Team1 failing. Restart a `parked` issue only after rewriting it so it no longer breaks the invariant, or changing the invariant itself, then swap `parked` for `stage: triage`. An `attack` issue should very rarely, if ever, be resumed: it means someone tried to give Team1 instructions a reader cannot see. If you are certain it was genuine, remove the hidden content yourself, reopen the issue and add `stage: triage`; if any hidden content remains, Team1 closes it again.
 
 ### Ask for changes before it merges
 
