@@ -17,7 +17,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Team1-dev/Team1-Factory" alt="License: Apache-2.0"></a>
   <a href="https://github.com/Team1-dev/Team1-Factory/releases/latest"><img src="https://img.shields.io/github/v/release/Team1-dev/Team1-Factory" alt="Latest release"></a>
-  <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2022.18-5FA04E?logo=nodedotjs&logoColor=white" alt="Node.js 22.18 or later"></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/runs%20in-Docker-2496ED?logo=docker&logoColor=white" alt="Runs in Docker"></a>
 </p>
 
 # Team1 Software Factory
@@ -36,45 +36,32 @@ Watch one go from [issue](https://github.com/Team1-dev/Team1-demo/issues/24) to 
 ## Requirements
 
 > [!WARNING]
-> Run Team1 on a server of its own, never on your own computer. It runs Claude Code unattended with permission checks off.
+> Team1 runs Claude Code unattended with permission checks off. It runs inside a container, and we still recommend a server of its own rather than your own computer.
 
-* A fresh Linux VPS. The steps below are for Ubuntu or Debian. Tested with 4 GB RAM and 2 CPUs; Team1 itself needs little, the memory goes to Claude Code and your own tests.
-* Node.js 22.18+
-* `git`, `jq`, `npm`
-* `pnpm` if required by a repository
-* Claude Code, installed and logged in
+* A Linux VPS. The steps below are for Ubuntu or Debian. Tested with 4 GB RAM and 2 CPUs; Team1 itself needs little, the memory goes to Claude Code and your own tests.
+* Docker. Step 1 installs it
+* A Claude subscription
 * Dedicated GitHub account
 
-Team1 must run as an ordinary user, not root. Claude Code refuses to run unattended as root, so the implement and review stages would fail. Claude Code must be logged in as that same user, with `~/.claude/.credentials.json` present.
+Node.js, git, Claude Code and everything else Team1 needs are inside the image.
 
 ## Quick start
 
-### 1. As root: system packages, Node and a user
+### 1. As root: Docker and a user
 
 Log in to the VPS as root. A provider web console works; no SSH client is needed.
 
 ```sh
-apt-get update && apt-get install -y git jq curl
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt-get install -y nodejs
+apt-get update && apt-get install -y git curl
+curl -fsSL https://get.docker.com | sh
 adduser --disabled-password --gecos "" team1
+usermod -aG docker team1
 su - team1
 ```
 
 Everything from here on runs as `team1`. Each time you open a new console session, run `su - team1` first.
 
-### 2. As team1: install Claude Code and log in
-
-```sh
-curl -fsSL https://claude.ai/install.sh | bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-claude
-```
-
-Claude Code prints a login URL. Open it in a browser on any machine, then paste the code it gives you back into the terminal. Once logged in, exit Claude Code.
-
-### 3. Configure GitHub
+### 2. Configure GitHub
 
 Create a dedicated GitHub account and give it access to the repositories you want Team1 to manage.
 
@@ -90,15 +77,14 @@ A classic token with `repo` scope also works.
 
 Keep the token on the Team1 host only.
 
-### 4. Install Team1
+### 3. Install Team1
 
 ```sh
 git clone https://github.com/Team1-dev/Team1-Factory.git team1
 cd team1
-npm ci
 ```
 
-### 5. Configure Team1
+### 4. Configure Team1
 
 Create `.env`:
 
@@ -109,39 +95,51 @@ GITHUB_TOKEN=github_pat_...
 
 Web consoles often mangle pasted text. After pasting the token, check it with `cat .env`.
 
-Credentials are not passed to Claude Code or gate commands.
+Credentials are not passed to Claude Code or gate commands. `.env` is never copied into the image.
+
+### 5. Log in to Claude
+
+```sh
+docker compose run --rm team1 claude
+```
+
+The first run builds the image, which takes a few minutes. Claude Code then prints a login URL. Open it in a browser on any machine, then paste the code it gives you back into the terminal. Once logged in, type `/exit`.
+
+The login is kept in a Docker volume, so you do this once.
 
 ### 6. Run it
 
 Start the factory. This also creates Team1's labels in each repository:
 
 ```sh
-npm start
+docker compose up -d
 ```
 
 ## Run Team1
 
 ```sh
-npm run logs      # watch the logs
-npm run status    # check whether it is running
-npm stop          # stop gracefully
+docker compose logs -f    # watch the logs
+docker compose ps         # check whether it is running
+docker compose stop       # stop gracefully
 ```
 
-Team1 finishes the current card before stopping. Run `npm stop` again to abort it. `touch STOP` in the Team1 directory does the same as `npm stop`.
+Team1 finishes the current card before stopping. Run `docker compose kill` to abort it.
 
-Team1 keeps running after you close the console. It does not restart automatically after a reboot; log in, `su - team1`, and run `npm start` again.
+Team1 keeps running after you close the console, and starts again after a reboot.
 
 To run a single pass without starting the factory:
 
 ```sh
-npm run tick
+docker compose run --rm team1 node src/poll.mjs --once
 ```
 
 To update Team1:
 
 ```sh
-npm stop && git pull && npm ci && npm start
+docker compose stop && git pull && docker compose up -d --build
 ```
+
+The Claude login, Team1's working files and the tools it installed for your gates are in Docker volumes and survive an update.
 
 ## Give Team1 work
 
@@ -233,7 +231,7 @@ With `auto-merge` on, comment on the pull request instead, or review it. Team1 r
 
 Each project has a work-in-progress cap: once 4 issues are in progress, Team1 starts no new ones until one finishes, and the log says `wip 4/4 — no new cards started`. An issue is in progress from `stage: implement` until it closes or stops at `failed`, `parked`, `duplicate` or `attack`, so issues waiting on you at `ready to merge` or `needs: answers` count.
 
-To carry on, clear what is waiting: merge or close the `ready to merge` issues and answer the `needs: answers` ones. To raise the cap, set it in `.env` and restart Team1:
+To carry on, clear what is waiting: merge or close the `ready to merge` issues and answer the `needs: answers` ones. To raise the cap, set it in `.env` and run `docker compose up -d` again:
 
 ```sh
 WIP_CAP=8
@@ -290,7 +288,6 @@ Optional lines for `.env`:
 
 ```sh
 TRUSTED_LOGINS=alice,bob
-WORK_DIR=/srv/team1/work
 # A token for one repository: GITHUB_TOKEN_ + owner/name, with characters outside [0-9a-z] replaced by _
 GITHUB_TOKEN_owner_other_repo=github_pat_...
 ```
@@ -317,7 +314,7 @@ Each project can have its own `.agents/project.md` and `.agents/style.md` at its
 * **You can hold the merge.** `auto-merge` is off until you turn it on, and `human-approvals` or the `human-review` label keep a pull request waiting for a person. With auto-merge on, Team1 still waits two minutes before it merges.
 * **It stops and asks.** An issue that reaches $15 of model cost (`MAX_COST_PER_CARD`), or that keeps going round without settling, moves to `needs: answers` and waits for you.
 * **Only trusted accounts give orders.** Team1 treats issues and comments from repository write-access users as instructions. Trust more accounts with `TRUSTED_LOGINS=alice,bob`. Content from anyone else is information, not instructions, and an issue that hides instructions is labelled `attack` and left unbuilt.
-* **Everything is on the record.** Verdicts and costs are posted on the issue and written to `WORK_DIR/metrics.jsonl`.
+* **Everything is on the record.** Verdicts and costs are posted on the issue and written to `metrics.jsonl` in the `work` volume: `docker compose exec team1 cat /home/team1/.team1/work/metrics.jsonl`.
 
 ## FAQ
 
@@ -327,7 +324,7 @@ We run it on a Max plan. Team1 runs the official Claude Code CLI, unmodified, an
 
 ### Can I use an API key instead?
 
-Not yet. Team1 uses the Claude Code login from step 2.
+Not yet. Team1 uses the Claude Code login from step 5.
 
 ### What happens when my Claude plan hits its limit?
 
@@ -335,7 +332,7 @@ Team1 sees the limit, waits until it lifts, and carries on.
 
 ### Does it work on repositories that are not Node?
 
-Gates can be any shell command, but Team1 installs dependencies only for npm and pnpm.
+Yes. Gates can be any shell command. The image holds Node.js, npm, pnpm, git, jq and a C and C++ compiler. When a gate needs a compiler, a runtime or a library that is missing, the implement session installs it with Homebrew, without root, and runs the gate again. What it installs is kept in a Docker volume and survives an update.
 
 ## Community
 

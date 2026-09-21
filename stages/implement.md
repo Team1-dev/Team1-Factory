@@ -40,6 +40,10 @@ from the issue text.
    receives its data. Where the style guide is silent, existing code settles the question.
 3. **Run the gates yourself** (`gates` in `project.md`) and fix what they find. Team1 re-runs them
    and re-checks the worktree: **never claim something checkable that you did not run.**
+   **A tool the gates need and this machine lacks — a compiler, a runtime, a library — is yours to
+   install:** `brew install …` where `brew` is on `PATH`, the language's own installer otherwise,
+   never `sudo`. Install what the repo asks for, at the version it asks for; do not change the
+   repo to suit the machine.
 4. **Stop at your additions list.** Do not tidy neighbouring code, rename things you dislike, or
    fix unrelated defects — **put them in `cards` instead**; as prose in your section they are lost
    the moment this card merges. You are the only agent that reads this code with the intent to

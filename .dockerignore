@@ -1,0 +1,7 @@
+# The image copies package.json, src, stages and scripts by name. Everything else stays out of the build context,
+# .env above all: the tokens reach the container through compose's env_file, never through the image.
+*
+!package.json
+!src
+!stages
+!scripts

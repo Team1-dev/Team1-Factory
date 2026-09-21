@@ -1,0 +1,25 @@
+services:
+  team1:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    # tini as pid 1: it passes the stop signal on to node and reaps what Claude Code and the gates leave behind.
+    init: true
+    # `docker compose stop` halts after the card in flight, as npm stop does; this is how long it may take.
+    stop_grace_period: 45m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      # The Claude login, written once by `docker compose run --rm team1 claude`.
+      - claude:/home/team1/.claude
+      # WORK_DIR: the clones, the worktrees and metrics.jsonl.
+      - work:/home/team1/.team1
+      # What the agent installed with brew for a repo's gates, kept across updates.
+      - brew:/home/linuxbrew
+
+volumes:
+  claude:
+  work:
+  brew:
