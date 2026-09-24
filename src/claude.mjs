@@ -13,8 +13,8 @@ export const IMPLEMENT_TIMEOUT_MS = 30 * 60 * 1000;
 
 const ROLES = {
 	classify: { models: ['sonnet', 'haiku'], effort: 'low', budget: 0.5, cacheTtl: '5m' },
-	work: { models: ['sonnet', 'opus'], effort: 'medium', budget: 8, cacheTtl: undefined },
-	judge: { models: ['sonnet', 'opus'], effort: 'medium', budget: 1.5, cacheTtl: '5m' },
+	work: { models: ['claude-opus-5-5', 'sonnet'], effort: 'medium', budget: 8, cacheTtl: undefined },
+	judge: { models: ['claude-opus-5-5', 'sonnet'], effort: 'medium', budget: 1.5, cacheTtl: '5m' },
 	trivial: { models: ['sonnet', 'haiku'], effort: 'low', budget: 1, cacheTtl: '5m' },
 };
 
