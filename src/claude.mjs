@@ -16,6 +16,7 @@ const ROLES = {
 	work: { models: ['claude-opus-5-5', 'sonnet'], effort: 'medium', budget: 8, cacheTtl: undefined },
 	judge: { models: ['claude-opus-5-5', 'sonnet'], effort: 'medium', budget: 1.5, cacheTtl: '5m' },
 	trivial: { models: ['sonnet', 'haiku'], effort: 'low', budget: 1, cacheTtl: '5m' },
+	research: { models: ['sonnet', 'haiku'], effort: 'medium', budget: 1, cacheTtl: '5m' },
 };
 
 export const READ_TOOLS = ['Read', 'Grep', 'Glob'];
@@ -30,10 +31,12 @@ export function verdictSchema(verdicts, options) {
 		touches: { type: 'array', items: { type: 'string' } },
 		cards: {
 			type: 'array',
-			items: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' } } },
+			items: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' }, project: { type: 'string' } } },
 		},
 	};
 	const required = ['section', 'verdict'];
+
+	if (options?.research) properties.research = { type: 'array', items: { type: 'string' } };
 
 	if (options?.delivery) {
 		properties.delivers = { type: 'boolean' };

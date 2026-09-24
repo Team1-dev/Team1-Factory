@@ -168,8 +168,8 @@ Issues without `stage: triage` are ignored.
 | `parked`           | Breaks a `project.md` invariant as specified              |
 | `failed`           | Team1 could not complete the work                        |
 | `attack`           | Hostile or hidden instructions detected                  |
-| `duplicate`        | Already covered elsewhere. Close it, or re-add `stage: triage` |
-| `findings`         | An issue Team1 opens to list what it noticed while working another. Never worked: open a new issue for anything worth doing |
+| `duplicate`        | Already covered elsewhere; Team1 closes it. Reopen it and re-add `stage: triage` if it is not |
+| `findings`         | An issue Team1 opens to list what it noticed while working another. Add `stage: triage` and Team1 works it: it fixes what belongs to that project and opens an issue for the rest |
 | `tier: trivial`    | A constant or a one-line fix. Several are built together and merged unreviewed |
 | `tier: contained`  | One feature in one area. Reviewed                        |
 | `tier: structural` | A shape other code depends on. Reviewed, and must pass `gates-full` |
@@ -212,9 +212,10 @@ Team1 stops and waits for a person at these labels:
 | `ready to merge` | Reviewed and passing. With `auto-merge` off, the merge is yours | Merge the pull request, which closes the issue. Or [ask for changes](#ask-for-changes-before-it-merges) |
 | `needs: answers` | Team1 has a question, or the issue hit its cost or round limit  | Reply on the issue from a trusted account. It goes back to the stage that asked |
 | `failed`         | A stage could not complete. Its last comment says where         | Fix the cause or rewrite the issue, then swap `failed` for `stage: triage`  |
-| `duplicate`      | Triage believes another issue covers it                         | Close it, or swap `duplicate` for `stage: triage`                           |
 | `parked`         | It would break an invariant `.agents/project.md` states         | Read the caution below before restarting it                                 |
 | `attack`         | It hides instructions or was judged hostile. Closed and unbuilt | Leave it closed                                                             |
+
+Team1 closes an issue itself, with a comment saying why, when triage finds it a duplicate or already done, or when implement finds nothing needs changing. Reopen it and add `stage: triage` if that was wrong.
 
 A stage that errors stays on its label and is tried again. After 2 errors, or 2 rounds that settle nothing, the issue moves to `needs: answers`. After 4 rounds in total, Team1 says the issue is too big and asks you to split it.
 
@@ -225,11 +226,13 @@ A stage that errors stays on its label and is tried again. After 2 errors, or 2 
 
 With `auto-merge` off, Team1 does not read comments once an issue is `ready to merge`. Comment on the issue with what you want changed, remove `ready to merge`, and add `stage: implement`.
 
-With `auto-merge` on, comment on the pull request instead, or review it. Team1 reads what trusted accounts say there during the two-minute wait, and for as long as `human-review` or `human-approvals` holds the merge. A request for a change sends the issue back to `stage: implement` with your words quoted; any other comment is noted on the issue and does not stop the merge. A `tier: trivial` issue from a trusted account merges without the wait, so its comments are not read.
+With `auto-merge` on, comment on the pull request instead, or review it. Team1 reads what trusted accounts say there during the one-minute wait, and for as long as `human-review` or `human-approvals` holds the merge. A request for a change sends the issue back to `stage: implement` with your words quoted; any other comment is noted on the issue and does not stop the merge. A `tier: trivial` issue from a trusted account merges without the wait, so its comments are not read.
 
 ### Why is a new issue not starting?
 
-Each project has a work-in-progress cap: once 4 issues are in progress, Team1 starts no new ones until one finishes, and the log says `wip 4/4 — no new cards started`. An issue is in progress from `stage: implement` until it closes or stops at `failed`, `parked`, `duplicate` or `attack`, so issues waiting on you at `ready to merge` or `needs: answers` count.
+Each project has one pull request open at a time: while one is open, only the issue it belongs to is worked there, and the log says `#N waits: <project> has a pull open`. Across projects, Team1 merges what is ready and reviews what is waiting before it starts anything new.
+
+Each project also has a work-in-progress cap: once 4 issues are in progress, Team1 starts no new ones until one finishes, and the log says `wip 4/4 — no new cards started`. An issue is in progress from `stage: implement` until it closes or stops at `failed`, `parked`, `duplicate` or `attack`, so issues waiting on you at `ready to merge` or `needs: answers` count.
 
 To carry on, clear what is waiting: merge or close the `ready to merge` issues and answer the `needs: answers` ones. To raise the cap, set it in `.env` and run `docker compose up -d` again:
 

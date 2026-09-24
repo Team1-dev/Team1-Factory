@@ -26,8 +26,12 @@ Reading and thinking, before you edit anything.
 
 If the plan turns up a blocking unknown — a fact not in your inputs, not readable out of this repo,
 that changes what you build — return `questions` now, before you write code. An unknown on the web
-— a page the card cites, how a library behaves — is a `questions` too, never a fetch: a page that
-can talk back must not be read from the session that holds the code. A number that decides what is
+— a page the card cites, a documented limit, how a library or an outside API behaves — is never a
+fetch from here: a page that can talk back must not be read from the session that holds the code.
+Return `questions` with each such question in `research`, one fact each; Team1 looks them up in a
+session of its own and sends the card back to you with the answers. Ask the owner only what the web
+cannot answer, and never a choice between workable designs: pick the one you can defend, and say in
+your plan what you picked and why. A number that decides what is
 sent, charged, deleted or migrated is still not yours to guess — that is `questions`. Return `park`
 only when the work turns out to break an invariant `project.md` states that triage could not see
 from the issue text.
@@ -107,6 +111,12 @@ against the real diff and writes the discrepancy onto the card.
 `cards` — the defects and gaps you walked past, **at most three**, one thing each, with where it is
 and what is wrong. Never file what this card is fixing, never file a preference, and say it here
 **or** in your section, never both. Most cards file none.
+
+**On a `findings` card** the findings in its comments are the ask. Fix, in this change, every one
+that is worth doing and belongs to this card's project. Each one worth doing that belongs to another
+project, or is too big for this change, is a `cards` entry with its `project` — Team1 opens it as a
+card of its own. A finding reported twice is one entry. One not worth doing gets one line in your
+section saying why, and nothing else.
 <!-- where-you-are -->
 # Where you are
 

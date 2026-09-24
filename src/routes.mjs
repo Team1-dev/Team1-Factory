@@ -32,7 +32,7 @@ export const ROUTES = {
 		park: 'parked',
 		threat: 'attack',
 		duplicate: 'duplicate',
-		done: 'duplicate',
+		done: '',
 		fail: 'stage: triage',
 	},
 	implement: {

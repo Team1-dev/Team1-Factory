@@ -6,6 +6,7 @@ import { filesNamedOnCards, inlineFiles } from './files.mjs';
 import { install, runGates } from './gates.mjs';
 import { newestSession } from './ledger.mjs';
 import { fileFindings } from './findings.mjs';
+import { researchOutcome } from './research.mjs';
 import { alreadyDone, batchOutcome, hold, spentTotal, note, start, unreadableOutcome } from './outcomes.mjs';
 import { cardHeading, fragment, joinSections, resumeSince, RULE, systemPrompt, userPrompt } from './prompts.mjs';
 import { route } from './routes.mjs';
@@ -42,6 +43,11 @@ async function settleUnpushed(run, worktree, attempt) {
 	const outcome = reply.output.verdict;
 	const measured = attempt.measured;
 	let section = reply.section;
+	const research = reply.output.research ?? [];
+	if (outcome === 'questions' && research.length > 0 && run.conversation.newest.research === undefined) {
+		return researchOutcome(run, section, research, measured);
+	}
+
 	if (outcome !== 'advance' && !attempt.changes.unpushed) {
 		const previous = run.conversation.newest.implement;
 
@@ -67,9 +73,14 @@ async function settleUnpushed(run, worktree, attempt) {
 		measured.verdict = 'no-change';
 		if (section === '') section = fragment('_notes.md', 'no-change-empty', {});
 
-		const body = note(run, 'no-change', { section: section }, measured);
+		const filed = await fileFindings(run, reply.output.cards, run.stage.proposals, 'proposal-origin-implement');
+		const body = note(run, 'no-change', { section: section, filed: filed !== '' ? ' ' + filed : '' }, measured);
+		const closedOutcome = batchOutcome(run.batch, body, '', measured);
+		for (const entry of closedOutcome.cards) {
+			entry.close = 'completed';
+		}
 
-		return batchOutcome(run.batch, body, 'failed', measured);
+		return closedOutcome;
 	}
 
 	if (outcome === 'advance' && attempt.changes.files.length === 0) {
@@ -377,7 +388,7 @@ export async function handleImplement(run) {
 		permissionMode: 'bypassPermissions',
 		timeoutMs: IMPLEMENT_TIMEOUT_MS,
 		env: { CLAUDE_PROJECT_DIR: worktree.cwd },
-		schema: verdictSchema(run.stage.verdicts),
+		schema: verdictSchema(run.stage.verdicts, { research: true }),
 		priorSession: priorSession,
 		resumePrompt: prompts.resumePrompt,
 		cutOn: PLAN_CUT,

@@ -232,17 +232,71 @@ test('advance with nothing pushed and a pull already open is already-done and go
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:already-done']);
 });
 
-test('advance with nothing pushed and no pull is no-change and fails the card', async () => {
+test('advance with nothing pushed and no pull is no-change and closes the card as done', async () => {
 	setup();
 	answered('advance', {}, 0.5);
 
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
-	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
-	expect(pass.writes[0].body).toContain(SECTION + '\n\nNothing was pushed and the card is not progressing, so it needs a');
+	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels', 'close']);
+	expect(pass.writes[0].body).toContain(SECTION + '\n\nNothing needed changing, so the card is closed as done. If that is wrong, reopen it');
 	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · no-change · 0 tokens · $0.50 API · total 0 tokens · $0.60 API · sonnet')).toBe(true);
-	expect(pass.writes[1].labels).toEqual(['tier: contained', 'failed']);
+	expect(pass.writes[1].labels).toEqual(['tier: contained']);
+	expect(pass.writes[2]).toEqual({ name: 'close', number: CARD, reason: 'completed' });
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:no-change']);
+});
+
+test('questions the web can answer are looked up by a session with only the web tools, and the card goes back to implement', async () => {
+	setup();
+	answered('questions', { research: ['How many named agents may an account approve?'] }, 0.5);
+	model.answers.push(modelAnswer({
+		answers: [{ question: 'How many named agents may an account approve?', answer: 'Three, plus one unnamed.', sources: ['https://example.test/docs'] }],
+	}, 0.2));
+
+	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(model.calls[1].role).toBe('research');
+	expect(model.calls[1].run).toBeUndefined();
+	expect(model.calls[1].options.tools).toEqual(['WebSearch', 'WebFetch']);
+	expect(model.calls[1].prompt).toContain('- How many named agents may an account approve?');
+	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
+	expect(pass.writes[0].body).toContain('## Research');
+	expect(pass.writes[0].body).toContain('**How many named agents may an account approve?**\n\nThree, plus one unnamed.\n\nSources: <https://example.test/docs>');
+	expect(pass.writes[0].body).toContain('· research · answered · 0 tokens · $0.70 API · total 0 tokens · $0.80 API · sonnet');
+	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
+});
+
+test('once a card has had research, its questions go to a person', async () => {
+	setup();
+	answered('questions', { research: ['Still unknown?'] }, 0.5);
+
+	const researched = stamped('research', 'answered', 0.2);
+	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged(), researched] } }, CARD);
+
+	expect(model.calls.length).toBe(1);
+	expect(pass.writes.at(-1).labels).toEqual(['tier: contained', 'needs: answers']);
+});
+
+test('a findings card opens what it does not fix here as cards of their own in their project, straight to triage', async () => {
+	setup();
+	answered('advance', {
+		cards: [{ title: 'Rate limit the nonce route', body: 'No limit on it.', project: 'lib' }, { title: 'Sign the ownership message', body: 'No caller yet.' }],
+	}, 0.5);
+
+	const pass = await passOver({ issues: [implementCard(['findings', 'project: app'], 'x')], comments: { [CARD]: [triaged()] }, files: MONO }, CARD);
+
+	const opened = pass.writes.filter(write => write.name === 'createIssue');
+
+	expect(opened.map(write => [write.title, write.labels])).toEqual([
+		['Rate limit the nonce route', ['stage: triage', 'project: lib']],
+		['Sign the ownership message', ['stage: triage', 'project: app']],
+	]);
+	expect(opened[0].body).toBe('No limit on it.\n\nSplit out of #5.');
+
+	const noted = pass.writes.find(write => write.name === 'comment' && write.number === CARD);
+
+	expect(noted.body).toMatch(/closed as done\. Opened as cards of their own: #\d+, #\d+\. If that is wrong/);
+	expect(pass.writes.at(-1)).toEqual({ name: 'close', number: CARD, reason: 'completed' });
 });
 
 test('advance with commits but no changed files closes the card as already on the base', async () => {

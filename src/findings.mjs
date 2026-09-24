@@ -45,11 +45,43 @@ async function proposalsCard(run, title) {
 	return issue.number;
 }
 
+const FINDINGS_CARD_LIMIT = 10;
+
+// A findings card being worked opens what it does not do here as cards of their own, straight to triage in their project.
+async function openCards(run, findings) {
+	const opened = [];
+	for (const finding of findings.slice(0, FINDINGS_CARD_LIMIT)) {
+		if (typeof finding.title !== 'string' || finding.title.trim() === '') continue;
+
+		const project = run.board.areaNames.includes(finding.project) ? finding.project : run.area.name;
+		const labels = ['stage: triage'];
+		if (run.board.mono && project !== '') labels.push('project: ' + project);
+
+		const body = redactSecrets(finding.body ?? '') + '\n\n' + fragment('_notes.md', 'split-from', { number: run.lead.number });
+		const issue = await run.github.createIssue(redactSecrets(finding.title.slice(0, 120)), body, labels);
+		opened.push('#' + issue.number);
+	}
+
+	if (opened.length === 0) return '';
+
+	return fragment('_notes.md', 'opened-cards', { cards: opened.join(', ') });
+}
+
 // What a stage found worth doing separately, posted as one comment per origin (implement, review) on this
 // card's own proposals issue: a rerun of the same stage on the same card replaces its own comment rather
 // than piling another one up, since the origin note it is filed under is the same text every time.
 export async function fileFindings(run, findings, limit, originNote) {
 	if (findings === undefined || findings.length === 0) return '';
+
+	if (run.lead.labels.includes('findings')) {
+		try {
+			return await openCards(run, findings);
+		} catch (error) {
+			console.log(run.tag + ': cards not opened: ' + error.message);
+
+			return '';
+		}
+	}
 
 	const sections = [];
 	for (const finding of findings.slice(0, limit)) {

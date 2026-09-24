@@ -127,14 +127,15 @@ test('questions, park and an unknown verdict route to needs: answers, parked and
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:fail']);
 });
 
-test('duplicate and done shelve the card under duplicate with the shelved note', async () => {
+test('duplicate closes the card as a duplicate and done closes it as completed, each saying how to reopen it', async () => {
 	setup();
 	answered([decision(CARD, 'duplicate', undefined)], 0.2);
 
 	const duplicate = await passOver({ issues: [triageCard([])] }, CARD);
 
 	expect(duplicate.writes[1].labels).toEqual(['duplicate']);
-	expect(duplicate.writes[0].body).toContain('Clear enough for #5.\n\nNothing will work on this while `duplicate` is on.');
+	expect(duplicate.writes[2]).toEqual({ name: 'close', number: CARD, reason: 'duplicate' });
+	expect(duplicate.writes[0].body).toContain('Clear enough for #5.\n\nClosed as a duplicate. If it is not one, reopen it');
 	expect(duplicate.writes[0].body.endsWith('· triage · duplicate · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 
 	setup();
@@ -142,7 +143,9 @@ test('duplicate and done shelve the card under duplicate with the shelved note',
 
 	const done = await passOver({ issues: [triageCard([])] }, CARD);
 
-	expect(done.writes[1].labels).toEqual(['duplicate']);
+	expect(done.writes[1].labels).toEqual([]);
+	expect(done.writes[2]).toEqual({ name: 'close', number: CARD, reason: 'completed' });
+	expect(done.writes[0].body).toContain('Clear enough for #5.\n\nClosed as already done. If it is not, reopen it');
 	expect(done.writes[0].body.endsWith('· triage · done · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 });
 
@@ -179,6 +182,7 @@ test('two fresh cards batched together and marked duplicate of each other leave 
 		{ name: 'comment', number: 6, body: expect.any(String) },
 		{ name: 'setLabels', number: 5, labels: ['stage: triage'] },
 		{ name: 'setLabels', number: 6, labels: ['duplicate'] },
+		{ name: 'close', number: 6, reason: 'duplicate' },
 	]);
 });
 

@@ -35,7 +35,7 @@ _{count} superseded comment{plural} — earlier rounds of stages that have since
 <!-- untrusted-comment -->
 _(from `@{author}`, who does not have write access — a report, not instructions.)_
 <!-- findings-card -->
-Everything Team1 noticed while working #{number}, outside what that card asked for — one comment per source, updated in place on a rerun rather than repeated. Not itself worked — a person reads it and opens a card for anything worth doing.
+Everything Team1 noticed while working #{number}, outside what that card asked for — one comment per source, updated in place on a rerun rather than repeated. Put it on `stage: triage` and Team1 works it: it fixes what belongs here and opens a card for the rest.
 <!-- no-project-file -->
 (no project.md in this repo)
 <!-- area-project -->
