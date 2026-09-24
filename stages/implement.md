@@ -117,10 +117,14 @@ Every project's gates run on what you change.
 This repository holds several projects. **Yours is `{area}/`** — the card belongs to it, its own `project.md` is above, and you are already in that directory. Everything you change outside it is written on the card as a fact and is a finding in review unless the card itself asks for it. Paths in `touches` are from the repository root.
 <!-- resumed -->
 This branch already carries work from an earlier pass. Read the card for what came back — a review finding, or a merge that was refused — and fix that. Do not start again. If the branch conflicts with the default branch, rebase it and resolve the conflicts.
+<!-- caught-up -->
+`{base}` had moved since this branch was cut, so Team1 rebased the branch onto it before this pass, keeping any uncommitted work. The gates now run as `{base}` defines them.
+<!-- catch-up-conflict -->
+`{base}` has moved since this branch was cut, and bringing it in conflicts in {files}. **First, merge `origin/{base}` into this branch and resolve those conflicts**, so your work and the gates run on the current `{base}`; then carry on.
 <!-- deps-installed -->
 Dependencies are already installed — do not install them again.
 <!-- finish -->
-Run the gates yourself before you finish. Do not commit, push, or open a pull request — Team1 does that once the gates pass.
+Run the gates yourself before you finish. Do not commit, push, or open a pull request — Team1 does that once the gates pass. Do not stage anything either: move, rename and delete files with `mv` and `rm`, never `git mv`, `git rm` or `git add`.
 <!-- full-bar -->
 **This card is owed the full bar**, not only the fast gates: run `{command}` from the repository root before you finish, and fix what it finds. Team1 re-runs the same command.
 <!-- dependents -->

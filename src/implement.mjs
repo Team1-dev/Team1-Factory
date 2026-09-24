@@ -122,6 +122,12 @@ async function implementPrompt(run, worktree, installed, priorSession) {
 
 	if (worktree.resumed) sentences.push(fragment('implement.md', 'resumed', {}));
 
+	if (worktree.caughtUp.moved) sentences.push(fragment('implement.md', 'caught-up', { base: run.board.defaultBranch }));
+
+	if (worktree.caughtUp.conflicts.length > 0) {
+		sentences.push(fragment('implement.md', 'catch-up-conflict', { base: run.board.defaultBranch, files: worktree.caughtUp.conflicts.map(file => '`' + file + '`').join(', ') }));
+	}
+
 	if (installed.ran) sentences.push(fragment('implement.md', 'deps-installed', {}));
 
 	sentences.push(fragment('implement.md', 'finish', {}));
@@ -197,6 +203,7 @@ async function buildUntilGreen(run, worktree, prompts, options) {
 	let reply = await promptClaude(run.role, run, prompts.prompt, options);
 	let spent = 0;
 	let turns = 0;
+	let gateMs = 0;
 	for (let fixes = 0; ; fixes += 1) {
 		if (reply.output.verdict === undefined) return { outcome: unreadableOutcome(run, reply.metrics) };
 
@@ -210,7 +217,10 @@ async function buildUntilGreen(run, worktree, prompts, options) {
 
 		if (settled !== undefined) return { outcome: settled };
 
+		const gateStarted = Date.now();
 		const gate = await runGates(worktree.root, run, changes.files);
+		gateMs += Date.now() - gateStarted;
+		attempt.measured.gateMs = gateMs;
 
 		if (gate.passed || fixes === state.knobs.MAX_GATE_FIXES) return { attempt: attempt, gate: gate, fixes: fixes };
 
@@ -346,6 +356,7 @@ export async function handleImplement(run) {
 			+ 'A person reconciles the branch by hand.');
 	}
 
+	worktree.caughtUp = await run.git.catchUp(worktree.root, run.board.defaultBranch);
 	worktree.cwd = join(worktree.root, run.area.path);
 	run.resumed = worktree.resumed;
 

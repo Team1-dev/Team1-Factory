@@ -55,6 +55,12 @@ async function rebaseOnto(root, base, headSha) {
 	return git.given.rebase;
 }
 
+async function catchUp(root, base) {
+	git.calls.push({ name: 'catchUp', root: root, base: base });
+
+	return git.given.catchUp ?? { moved: false, conflicts: [] };
+}
+
 async function diff(root, base) {
 	git.calls.push({ name: 'diff', root: root, base: base });
 
@@ -79,6 +85,7 @@ export function repository() {
 		listFiles: listFiles,
 		forcePush: forcePush,
 		rebaseOnto: rebaseOnto,
+		catchUp: catchUp,
 		removeWorktree: removeWorktree,
 		deleteLocalBranch: deleteLocalBranch,
 	};

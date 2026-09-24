@@ -52,6 +52,30 @@ test('a card never triaged goes back to triage before anything runs', async () =
 	expect(git.calls).toEqual([]);
 });
 
+test('a branch the base moved under is caught up first, and the prompt says the gates now run as the base defines them', async () => {
+	setup();
+	answered('questions', {}, 0.5);
+	git.given.tree    = ['package.json'];
+	git.given.catchUp = { moved: true, conflicts: [] };
+
+	await passOver({ issues: [implementCard([], 'add a --quiet flag')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(model.calls[0].prompt).toContain('`main` had moved since this branch was cut, so Team1 rebased the branch onto it before this pass');
+	expect(model.calls[0].prompt).not.toContain('bringing it in conflicts');
+});
+
+test('a catch-up that conflicts names the files and asks for the base to be merged first', async () => {
+	setup();
+	answered('questions', {}, 0.5);
+	git.given.tree    = ['package.json'];
+	git.given.catchUp = { moved: false, conflicts: ['src/cli.mjs', 'README.md'] };
+
+	await passOver({ issues: [implementCard([], 'add a --quiet flag')], comments: { [CARD]: [triaged()] } }, CARD);
+
+	expect(model.calls[0].prompt).toContain('bringing it in conflicts in `src/cli.mjs`, `README.md`. **First, merge `origin/main` into this branch');
+	expect(model.calls[0].prompt).not.toContain('Team1 rebased the branch onto it');
+});
+
 test('the prompt: where you are, the file list, the card and the conversation; the contained role', async () => {
 	setup();
 	answered('questions', {}, 0.5);
@@ -63,8 +87,9 @@ test('the prompt: where you are, the file list, the card and the conversation; t
 		comments: { [CARD]: [triaged(), person('keep it small')] },
 	}, CARD);
 
-	expect(callNames(git.calls)).toEqual(['checkout', 'ensureGitignore', 'listFiles', 'changes']);
+	expect(callNames(git.calls)).toEqual(['checkout', 'catchUp', 'ensureGitignore', 'listFiles', 'changes']);
 	expect(git.calls[0]).toEqual({ name: 'checkout', root: ROOT, branch: BRANCH, readOnly: false });
+	expect(git.calls[1]).toEqual({ name: 'catchUp', root: ROOT, base: 'main' });
 	expect(gates.calls).toEqual([{ name: 'install', root: ROOT, area: '' }]);
 	expect(model.calls.length).toBe(1);
 
@@ -233,7 +258,7 @@ test('advance with commits but no changed files closes the card as already on th
 	expect(pass.writes[1].labels).toEqual(['tier: contained']);
 	expect(pass.writes[2]).toEqual({ name: 'close', number: CARD, reason: 'completed' });
 	expect(pass.writes[3]).toEqual({ name: 'deleteBranch', branch: BRANCH });
-	expect(callNames(git.calls)).toEqual(['checkout', 'ensureGitignore', 'listFiles', 'changes', 'removeWorktree', 'deleteLocalBranch']);
+	expect(callNames(git.calls)).toEqual(['checkout', 'catchUp', 'ensureGitignore', 'listFiles', 'changes', 'removeWorktree', 'deleteLocalBranch']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:already-done']);
 });
 
@@ -269,7 +294,7 @@ test('red gates go back to the session with the output; still red after the fix 
 	expect(ledgerLines()[1].gateFixes).toBe(2);
 	expect(ledgerLines()[1].cost).toBe(1);
 	expect(ledgerLines()[1].turns).toBe(3);
-	expect(callNames(git.calls)).toEqual(['checkout', 'ensureGitignore', 'listFiles', 'changes', 'changes', 'changes']);
+	expect(callNames(git.calls)).toEqual(['checkout', 'catchUp', 'ensureGitignore', 'listFiles', 'changes', 'changes', 'changes']);
 	expect(callNames(gates.calls)).toEqual(['install', 'runGates', 'runGates', 'runGates']);
 });
 
@@ -284,7 +309,7 @@ test('red gates that the session turns green: pushed as usual, one fix round on 
 
 	expect(model.calls.length).toBe(2);
 	expect(callNames(gates.calls)).toEqual(['install', 'runGates', 'runGates']);
-	expect(callNames(git.calls)).toEqual(['checkout', 'ensureGitignore', 'listFiles', 'changes', 'changes', 'commitAndPush']);
+	expect(callNames(git.calls)).toEqual(['checkout', 'catchUp', 'ensureGitignore', 'listFiles', 'changes', 'changes', 'commitAndPush']);
 	expect(callNames(pass.writes)).toEqual(['createPull', 'comment', 'setLabels']);
 	expect(pass.writes[1].body).toContain('Implemented on https://github.com/acme/app/pull/');
 	expect(pass.writes[1].body).not.toContain('Gates failed');
@@ -350,8 +375,8 @@ test('green gates: commit, push, open the pull, post findings, note the files an
 
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
-	expect(callNames(git.calls)).toEqual(['checkout', 'ensureGitignore', 'listFiles', 'changes', 'commitAndPush']);
-	expect(git.calls[4]).toEqual({
+	expect(callNames(git.calls)).toEqual(['checkout', 'catchUp', 'ensureGitignore', 'listFiles', 'changes', 'commitAndPush']);
+	expect(git.calls[5]).toEqual({
 		name: 'commitAndPush', root: ROOT, branch: BRANCH, message: 'Card 5\n\nCloses #5', files: ['src/cli.mjs', 'README.md', 'tests/cli.test.mjs'],
 	});
 	expect(gates.calls[1].files).toEqual(['src/cli.mjs', 'README.md', 'tests/cli.test.mjs']);
@@ -499,7 +524,7 @@ test('a batch: the batch label, the mates in the prompt, one commit closing ever
 	expect(model.calls[0].prompt).toContain('# The other cards in this batch\n\nThey are all `trivial`');
 	expect(model.calls[0].prompt).toContain('## #6 Card 6\n\nsecond');
 	expect(model.calls[0].prompt).not.toContain('third');
-	expect(git.calls[4].message).toBe('Card 5 (+1 more: #6)\n\nCloses #5\nCloses #6');
+	expect(git.calls[5].message).toBe('Card 5 (+1 more: #6)\n\nCloses #5\nCloses #6');
 	expect(callNames(pass.writes)).toEqual([
 		'setLabels', 'setLabels', 'createPull', 'comment', 'comment', 'setLabels', 'setLabels',
 	]);
@@ -601,7 +626,7 @@ test('output without a verdict posts stage-failed and leaves the label', async (
 	expect(callNames(pass.writes)).toEqual(['comment']);
 	expect(pass.writes[0].body).toContain('**implement** could not complete: the stage returned output nothing could read');
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:unparseable']);
-	expect(callNames(git.calls)).toEqual(['checkout', 'ensureGitignore', 'listFiles']);
+	expect(callNames(git.calls)).toEqual(['checkout', 'catchUp', 'ensureGitignore', 'listFiles']);
 });
 
 test('in a monorepo the area is the working directory and its dependents are named and gated', async () => {
@@ -770,8 +795,8 @@ test('a .gitignore Team1 wrote itself is committed though the stage never listed
 
 	const written = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
-	expect(git.calls[1]).toEqual({ name: 'ensureGitignore', root: ROOT, areaPath: '.' });
-	expect(git.calls[4].files).toEqual(['src/cli.mjs', '.gitignore']);
+	expect(git.calls[2]).toEqual({ name: 'ensureGitignore', root: ROOT, areaPath: '.' });
+	expect(git.calls[5].files).toEqual(['src/cli.mjs', '.gitignore']);
 	expect(written.writes[1].body).toContain('**Left out of the commit, untracked and not in the stage\'s own list:** `node_modules/x/index.js`.');
 
 	setup();
@@ -780,7 +805,7 @@ test('a .gitignore Team1 wrote itself is committed though the stage never listed
 
 	const found = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
-	expect(git.calls[4].files).toEqual(['src/cli.mjs']);
+	expect(git.calls[5].files).toEqual(['src/cli.mjs']);
 	expect(found.writes[1].body).toContain('**Left out of the commit, untracked and not in the stage\'s own list:** `.gitignore`.');
 });
 

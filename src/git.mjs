@@ -21,8 +21,10 @@ export function repository(settings) {
 		const outcome = await tryGit(cwd, args);
 
 		if (outcome.code !== 0) {
-			throw new Error('git ' + args.join(' ') + ' in ' + cwd + ' exited ' + outcome.code + ': '
-				+ outcome.output.trim().slice(-300));
+			// The command is shortened, never git's own output: a long path list must not push out the reason.
+			const command = args.join(' ');
+			const shown = command.length <= 120 ? command : command.slice(0, 120) + '… (' + args.length + ' arguments)';
+			throw new Error('git ' + shown + ' in ' + cwd + ' exited ' + outcome.code + ': ' + outcome.output.trim().slice(-300));
 		}
 
 		return outcome.output.trim();
@@ -208,7 +210,15 @@ export function repository(settings) {
 	}
 
 	async function commitAndPush(root, branch, message, files) {
-		if (files.length > 0) await git(root, ['add', '--', ...files]);
+		// A path gone from both the tree and the index (a move or delete someone already staged) has nothing to add, and would fail
+		// the whole add.
+		const tracked = files.length > 0 ? (await git(root, ['ls-files', '--', ...files])).split('\n') : [];
+		const addable = [];
+		for (const file of files) {
+			if (tracked.includes(file) || await exists(join(root, file))) addable.push(file);
+		}
+
+		if (addable.length > 0) await git(root, ['add', '--', ...addable]);
 
 		const staged = await tryGit(root, ['diff', '--cached', '--quiet']);
 
@@ -235,6 +245,45 @@ export function repository(settings) {
 		return { moved: true, conflict: true };
 	}
 
+	// A card's own worktree brought onto the base before a stage works in it, so the card, its gates and the scripts they run all
+	// come from the same base. What an earlier attempt left uncommitted is stashed, the card's commits are rebased onto the base,
+	// and the stash is put back. When the rebase or putting the work back conflicts, the worktree is returned exactly as it was
+	// and the conflicting files are named, for the model to resolve.
+	async function catchUp(root, base) {
+		await git(root, ['fetch', '--prune', 'origin']);
+
+		if ((await tryGit(root, ['merge-base', '--is-ancestor', 'origin/' + base, 'HEAD'])).code === 0) return { moved: false, conflicts: [] };
+
+		const head = await git(root, ['rev-parse', 'HEAD']);
+		const stashed = !(await isClean(root));
+		if (stashed) await git(root, ['stash', 'push', '--include-untracked', '-m', 'team1 catch-up']);
+
+		if ((await tryGit(root, ['rebase', 'origin/' + base])).code !== 0) {
+			const conflicts = await conflictedFiles(root);
+			await git(root, ['rebase', '--abort']);
+			if (stashed) await git(root, ['stash', 'pop']);
+
+			return { moved: false, conflicts: conflicts };
+		}
+
+		if (stashed && (await tryGit(root, ['stash', 'pop'])).code !== 0) {
+			const conflicts = await conflictedFiles(root);
+			await git(root, ['reset', '--hard', head]);
+			await git(root, ['clean', '-fd']);
+			await git(root, ['stash', 'pop']);
+
+			return { moved: false, conflicts: conflicts };
+		}
+
+		return { moved: true, conflicts: [] };
+	}
+
+	async function conflictedFiles(root) {
+		const output = await git(root, ['diff', '--name-only', '--diff-filter=U']);
+
+		return output === '' ? [] : output.split('\n');
+	}
+
 	async function deleteLocalBranch(branch) {
 		await tryGit(store, ['branch', '-D', branch]);
 	}
@@ -246,6 +295,7 @@ export function repository(settings) {
 	}
 
 	return {
+		catchUp: catchUp,
 		checkout: checkout,
 		changes: changes,
 		commitAndPush: commitAndPush,

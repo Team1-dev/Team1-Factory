@@ -147,6 +147,91 @@ test('a read-only checkout is detached at the default branch; a rebase onto a mo
 	expect(await o.sh(root, ['status', '--porcelain'])).toBe('');
 }, 30000);
 
+test('catching up rebases a branch behind the base, keeps uncommitted work, and leaves a branch already on the base alone', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '6-card');
+	await o.repo.checkout(root, 'card/6-x', false);
+	writeFileSync(join(root, 'feature.txt'), 'feature\n');
+	await o.sh(root, ['add', '-A']);
+	await o.sh(root, ['-c', 'user.name=r', '-c', 'user.email=r@x', 'commit', '-qm', 'feature']);
+
+	expect(await o.repo.catchUp(root, 'main')).toEqual({ moved: false, conflicts: [] });
+
+	writeFileSync(join(o.seed, 'gates.sh'), 'new gate\n');
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'add', '-A']);
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'commit', '-qm', 'gate']);
+	await o.sh(o.seed, ['push', '-q', 'origin', 'main']);
+	writeFileSync(join(root, 'feature.txt'), 'feature, more\n');
+	writeFileSync(join(root, 'untracked.txt'), 'new\n');
+
+	expect(await o.repo.catchUp(root, 'main')).toEqual({ moved: true, conflicts: [] });
+	expect(existsSync(join(root, 'gates.sh'))).toBe(true);
+	expect(await o.sh(root, ['log', '-1', '--format=%s'])).toBe('feature');
+	expect(await o.sh(root, ['status', '--porcelain'])).toBe('M feature.txt\n?? untracked.txt');
+	expect(await o.sh(root, ['stash', 'list'])).toBe('');
+}, 30000);
+
+test('catching up with a conflicting base leaves the worktree exactly as it was, uncommitted work included, and names the files', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '7-card');
+	await o.repo.checkout(root, 'card/7-x', false);
+	writeFileSync(join(root, 'README.md'), 'ours\n');
+	await o.sh(root, ['-c', 'user.name=r', '-c', 'user.email=r@x', 'commit', '-qam', 'ours']);
+	writeFileSync(join(root, 'work.txt'), 'uncommitted\n');
+
+	const head = await o.sh(root, ['rev-parse', 'HEAD']);
+
+	writeFileSync(join(o.seed, 'README.md'), 'theirs\n');
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'commit', '-qam', 'theirs']);
+	await o.sh(o.seed, ['push', '-q', 'origin', 'main']);
+
+	expect(await o.repo.catchUp(root, 'main')).toEqual({ moved: false, conflicts: ['README.md'] });
+	expect(await o.sh(root, ['rev-parse', 'HEAD'])).toBe(head);
+	expect(await o.sh(root, ['status', '--porcelain'])).toBe('?? work.txt');
+	expect(await o.sh(root, ['stash', 'list'])).toBe('');
+}, 30000);
+
+test('catching up when only the uncommitted work conflicts with the base puts that work back as it was', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '8-card');
+	await o.repo.checkout(root, 'card/8-x', false);
+	writeFileSync(join(root, 'README.md'), 'uncommitted ours\n');
+
+	const head = await o.sh(root, ['rev-parse', 'HEAD']);
+
+	writeFileSync(join(o.seed, 'README.md'), 'theirs\n');
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'commit', '-qam', 'theirs']);
+	await o.sh(o.seed, ['push', '-q', 'origin', 'main']);
+
+	expect(await o.repo.catchUp(root, 'main')).toEqual({ moved: false, conflicts: ['README.md'] });
+	expect(await o.sh(root, ['rev-parse', 'HEAD'])).toBe(head);
+	expect(await o.sh(root, ['status', '--porcelain'])).toBe('M README.md');
+	expect(await o.sh(root, ['stash', 'list'])).toBe('');
+}, 30000);
+
+test('a move a session already staged with git mv still commits: the old path, gone from tree and index, is not added', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '9-card');
+	await o.repo.checkout(root, 'card/9-x', false);
+	mkdirSync(join(root, 'moved'));
+	await o.sh(root, ['mv', 'README.md', 'moved/README.md']);
+
+	await o.repo.commitAndPush(root, 'card/9-x', 'move', ['README.md', 'moved/README.md']);
+
+	expect(await o.sh(root, ['show', '--name-status', '--format=', 'HEAD'])).toMatch(/^R\d+\tREADME\.md\tmoved\/README\.md$/);
+	expect(await o.sh(root, ['status', '--porcelain'])).toBe('');
+}, 30000);
+
+test('a failing git command keeps git\'s own reason when its arguments are long', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '10-card');
+	await o.repo.checkout(root, 'card/10-x', false);
+
+	const longBase = 'no-such-base-' + 'x'.repeat(200);
+
+	await expect(o.repo.diff(root, longBase)).rejects.toThrow(/… \(2 arguments\) in .* exited \d+: .*(unknown revision|ambiguous argument|bad revision)/s);
+}, 30000);
+
 test('diff reads the branch against its base straight from the clone, with no size limit and no download', async () => {
 	const o = await origin();
 	const root = join(o.base, 'work', '5-card');
