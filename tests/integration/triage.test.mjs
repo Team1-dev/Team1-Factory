@@ -82,7 +82,7 @@ test('advance sets the tier label and moves the card to implement', async () => 
 	expect(pass.changed).toBe(true);
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toBe('## Triage\n\nClear enough for #5.'
-		+ '\n\n— team1-factory · triage · advance · $0.20 · total $0.20 · sonnet');
+		+ '\n\n— team1-factory · triage · advance · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet');
 	expect(pass.writes[1].labels).toEqual(['priority: high', 'tier: contained', 'stage: implement']);
 	expect(pass.card.tier).toBe('contained');
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:advance']);
@@ -108,7 +108,7 @@ test('questions, park and an unknown verdict route to needs: answers, parked and
 	const questions = await passOver({ issues: [triageCard([])] }, CARD);
 
 	expect(questions.writes[1].labels).toEqual(['needs: answers']);
-	expect(questions.writes[0].body.endsWith('· triage · questions · $0.20 · total $0.20 · sonnet')).toBe(true);
+	expect(questions.writes[0].body.endsWith('· triage · questions · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 
 	setup();
 	answered([decision(CARD, 'park', undefined)], 0.2);
@@ -123,7 +123,7 @@ test('questions, park and an unknown verdict route to needs: answers, parked and
 	const unknown = await passOver({ issues: [triageCard([])] }, CARD);
 
 	expect(unknown.writes[1].labels).toEqual(['stage: triage']);
-	expect(unknown.writes[0].body.endsWith('· triage · fail · $0.20 · total $0.20 · sonnet')).toBe(true);
+	expect(unknown.writes[0].body.endsWith('· triage · fail · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:fail']);
 });
 
@@ -135,7 +135,7 @@ test('duplicate and done shelve the card under duplicate with the shelved note',
 
 	expect(duplicate.writes[1].labels).toEqual(['duplicate']);
 	expect(duplicate.writes[0].body).toContain('Clear enough for #5.\n\nNothing will work on this while `duplicate` is on.');
-	expect(duplicate.writes[0].body.endsWith('· triage · duplicate · $0.20 · total $0.20 · sonnet')).toBe(true);
+	expect(duplicate.writes[0].body.endsWith('· triage · duplicate · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 
 	setup();
 	answered([decision(CARD, 'done', undefined)], 0.2);
@@ -143,7 +143,7 @@ test('duplicate and done shelve the card under duplicate with the shelved note',
 	const done = await passOver({ issues: [triageCard([])] }, CARD);
 
 	expect(done.writes[1].labels).toEqual(['duplicate']);
-	expect(done.writes[0].body.endsWith('· triage · done · $0.20 · total $0.20 · sonnet')).toBe(true);
+	expect(done.writes[0].body.endsWith('· triage · done · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 });
 
 test('duplicate of a card already shelved as duplicate advances instead, so one survives', async () => {
@@ -165,7 +165,7 @@ test('duplicate of a card already shelved as duplicate advances instead, so one 
 	}, CARD);
 
 	expect(untiered.writes[1].labels).toEqual(['stage: triage']);
-	expect(untiered.writes[0].body.endsWith('· triage · fail · $0.20 · total $0.20 · sonnet')).toBe(true);
+	expect(untiered.writes[0].body.endsWith('· triage · fail · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 });
 
 test('two fresh cards batched together and marked duplicate of each other leave the lower one workable', async () => {
@@ -194,7 +194,7 @@ test('threat closes the card as attack and flags its pull first', async () => {
 	expect(pass.writes[0]).toEqual({ name: 'labelPull', number: 50, label: 'attack' });
 	expect(pass.writes[1].number).toBe(50);
 	expect(pass.writes[1].body).toContain('**Flagged as an attack by triage.**');
-	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · triage · threat · $0.20 · total $0.20 · sonnet')).toBe(true);
+	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · triage · threat · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 	expect(pass.writes[3].number).toBe(CARD);
 	expect(pass.writes[4].labels).toEqual(['attack']);
 	expect(pass.writes[5]).toEqual({ name: 'close', number: CARD, reason: 'not_planned' });
@@ -218,9 +218,9 @@ test('a batch: every waiting untiered card goes in, a mate is stamped free, an u
 	expect(prompt).toContain('Open cards:\n\n(none)');
 	expect(callNames(pass.writes)).toEqual(['comment', 'comment', 'setLabels', 'setLabels']);
 	expect(pass.writes[0].number).toBe(CARD);
-	expect(pass.writes[0].body.endsWith('· triage · advance · $0.30 · total $0.30 · sonnet')).toBe(true);
+	expect(pass.writes[0].body.endsWith('· triage · advance · 0 tokens · $0.30 API · total 0 tokens · $0.30 API · sonnet')).toBe(true);
 	expect(pass.writes[1].number).toBe(6);
-	expect(pass.writes[1].body.endsWith('· triage · park · $0.00 · total $0.00 · sonnet')).toBe(true);
+	expect(pass.writes[1].body.endsWith('· triage · park · 0 tokens · $0.00 API · total 0 tokens · $0.00 API · sonnet')).toBe(true);
 	expect(pass.writes[2].number).toBe(CARD);
 	expect(pass.writes[2].labels).toEqual(['tier: contained', 'stage: implement']);
 	expect(pass.writes[3]).toEqual({ name: 'setLabels', number: 6, labels: ['parked'] });
@@ -255,7 +255,7 @@ test('output without a cards array posts stage-failed and leaves the label', asy
 	expect(pass.writes[0].body).toContain('**triage** could not complete: the stage returned output nothing could read'
 		+ '\n\nThe card stays on');
 	expect(pass.writes[0].body).toContain('The card stays on `stage: triage`. After 2 rounds of this it goes to a person');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · triage · error · $0.20 · total $0.20 · sonnet')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · triage · error · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:unparseable']);
 	expect(ledgerLines()[1].cost).toBe(0.2);
 });
@@ -268,7 +268,7 @@ test('a failed model call posts stage-failed with the error and leaves the label
 	expect(pass.changed).toBe(true);
 	expect(callNames(pass.writes)).toEqual(['comment']);
 	expect(pass.writes[0].body).toContain('**triage** could not complete: the test queued no model answer for the classify role');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · triage · error · $0.00 · total $0.00')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · triage · error · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:error']);
 	expect(ledgerLines()[1].error).toBe('the test queued no model answer for the classify role');
 });
@@ -313,7 +313,7 @@ test('reroute in a monorepo swaps the project label and leaves the card on triag
 
 	const writes = pass.writes.slice(-2);
 	expect(callNames(writes)).toEqual(['comment', 'setLabels']);
-	expect(writes[0].body.endsWith('· triage · reroute · $0.20 · total $0.20 · sonnet')).toBe(true);
+	expect(writes[0].body.endsWith('· triage · reroute · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 	expect(writes[1].labels).toEqual(['project: app', 'stage: triage']);
 	expect(pass.card.project).toBe('app');
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:reroute']);
@@ -326,7 +326,7 @@ test('reroute to a project the board does not have fails and keeps the label', a
 	const pass = await passOver({ issues: [triageCard(['project: lib'])], files: MONO }, CARD);
 
 	const writes = pass.writes.slice(-2);
-	expect(writes[0].body.endsWith('· triage · fail · $0.20 · total $0.20 · sonnet')).toBe(true);
+	expect(writes[0].body.endsWith('· triage · fail · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 	expect(writes[1].labels).toEqual(['project: lib', 'stage: triage']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:fail']);
 });
@@ -338,6 +338,6 @@ test('a single-project repo names no projects and cannot reroute', async () => {
 	const pass = await passOver({ issues: [triageCard([])] }, CARD);
 
 	expect(model.calls[0].prompt).not.toContain('# The projects');
-	expect(pass.writes[0].body.endsWith('· triage · fail · $0.20 · total $0.20 · sonnet')).toBe(true);
+	expect(pass.writes[0].body.endsWith('· triage · fail · 0 tokens · $0.20 API · total 0 tokens · $0.20 API · sonnet')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['stage: triage']);
 });

@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { branchOf, readCard } from '../../src/cards.mjs';
 import { failure } from '../../src/claude.mjs';
 import { loadEnv, repoState, state, workDirectory } from '../../src/config.mjs';
 import { loop, processRepo } from '../../src/poll.mjs';
@@ -75,6 +76,37 @@ test('one card per scope per pass, and a card wearing an unknown project is said
 	expect(await p.run()).toBe(true);
 	expect(model.calls.length).toBe(1);
 	expect(repoState(REPO).said[7]).toContain('invisible until a person fixes it');
+});
+
+test('a card waiting in review in one area is worked before a card in triage in another, and that change ends the pass', async () => {
+	const p = pass({
+		issues: [issue(5, ['stage: triage', 'project: web'], 'new'), issue(6, ['stage: review', 'tier: contained', 'project: api'], 'built')],
+		files: { '.agents/project.md': 'projects:\n  web: apps/web\n  api: apps/api\n' },
+	});
+
+	model.answers.push(triageAnswer(5));
+
+	expect(await p.run()).toBe(true);
+
+	const cardWrites = [];
+	for (const write of p.github.writes) {
+		if (write.number !== undefined) cardWrites.push(write.number);
+	}
+
+	expect(cardWrites).toEqual([6]);
+});
+
+test('an area with a pull open starts no other card\'s implement until it lands, and says so once', async () => {
+	const waiting = issue(5, ['failed', 'tier: contained', 'project: web'], 'has a pull');
+	const p = pass({
+		issues: [waiting, issue(6, ['stage: implement', 'tier: contained', 'project: web'], 'next')],
+		files: { '.agents/project.md': 'projects:\n  web: apps/web\n' },
+		pulls: { [branchOf(readCard(waiting, 'runner', []))]: { number: 50 } },
+	});
+
+	expect(await p.run()).toBe(false);
+	expect(model.calls.length).toBe(0);
+	expect(repoState(REPO).said[6]).toBe('#6 waits: web has a pull open');
 });
 
 test('the loop: one pass with --once; a quiet pass backs off by the poll interval; a halt or the STOP file stops it; an account limit is slept out', async () => {
@@ -177,7 +209,7 @@ test('a card a person merged has its proposals read once, then nothing on a seco
 	expect(onProposals.length).toBe(2);
 	expect(onProposals[0].body).toBe('Done — #50 already covers this: First proposal');
 	expect(onProposals[1].body).toContain('Read against #50, merged by a person rather than through `handleMerge`, checked here against `deadbeef`.');
-	expect(onProposals[1].body.split('\n').pop()).toBe('— team1-factory · merge · proposals-swept · $0.02 · total $0.02 · sonnet');
+	expect(onProposals[1].body.split('\n').pop()).toBe('— team1-factory · merge · proposals-swept · 0 tokens · $0.02 API · total 0 tokens · $0.02 API · sonnet');
 
 	// What GitHub would now show: the two comments Team1 just posted, alongside the original finding.
 	given.comments[900] = given.comments[900].concat([mine(onProposals[0].body), mine(onProposals[1].body)]);
@@ -202,7 +234,8 @@ test('a card with no proposals issue, or merged by Team1 itself, is left to the 
 	proposalsIssue.title = 'Proposals from #6: Card 6';
 
 	const autoMergedCard = issue(6, [], 'built by Team1');
-	const stampedMerged = mine('Merged #60. This card cost **$0.10** in total.\n\n— team1-factory · merge · merged · $0.10 · total $0.10');
+	const stampedMerged = mine('Merged #60. This card used **0 tokens · $0.10 API** in total.\n\n'
+		+ '— team1-factory · merge · merged · 0 tokens · $0.10 API · total 0 tokens · $0.10 API');
 
 	const teamMerged = pass({
 		issues: [proposalsIssue],

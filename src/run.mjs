@@ -17,7 +17,7 @@ import { handleTriage } from './triage.mjs';
 async function handleAnswers(run) {
 	ledgerStart(run, [run.lead]);
 
-	return { cards: [{ card: run.lead, label: labelOfStage(run.conversation.asker) }], measured: { verdict: 'answered', cost: 0 } };
+	return { cards: [{ card: run.lead, label: labelOfStage(run.conversation.asker) }], measured: { verdict: 'answered', cost: 0, tokens: 0 } };
 }
 
 const HANDLERS = { triage: handleTriage, implement: handleImplement, review: handleReview, merge: handleMerge, answers: handleAnswers };
@@ -33,7 +33,9 @@ async function screened(run) {
 
 	if (cardFinding.unread) return decided(undefined);
 	if (cardFinding.instruction) {
-		return decided(divert(run, 'hides-instructions', { what: 'Its body or title', why: cardFinding.why }, { verdict: 'attack', cost: cardFinding.cost }));
+		const measured = { verdict: 'attack', cost: cardFinding.cost, tokens: cardFinding.tokens };
+
+		return decided(divert(run, 'hides-instructions', { what: 'Its body or title', why: cardFinding.why }, measured));
 	}
 
 	for (const githubComment of await run.github.comments(run.lead.number)) {
@@ -45,6 +47,7 @@ async function screened(run) {
 	const hiding = [];
 	const reasons = [];
 	let cost = 0;
+	let tokens = 0;
 	for (const comment of run.comments) {
 		if (comment.stamp !== undefined) continue;
 
@@ -53,6 +56,7 @@ async function screened(run) {
 		if (finding.unread) return decided(undefined);
 
 		cost += finding.cost;
+		tokens += finding.tokens;
 		if (!finding.instruction) continue;
 
 		hiding.push('@' + comment.login + "'s comment");
@@ -61,7 +65,7 @@ async function screened(run) {
 
 	if (hiding.length === 0) return undefined;
 
-	return decided(divert(run, 'hides-instructions', { what: hiding.join(' and '), why: reasons.join('; ') }, { verdict: 'attack', cost: cost }));
+	return decided(divert(run, 'hides-instructions', { what: hiding.join(' and '), why: reasons.join('; ') }, { verdict: 'attack', cost: cost, tokens: tokens }));
 }
 
 // The holds and diversions before a stage runs: not triaged, blocked, waiting for a person, over budget, round limits.
@@ -84,16 +88,16 @@ function held(run) {
 	if (stage.file !== undefined && conversation.spent >= state.knobs.MAX_COST_PER_CARD) {
 		const slots = { spent: conversation.spent.toFixed(2), budget: state.knobs.MAX_COST_PER_CARD };
 
-		return decided(divert(run, 'over-budget', slots, { verdict: 'over-budget', cost: 0 }));
+		return decided(divert(run, 'over-budget', slots, { verdict: 'over-budget', cost: 0, tokens: 0 }));
 	}
 
 	if (stage.waitsForPerson) return undefined;
 
 	const rounds = { stage: stage.name, rounds: state.knobs.MAX_ROUNDS };
 	const ever = { stage: stage.name, rounds: state.knobs.MAX_ROUNDS_EVER };
-	if (conversation.roundsEver >= state.knobs.MAX_ROUNDS_EVER) return decided(divert(run, 'too-big', ever, { verdict: 'too-big', cost: 0 }));
-	if (conversation.rounds >= state.knobs.MAX_ROUNDS) return decided(divert(run, 'stalled', rounds, { verdict: 'stalled', cost: 0 }));
-	if (conversation.errors >= state.knobs.MAX_ROUNDS) return decided(divert(run, 'died', rounds, { verdict: 'died', cost: 0 }));
+	if (conversation.roundsEver >= state.knobs.MAX_ROUNDS_EVER) return decided(divert(run, 'too-big', ever, { verdict: 'too-big', cost: 0, tokens: 0 }));
+	if (conversation.rounds >= state.knobs.MAX_ROUNDS) return decided(divert(run, 'stalled', rounds, { verdict: 'stalled', cost: 0, tokens: 0 }));
+	if (conversation.errors >= state.knobs.MAX_ROUNDS) return decided(divert(run, 'died', rounds, { verdict: 'died', cost: 0, tokens: 0 }));
 
 	return undefined;
 }
@@ -110,11 +114,13 @@ async function cardOutcome(run) {
 	try {
 		return await HANDLERS[run.stage.name](run);
 	} catch (error) {
-		if (noteLoginExpired(error)) return loginExpiredOutcome(run, { verdict: 'login-expired', cost: error.cost ?? 0 });
+		if (noteLoginExpired(error)) return loginExpiredOutcome(run, { verdict: 'login-expired', cost: error.cost ?? 0, tokens: error.tokens ?? 0 });
 
 		console.log(run.tag + ': stage failed: ' + error.message);
 
-		return failedOutcome(run, error.message, { verdict: 'error', cost: error.cost ?? 0, sessionId: error.sessionId }, noteExhaustion(error) || error.aborted);
+		const measured = { verdict: 'error', cost: error.cost ?? 0, tokens: error.tokens ?? 0, sessionId: error.sessionId };
+
+		return failedOutcome(run, error.message, measured, noteExhaustion(error) || error.aborted);
 	}
 }
 

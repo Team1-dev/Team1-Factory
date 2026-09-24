@@ -9,6 +9,10 @@ import { loadBoard } from './board.mjs';
 import { sweepMergedProposals } from './findings.mjs';
 import { processCard } from './run.mjs';
 
+// Landing and reviewing what is already open comes before any other stage.
+const FIRST_STAGES = ['ready to merge', 'stage: review'];
+const PASS_ORDER = STAGES.filter(stage => FIRST_STAGES.includes(stage.label)).concat(STAGES.filter(stage => !FIRST_STAGES.includes(stage.label)));
+
 async function sleepCheckingHalt(ms) {
 	for (let waited = 0; waited < ms; waited += 1000) {
 		if (state.haltAsked) return;
@@ -24,8 +28,14 @@ function stopAsked() {
 	return state.exhaustedUntil > Date.now();
 }
 
-function skipsCard(repo, card, capped) {
+function skipsCard(repo, card, stage, capped) {
 	if (capped && !card.started) return true;
+
+	if (stage.name === 'implement' && !card.hasPull && card.area.hasPull) {
+		sayOnce(repo, card.number, '#' + card.number + ' waits: ' + card.area.projectName + ' has a pull open');
+
+		return true;
+	}
 
 	if (card.bodyBlockers.length > 0) {
 		sayOnce(repo, card.number, '#' + card.number + ' blocked by #' + card.bodyBlockers.join(', #'));
@@ -50,25 +60,9 @@ async function processStage(github, board, stage, scope) {
 	const waiting = scope.queues[stage.label];
 	for (const card of waiting) {
 		if (stopAsked()) return false;
-		if (stage.startsWork && skipsCard(github.repo, card, scope.capped)) continue;
+		if (stage.startsWork && skipsCard(github.repo, card, stage, scope.capped)) continue;
 
 		const changed = await attemptCard(github, board, card, waiting);
-
-		if (changed) return true;
-	}
-
-	return false;
-}
-
-async function processScope(github, board, scope) {
-	if (scope.capped) {
-		sayOnce(github.repo, 'wip', 'wip ' + scope.active + '/' + state.knobs.WIP_CAP + ' — no new cards started');
-	} else {
-		forgetSaid(github.repo, 'wip');
-	}
-
-	for (const stage of STAGES) {
-		const changed = await processStage(github, board, stage, scope);
 
 		if (changed) return true;
 	}
@@ -127,7 +121,7 @@ export async function processRepo(repo) {
 	}
 
 	const perRepo = repoState(repo);
-	let changed = perRepo.fingerprint !== undefined && perRepo.fingerprint !== board.fingerprint;
+	const changed = perRepo.fingerprint !== undefined && perRepo.fingerprint !== board.fingerprint;
 	perRepo.fingerprint = board.fingerprint;
 
 	for (const card of board.unassignedCards) {
@@ -136,9 +130,19 @@ export async function processRepo(repo) {
 	}
 
 	for (const scope of board.scopes) {
-		const scopeChanged = await processScope(github, board, scope);
+		if (scope.capped) {
+			sayOnce(repo, 'wip', 'wip ' + scope.active + '/' + state.knobs.WIP_CAP + ' — no new cards started');
+		} else {
+			forgetSaid(repo, 'wip');
+		}
+	}
 
-		if (scopeChanged) changed = true;
+	// One stage at a time across every area, so what is open lands before new work starts; the first change ends the pass and
+	// the next one reads a fresh board.
+	for (const stage of PASS_ORDER) {
+		for (const scope of board.scopes) {
+			if (await processStage(github, board, stage, scope)) return true;
+		}
 	}
 
 	return changed;

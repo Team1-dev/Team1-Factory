@@ -74,8 +74,8 @@ test('over budget diverts to needs: answers with the spend and the budget', asyn
 	}, CARD);
 
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
-	expect(pass.writes[0].body).toContain('This card has cost **$15.10**, over the $15 budget. Work has stopped.');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · over-budget · $0.00 · total $15.10')).toBe(true);
+	expect(pass.writes[0].body).toContain('This card has used **$15.10 API**, over the $15 API budget. Work has stopped.');
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · over-budget · 0 tokens · $0.00 API · total 0 tokens · $15.10 API')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:over-budget']);
 	expect(model.calls).toEqual([]);
@@ -94,7 +94,7 @@ test('stalled: the stage ran maxRounds times since a person last spoke', async (
 
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain('This card has been through **implement** 2 times without settling.');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · stalled · $0.00 · total $3.10')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · stalled · 0 tokens · $0.00 API · total 0 tokens · $3.10 API')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:stalled']);
 	expect(model.calls).toEqual([]);
@@ -109,7 +109,7 @@ test('stalled: the stage ran maxRounds times since a person last spoke', async (
 
 	expect(model.calls.length).toBe(1);
 	expect(restarted.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
-	expect(restarted.writes[0].body).toBe('## Implementation\n\nasked\n\n— team1-factory · implement · questions · $0.50 · total $3.60 · sonnet');
+	expect(restarted.writes[0].body).toBe('## Implementation\n\nasked\n\n— team1-factory · implement · questions · 0 tokens · $0.50 API · total 0 tokens · $3.60 API · sonnet');
 });
 
 test('too big: the stage ran maxRoundsEver times across every answer', async () => {
@@ -124,7 +124,7 @@ test('too big: the stage ran maxRoundsEver times across every answer', async () 
 
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain('**implement** has now run 4 times on this card, across every answer');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · too-big · $0.00 · total $4.10')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · too-big · 0 tokens · $0.00 API · total 0 tokens · $4.10 API')).toBe(true);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:too-big']);
 });
 
@@ -138,7 +138,7 @@ test('died: the stage failed maxRounds times without a verdict', async () => {
 
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain('**implement** has died 2 times on this card — a budget ceiling or a fault');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · died · $0.00 · total $0.30')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · died · 0 tokens · $0.00 API · total 0 tokens · $0.30 API')).toBe(true);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:died']);
 });
 
@@ -186,7 +186,7 @@ test('a bug that throws once and works the next pass is unaffected', async () =>
 	}, CARD);
 
 	expect(model.calls.length).toBe(1);
-	expect(second.writes[0].body).toBe('## Implementation\n\nasked\n\n— team1-factory · implement · questions · $0.50 · total $0.60 · sonnet');
+	expect(second.writes[0].body).toBe('## Implementation\n\nasked\n\n— team1-factory · implement · questions · 0 tokens · $0.50 API · total 0 tokens · $0.60 API · sonnet');
 });
 
 test('a person can pick the model: the last "model:<model>[-effort]" in trusted text wins', async () => {
@@ -219,7 +219,7 @@ test('an expired claude login gets one plain note, no error stamp, and halts the
 	expect(callNames(first.writes)).toEqual(['comment']);
 	expect(first.writes[0].body).toContain('log back in');
 	expect(first.writes[0].body).not.toContain('· error ·');
-	expect(first.writes[0].body.endsWith('\n\n— team1-factory · implement · login-expired · $0.00 · total $0.10')).toBe(true);
+	expect(first.writes[0].body.endsWith('\n\n— team1-factory · implement · login-expired · 0 tokens · $0.00 API · total 0 tokens · $0.10 API')).toBe(true);
 	expect(state.haltAsked).toBe(true);
 	expect(state.haltReason).toContain('log back in');
 
@@ -244,7 +244,7 @@ test('a note of ours edited to a cost that is not a number does not switch the b
 		comments: { [CARD]: [TRIAGED, stamped('implement', 'advance', 7), edited, stamped('review', 'reject-local', 8)] },
 	}, CARD);
 
-	expect(pass.writes[0].body).toContain('This card has cost **$15.10**, over the $15 budget. Work has stopped.');
+	expect(pass.writes[0].body).toContain('This card has used **$15.10 API**, over the $15 API budget. Work has stopped.');
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:over-budget']);
 	expect(model.calls).toEqual([]);
 });

@@ -42,7 +42,7 @@ test('no open pull: back to implement with the no-pull note', async () => {
 	expect(pass.changed).toBe(true);
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain('No open pull request for `card/5-card-5`, which is 2 commit(s) ahead of `main`');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · no-pull · $0.00 · total $0.00')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · no-pull · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:no-pull']);
 });
@@ -61,7 +61,7 @@ test('a pull from a fork is labelled attack and closed with the card', async () 
 	expect(pass.writes[1]).toEqual({ name: 'closePull', number: PULL });
 	expect(pass.writes[2].number).toBe(CARD);
 	expect(pass.writes[2].body).toContain('#50 for `card/5-card-5` is opened from `mallory/app`, not this one');
-	expect(pass.writes[2].body.endsWith('\n\n— team1-factory · merge · attack · $0.00 · total $0.00')).toBe(true);
+	expect(pass.writes[2].body.endsWith('\n\n— team1-factory · merge · attack · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);
 	expect(pass.writes[3].labels).toEqual(['tier: contained', 'attack']);
 	expect(pass.writes[4]).toEqual({ name: 'close', number: CARD, reason: 'not_planned' });
 	expect(pass.card.labels).toEqual(['tier: contained', 'attack']);
@@ -80,7 +80,7 @@ test('a pull already labelled attack is refused and closed with the card', async
 	expect(pass.changed).toBe(true);
 	expect(callNames(pass.writes)).toEqual(['closePull', 'comment', 'setLabels', 'close']);
 	expect(pass.writes[1].body).toContain('#50 is labelled `attack` and will not be merged');
-	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · merge · attack · $0.00 · total $0.00')).toBe(true);
+	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · merge · attack · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);
 	expect(pass.writes[2].labels).toEqual(['tier: contained', 'attack']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:attack-pull']);
 });
@@ -101,7 +101,7 @@ test('a change request on the pull sends the card back to implement with the com
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain('@owner said this on #50, so it is not merging:');
 	expect(pass.writes[0].body).toContain('> please rename the flag\n> to --quiet');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · objection · $0.01 · total $0.01')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · objection · 0 tokens · $0.01 API · total 0 tokens · $0.01 API')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:objection']);
 	expect(ledgerLines()[1].cost).toBe(0.01);
@@ -120,7 +120,7 @@ test('an approval on the pull is noted on the card and does not move it', async 
 	expect(model.calls.length).toBe(1);
 	expect(callNames(pass.writes)).toEqual(['comment']);
 	expect(pass.writes[0].body).toContain('@owner said "LGTM, nice and small" on #50 — read as approval: says it looks fine');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · comment-noted · $0.01 · total $0.01')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · comment-noted · 0 tokens · $0.01 API · total 0 tokens · $0.01 API')).toBe(true);
 	expect(pass.card.labels).toEqual(['ready to merge', 'tier: contained']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:comment-noted']);
 });
@@ -208,7 +208,7 @@ test('a rebase conflict sends the card back to implement', async () => {
 	expect(git.calls[1]).toEqual({ name: 'rebaseOnto', root: 'work/acme__app/5', base: 'main', headSha: 'deadbeef' });
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain('`main` has moved since #50 was built and the branch no longer rebases onto it');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · conflict · $0.00 · total $0.00')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · conflict · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:conflict']);
 });
@@ -252,7 +252,7 @@ test('a merge refused for a conflict goes back to implement with the conflict wo
 	expect(pass.changed).toBe(true);
 	expect(callNames(pass.writes)).toEqual(['mergePull', 'comment', 'setLabels']);
 	expect(pass.writes[1].body).toContain('Could not merge #50.\n\nThe branch conflicts with the base');
-	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · merge · conflict · $0.00 · total $0.00')).toBe(true);
+	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · merge · conflict · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);
 	expect(pass.writes[2].labels).toEqual(['tier: contained', 'stage: implement']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:conflict']);
 });
@@ -267,7 +267,7 @@ test('a merge refused for another reason quotes the message', async () => {
 
 	expect(pass.changed).toBe(true);
 	expect(pass.writes[1].body).toContain('Could not merge #50.\n\nPUT merge 405: Required status check "ci" is expected');
-	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · merge · merge-refused · $0.00 · total $0.00')).toBe(true);
+	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · merge · merge-refused · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:merge-refused']);
 });
 
@@ -281,7 +281,8 @@ test('merged: the note, the routing label cleared, the remote branch deleted, th
 
 	expect(pass.changed).toBe(true);
 	expect(callNames(pass.writes)).toEqual(['mergePull', 'comment', 'setLabels', 'deleteBranch']);
-	expect(pass.writes[1].body).toBe('Merged #50. This card cost **$0.00** in total.\n\n— team1-factory · merge · merged · $0.00 · total $0.00');
+	expect(pass.writes[1].body).toBe('Merged #50. This card used **0 tokens · $0.00 API** in total.\n\n'
+		+ '— team1-factory · merge · merged · 0 tokens · $0.00 API · total 0 tokens · $0.00 API');
 	expect(pass.writes[2].labels).toEqual(['tier: contained', 'priority: high']);
 	expect(pass.writes[3]).toEqual({ name: 'deleteBranch', branch: BRANCH });
 	expect(pass.card.labels).toEqual(['tier: contained', 'priority: high']);
@@ -311,7 +312,8 @@ test('merged: proposals read against the merged diff add their cost to the total
 	expect(pass.writes[1].number).toBe(900);
 	expect(pass.writes[1].body).toBe('Done — #50 already covers this: First proposal');
 	expect(pass.writes[2].number).toBe(CARD);
-	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.02** in total.\n\n— team1-factory · merge · merged · $0.02 · total $0.02 · sonnet');
+	expect(pass.writes[2].body).toBe('Merged #50. This card used **0 tokens · $0.02 API** in total.\n\n'
+		+ '— team1-factory · merge · merged · 0 tokens · $0.02 API · total 0 tokens · $0.02 API · sonnet');
 });
 
 test('merged: a proposal reading that fails part way through still reports what was already paid for, including its own spend', async () => {
@@ -330,7 +332,8 @@ test('merged: a proposal reading that fails part way through still reports what 
 
 	const pass = await passOver(given, CARD);
 
-	expect(pass.writes[2].body).toBe('Merged #50. This card cost **$0.04** in total.\n\n— team1-factory · merge · merged · $0.04 · total $0.04 · sonnet');
+	expect(pass.writes[2].body).toBe('Merged #50. This card used **0 tokens · $0.04 API** in total.\n\n'
+		+ '— team1-factory · merge · merged · 0 tokens · $0.04 API · total 0 tokens · $0.04 API · sonnet');
 });
 
 test('merged: no proposals card, or one with nothing to read, still costs nothing', async () => {
@@ -344,7 +347,8 @@ test('merged: no proposals card, or one with nothing to read, still costs nothin
 
 	const pass = await passOver(given, CARD);
 
-	expect(pass.writes[1].body).toBe('Merged #50. This card cost **$0.00** in total.\n\n— team1-factory · merge · merged · $0.00 · total $0.00');
+	expect(pass.writes[1].body).toBe('Merged #50. This card used **0 tokens · $0.00 API** in total.\n\n'
+		+ '— team1-factory · merge · merged · 0 tokens · $0.00 API · total 0 tokens · $0.00 API');
 });
 
 test('the repository name is compared ignoring case: a differently cased head is not a fork', async () => {
@@ -386,7 +390,7 @@ test('the base moved and the rebased branch fails its gates: back to implement w
 
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain('`main` has moved since #50 was built. Rebased onto it the branch no longer passes the gates: `npm test` exited 1.');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · base-moved · $0.00 · total $0.00')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · base-moved · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
 	expect(callNames(git.calls)).not.toContain('forcePush');
 	expect(git.calls.find(call => call.name === 'resetTo')).toEqual({ name: 'resetTo', root: git.calls[0].root, sha: git.calls[1].headSha });
@@ -448,8 +452,8 @@ test('a comment read that fails after an earlier one already spent still counts 
 
 	const pass = await passOver(given, CARD);
 
-	expect(pass.writes[0].body).toContain('This card has cost **$0.03** so far.');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · unreadable-comment · $0.03 · total $0.03')).toBe(true);
+	expect(pass.writes[0].body).toContain('This card has used **0 tokens · $0.03 API** so far.');
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · unreadable-comment · 0 tokens · $0.03 API · total 0 tokens · $0.03 API')).toBe(true);
 	expect(ledgerLines()[1].cost).toBe(0.03);
 });
 

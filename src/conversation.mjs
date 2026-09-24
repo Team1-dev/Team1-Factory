@@ -42,6 +42,7 @@ export function readConversation(card, comments, stageName) {
 		personText: [],
 		runnerText: [],
 		spent: 0,
+		spentTokens: 0,
 		personSpokeLast: true,
 		mergeAnsweredAt: 0,
 		rounds: 0,
@@ -79,6 +80,7 @@ export function readConversation(card, comments, stageName) {
 
 		conversation.newest[stamp.stage] = comment;
 		conversation.spent += stamp.cost;
+		conversation.spentTokens += stamp.tokens;
 		if (stamp.stage !== 'answers' && ASKING_VERDICTS.includes(stamp.verdict)) conversation.asker = stamp.stage;
 
 		const kind = roundKind(stamp, stageName);

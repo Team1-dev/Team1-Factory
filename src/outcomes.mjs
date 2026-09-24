@@ -1,20 +1,23 @@
 import { setTimeout as sleep } from 'node:timers/promises';
-import { branchOf, readLabels, ROUTING_LABELS, stampLine } from './cards.mjs';
+import { branchOf, readLabels, ROUTING_LABELS, spentText, stampLine } from './cards.mjs';
 import { forgetSaid, sayOnce, state, workDirectory } from './config.mjs';
 import { ledgerEnd, ledgerStart } from './ledger.mjs';
 import { fragment } from './prompts.mjs';
 import { redactSecrets } from './stringUtils.mjs';
 
 // What the card has cost, this stage's own cost included: the conversation's running total plus what is being stamped now.
-export function costTotal(run, cost) {
-	return (run.conversation !== undefined ? run.conversation.spent : 0) + cost;
+// The card's spend so far with this run's added.
+export function spentTotal(run, spent) {
+	if (run.conversation === undefined) return { cost: spent.cost, tokens: spent.tokens };
+
+	return { cost: run.conversation.spent + spent.cost, tokens: run.conversation.spentTokens + spent.tokens };
 }
 
 export function note(run, name, slots, measured) {
-	const total = costTotal(run, measured.cost);
-	const stamp = stampLine(run.stage.name, measured.verdict, measured.cost, { total: total, model: measured.model });
+	const total = spentTotal(run, measured);
+	const stamp = stampLine(run.stage.name, measured.verdict, measured, total);
 
-	return fragment('_notes.md', name, { ...slots, total: total.toFixed(2), stamp: stamp });
+	return fragment('_notes.md', name, { ...slots, total: spentText(total), stamp: stamp });
 }
 
 export function batchOutcome(batch, body, label, measured) {
@@ -34,7 +37,7 @@ export function attackOutcome(run, body, flag, measured) {
 }
 
 export function backToImplement(run, name, slots, verdict) {
-	const measured = { verdict: verdict, cost: 0 };
+	const measured = { verdict: verdict, cost: 0, tokens: 0 };
 
 	return batchOutcome(run.batch, note(run, name, slots, measured), 'stage: implement', measured);
 }
@@ -70,14 +73,14 @@ export function failedOutcome(run, message, measured, silent) {
 	for (const card of run.batch) {
 		const entry = { card: card };
 		if (!silent) {
-			const cost = card === run.lead ? measured.cost : 0;
+			const lead = card === run.lead;
 
 			entry.body = note(run, 'stage-failed', {
 				stage: run.stage.name,
 				error: message.slice(0, 300),
 				label: run.stage.label,
 				retry: retry,
-			}, { verdict: 'error', cost: cost, model: measured.model });
+			}, { verdict: 'error', cost: lead ? measured.cost : 0, tokens: lead ? measured.tokens : 0, model: measured.model });
 		}
 
 		cards.push(entry);
@@ -182,7 +185,7 @@ export function divert(run, noteName, slots, measured) {
 		entry.flagPull = fragment('_notes.md', 'hides-instructions', {
 			what: 'The card it answers',
 			why: 'see the card',
-			stamp: stampLine(run.stage.name, measured.verdict, measured.cost, { total: costTotal(run, measured.cost), model: measured.model }),
+			stamp: stampLine(run.stage.name, measured.verdict, measured, spentTotal(run, measured)),
 		});
 	}
 
@@ -227,7 +230,7 @@ export async function missingPull(run) {
 
 	let why = fragment('_notes.md', 'no-pull-nothing-pushed', { branch: run.branch });
 	if (comparison !== undefined) {
-		if (comparison.ahead_by === 0) return alreadyDone(run, run.batchRoot, '', { verdict: 'already-done', cost: 0 });
+		if (comparison.ahead_by === 0) return alreadyDone(run, run.batchRoot, '', { verdict: 'already-done', cost: 0, tokens: 0 });
 
 		why = fragment('_notes.md', 'no-pull-ahead', { branch: run.branch, ahead: comparison.ahead_by, base: base });
 	}

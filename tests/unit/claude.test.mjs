@@ -54,6 +54,7 @@ test('readResult: an error reply throws with its cost and session; a good one is
 	const reply = readResult({
 		result: 'text\n## Done\n\nok', structured_output: { verdict: 'advance' }, total_cost_usd: 0.2, num_turns: 3, duration_ms: 10,
 		session_id: 'sid', modelUsage: { 'claude-opus-5': {} },
+		usage: { input_tokens: 10, cache_creation_input_tokens: 200, cache_read_input_tokens: 3000, output_tokens: 40 },
 	}, 'opus', call, 'sid');
 
 	// tests/integration/fake.mjs modelAnswer() stands in for this record: the two must have the same fields.
@@ -61,7 +62,10 @@ test('readResult: an error reply throws with its cost and session; a good one is
 		output: { verdict: 'advance' },
 		section: '## Done\n\nok',
 		sessionId: 'sid',
-		metrics: { model: 'claude-opus-5', cost: 0.2, turns: 3, durationMs: 10, promptChars: 3, outputChars: 16, usage: undefined },
+		metrics: {
+			model: 'claude-opus-5', cost: 0.2, tokens: 3250, turns: 3, durationMs: 10, promptChars: 3, outputChars: 16,
+			usage: { input_tokens: 10, cache_creation_input_tokens: 200, cache_read_input_tokens: 3000, output_tokens: 40 },
+		},
 	});
 
 	// A structured section wins over the text and is taken out of the output; one that came back as a single line is decoded first.

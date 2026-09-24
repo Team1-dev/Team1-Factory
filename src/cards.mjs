@@ -27,15 +27,29 @@ export function readBoardLabels() {
 	return boardLabels;
 }
 
-export function stampLine(stage, verdict, cost, totals) {
-	let line = STAMP_MARKER + ' · ' + stage + ' · ' + verdict + ' · $' + cost.toFixed(2) + ' · total $' + totals.total.toFixed(2);
-	if (totals.model !== undefined) line += ' · ' + totals.model;
+// What a run used, as tokens and what they would cost at API list prices. A subscription is not billed that figure.
+export function spentText(spent) {
+	return spent.tokens.toLocaleString('en-US') + ' tokens · $' + spent.cost.toFixed(2) + ' API';
+}
 
-	return line;
+const USAGE_MARKER = STAMP_MARKER + ' usage';
+
+// The stamp, and under it the subscription's usage when the run's model call reported it.
+export function stampLine(stage, verdict, spent, total) {
+	let line = STAMP_MARKER + ' · ' + stage + ' · ' + verdict + ' · ' + spentText(spent) + ' · total ' + spentText(total);
+	if (spent.model !== undefined) line += ' · ' + spent.model;
+	if (spent.planUsage === undefined || spent.planUsage.length === 0) return line;
+
+	const windows = spent.planUsage.map(window => window.name + ' ' + window.percent + '% (resets ' + window.resets + ')');
+
+	return line + '\n' + USAGE_MARKER + ' · ' + windows.join(' · ');
 }
 
 export function parseStamp(body) {
 	const lines = body.trimEnd().split('\n');
+	if (lines[lines.length - 1].startsWith(USAGE_MARKER)) lines.pop();
+	if (lines.length === 0) return undefined;
+
 	const lastLine = lines[lines.length - 1];
 	if (!lastLine.startsWith(STAMP_MARKER)) return undefined;
 
@@ -43,10 +57,13 @@ export function parseStamp(body) {
 	const fields = lastLine.trim().split(' · ');
 	if (fields.length < 4) return undefined;
 
-	const cost = Number(fields[3].slice(1));
-	if (Number.isNaN(cost)) return undefined;
+	// A stamp from before tokens were counted reads `$cost · total $cost`, and counts no tokens.
+	const counted = fields[3].endsWith(' tokens');
+	const tokens = counted ? Number(fields[3].slice(0, -' tokens'.length).replaceAll(',', '')) : 0;
+	const cost = Number((counted ? fields[4] : fields[3]).replace(' API', '').slice(1));
+	if (Number.isNaN(cost) || Number.isNaN(tokens)) return undefined;
 
-	return { stage: fields[1], verdict: fields[2], cost: cost };
+	return { stage: fields[1], verdict: fields[2], cost: cost, tokens: tokens };
 }
 
 export function readLabels(card) {

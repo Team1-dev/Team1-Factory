@@ -1,6 +1,6 @@
 import { stampLine } from './cards.mjs';
 import { fileFindings } from './findings.mjs';
-import { attackOutcome, batchOutcome, costTotal } from './outcomes.mjs';
+import { attackOutcome, batchOutcome, spentTotal } from './outcomes.mjs';
 import { fragment, joinSections } from './prompts.mjs';
 import { route } from './routes.mjs';
 
@@ -28,7 +28,7 @@ export async function verdictOutcome(run, reply, options) {
 	if (section === '' && options.emptySection !== undefined) section = options.emptySection(outcome);
 	if (options.heading !== undefined) section = withHeading(section, options.heading);
 
-	const stamp = stampLine(run.stage.name, outcome, metrics.cost, { total: costTotal(run, metrics.cost), model: metrics.model });
+	const stamp = stampLine(run.stage.name, outcome, metrics, spentTotal(run, metrics));
 	metrics.verdict = outcome;
 
 	if (outcome === options.attack) {

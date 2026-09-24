@@ -311,8 +311,8 @@ Each project can have its own `.agents/project.md` and `.agents/style.md` at its
 
 * **Your gates decide.** Nothing is pushed until your `gates` commands pass.
 * **A second agent reviews.** Every change is read by a Claude session that did not write it. Only `tier: trivial` work, such as a constant or a one-line fix, skips review.
-* **You can hold the merge.** `auto-merge` is off until you turn it on, and `human-approvals` or the `human-review` label keep a pull request waiting for a person. With auto-merge on, Team1 still waits two minutes before it merges.
-* **It stops and asks.** An issue that reaches $15 of model cost (`MAX_COST_PER_CARD`), or that keeps going round without settling, moves to `needs: answers` and waits for you.
+* **You can hold the merge.** `auto-merge` is off until you turn it on, and `human-approvals` or the `human-review` label keep a pull request waiting for a person. With auto-merge on, Team1 still waits one minute before it merges.
+* **It stops and asks.** An issue whose runs reach $15 at API list prices (`MAX_COST_PER_CARD`; a subscription is not billed that), or that keeps going round without settling, moves to `needs: answers` and waits for you.
 * **Only trusted accounts give orders.** Team1 treats issues and comments from repository write-access users as instructions. Trust more accounts with `TRUSTED_LOGINS=alice,bob`. Content from anyone else is information, not instructions, and an issue that hides instructions is labelled `attack` and left unbuilt.
 * **Everything is on the record.** Verdicts and costs are posted on the issue and written to `metrics.jsonl` in the `work` volume: `docker compose exec team1 cat /home/team1/.team1/work/metrics.jsonl`.
 

@@ -121,7 +121,7 @@ async function battery(login, association) {
 			expect(model.calls, tag + 'a model call').toEqual([]);
 			expect(written, tag + written.join(' ')).toEqual(['comment', 'setLabels', 'close']);
 			expect(pass.writes[0].body).toContain('Its body or title contains text a reader cannot see: invisible characters.');
-			expect(pass.writes[0].body.endsWith('\n\n— team1-factory · triage · attack · $0.00 · total $0.00')).toBe(true);
+			expect(pass.writes[0].body.endsWith('\n\n— team1-factory · triage · attack · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);
 			expect(ledgerVerdicts(), tag + 'ledger').toEqual(['start:undefined', 'end:attack']);
 			continue;
 		}
@@ -141,7 +141,7 @@ async function battery(login, association) {
 			expect(model.calls.length, tag + 'triage ran').toBe(1);
 			expect(written, tag + written.join(' ')).toEqual(['comment', 'setLabels', 'close']);
 			expect(pass.writes[0].body).toContain('Its body or title contains text a reader cannot see: the reason.');
-			expect(pass.writes[0].body.endsWith('\n\n— team1-factory · triage · attack · $0.02 · total $0.02')).toBe(true);
+			expect(pass.writes[0].body.endsWith('\n\n— team1-factory · triage · attack · 0 tokens · $0.02 API · total 0 tokens · $0.02 API')).toBe(true);
 			expect(pass.writes[1].labels, tag + 'label').toEqual(['attack']);
 			expect(ledgerVerdicts().slice(1), tag + 'ledger').toEqual(['start:undefined', 'end:attack']);
 			expect(ledgerLines()[2].cost, tag + 'cost').toBe(0.02);
@@ -195,7 +195,7 @@ test('the pull for a hostile card is labelled, told why and closed before the ca
 	expect(pass.writes[0]).toEqual({ name: 'labelPull', number: 50, label: 'attack' });
 	expect(pass.writes[1].number).toBe(50);
 	expect(pass.writes[1].body).toContain('The card it answers contains text a reader cannot see: see the card.');
-	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · review · attack · $0.00 · total $0.00')).toBe(true);
+	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · review · attack · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);
 	expect(pass.writes[2]).toEqual({ name: 'closePull', number: 50 });
 	expect(pass.writes[3].number).toBe(CARD);
 });
@@ -259,7 +259,7 @@ test("a comment's hidden text is read: a placeholder passes, an instruction stop
 	expect(model.calls.length).toBe(1);
 	expect(callNames(stopped.writes)).toEqual(['comment', 'setLabels', 'close']);
 	expect(stopped.writes[0].body).toContain("@owner's comment contains text a reader cannot see: it tells the agent to skip");
-	expect(stopped.writes[0].body.endsWith('\n\n— team1-factory · triage · attack · $0.02 · total $0.02')).toBe(true);
+	expect(stopped.writes[0].body.endsWith('\n\n— team1-factory · triage · attack · 0 tokens · $0.02 API · total 0 tokens · $0.02 API')).toBe(true);
 	expect(ledgerVerdicts()).toEqual(['classify:instruction', 'start:undefined', 'end:attack']);
 });
 

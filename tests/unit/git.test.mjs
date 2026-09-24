@@ -362,3 +362,24 @@ test('a resumed worktree ahead of a remote nobody moved keeps its unpushed commi
 
 	expect(await o.sh(o.bare, ['log', '--format=%s', 'card/5-x'])).toContain('mine');
 }, 30000);
+
+test('a resumed card caught up with a base that moved counts only its own files in round, not what the base gained', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '5-card');
+
+	await o.repo.checkout(root, 'card/5-x', false);
+	writeFileSync(join(root, 'new.txt'), 'new\n');
+	await o.repo.commitAndPush(root, 'card/5-x', 'Card 5', ['new.txt']);
+
+	writeFileSync(join(o.seed, 'merged.txt'), 'another card, merged meanwhile\n');
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'add', '-A']);
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'commit', '-qm', 'merged']);
+	await o.sh(o.seed, ['push', '-q', 'origin', 'main']);
+
+	expect(await o.repo.catchUp(root, 'main')).toMatchObject({ moved: true, conflicts: [] });
+
+	writeFileSync(join(root, 'more.txt'), 'rework\n');
+	await o.sh(root, ['add', 'more.txt']);
+
+	expect(await o.repo.changes(root, 'card/5-x', 'main')).toEqual({ unpushed: true, changed: ['more.txt', 'new.txt'], round: ['more.txt'], untracked: [] });
+}, 30000);

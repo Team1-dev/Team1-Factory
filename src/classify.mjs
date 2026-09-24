@@ -23,13 +23,14 @@ export async function classify(tag, prompt, subject, verdicts) {
 		if (reply.output.verdict === undefined) {
 			console.log(tag + ': ' + subject + ' reading gave no verdict');
 
-			return { verdict: undefined, reason: '', cost: reply.metrics.cost };
+			return { verdict: undefined, reason: '', cost: reply.metrics.cost, tokens: reply.metrics.tokens };
 		}
 
 		return {
 			verdict: reply.output.verdict,
 			reason: (reply.output.reason ?? '').slice(0, REASON_LIMIT),
 			cost: reply.metrics.cost,
+			tokens: reply.metrics.tokens,
 			model: reply.metrics.model,
 		};
 	} catch (error) {
@@ -40,12 +41,12 @@ export async function classify(tag, prompt, subject, verdicts) {
 		noteExhaustion(error);
 		noteLoginExpired(error);
 
-		return { verdict: undefined, reason: '', cost: error.cost };
+		return { verdict: undefined, reason: '', cost: error.cost, tokens: error.tokens };
 	}
 }
 
 export async function hiddenInstruction(run, comment, commentId) {
-	const finding = { instruction: false, why: '', cost: 0, unread: false };
+	const finding = { instruction: false, why: '', cost: 0, tokens: 0, unread: false };
 	if (comment.hostile) {
 		finding.instruction = true;
 		finding.why         = 'invisible characters';
@@ -66,6 +67,7 @@ export async function hiddenInstruction(run, comment, commentId) {
 	}), 'hidden text', ['placeholder', 'instruction']);
 
 	finding.cost = reading.cost;
+	finding.tokens = reading.tokens;
 
 	if (reading.verdict === undefined) {
 		finding.unread = true;

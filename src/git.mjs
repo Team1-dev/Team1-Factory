@@ -185,7 +185,8 @@ export function repository(settings) {
 	// changed and untracked are kept apart: a changed tracked file is always the card's work, but an untracked one is only the
 	// card's work when the stage says it touched it, and the caller is the one who knows what the stage said. changed counts the
 	// whole branch since the merge base; round is since this round started (the remote branch on a resumed card, else the same
-	// merge base), so a reworked card does not read its own earlier rounds as unlisted.
+	// merge base), so a reworked card does not read its own earlier rounds as unlisted. round keeps only files the branch changed:
+	// once the card catches up with a base that moved, the pushed sha is behind it, and what the base gained is not the card's.
 	async function changes(root, branch, base) {
 		const mergeBase = await git(root, ['merge-base', 'HEAD', 'origin/' + base]);
 		const remoteBranch = await tryGit(root, ['rev-parse', '--verify', '--quiet', 'origin/' + branch]);
@@ -202,7 +203,7 @@ export function repository(settings) {
 		const changedOutput = await git(root, ['diff', '--name-only', mergeBase]);
 		const changed = changedOutput === '' ? [] : changedOutput.split('\n');
 		const roundOutput = await git(root, ['diff', '--name-only', pushedSha]);
-		const round = roundOutput === '' ? [] : roundOutput.split('\n');
+		const round = roundOutput === '' ? [] : roundOutput.split('\n').filter(file => changed.includes(file));
 		const untrackedOutput = await git(root, ['ls-files', '--others', '--exclude-standard']);
 		const untracked = untrackedOutput === '' ? [] : untrackedOutput.split('\n');
 

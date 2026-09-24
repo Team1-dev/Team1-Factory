@@ -111,7 +111,7 @@ export function noteLoginExpired(error) {
 }
 
 export function failure(message, fields) {
-	const error = Object.assign(new Error(message), { cost: 0 }, fields);
+	const error = Object.assign(new Error(message), { cost: 0, tokens: 0 }, fields);
 
 	error.exhaustedUntil = exhaustionEnd(message);
 	if (error.exhaustedUntil !== undefined) error.retryable = false;
@@ -149,7 +149,7 @@ function isRetryable(message) {
 // before the call and a later pass can resume it.
 export function claudeArguments(model, call, sessionId, systemPath) {
 	const args = [
-		'-p', '--model', model, '--output-format', 'json', '--permission-mode', call.permissionMode,
+		'-p', '--model', model, '--output-format', 'stream-json', '--verbose', '--permission-mode', call.permissionMode,
 		'--exclude-dynamic-system-prompt-sections', '--setting-sources', 'user', '--strict-mcp-config',
 		'--tools', call.tools.join(','),
 	];
@@ -165,6 +165,54 @@ export function claudeArguments(model, call, sessionId, systemPath) {
 	return args;
 }
 
+const WINDOW_NAMES = { five_hour: '5h', seven_day: 'week' };
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function resetText(seconds) {
+	const at = new Date(seconds * 1000);
+
+	return DAYS[at.getUTCDay()] + ' ' + String(at.getUTCHours()).padStart(2, '0') + ':' + String(at.getUTCMinutes()).padStart(2, '0') + ' UTC';
+}
+
+// The subscription's usage windows from the newest rate-limit event, read once: each window's name, percent used and reset.
+function planWindows(info) {
+	const windows = [];
+	for (const [name, window] of Object.entries(info.unifiedWindows ?? {})) {
+		windows.push({ name: WINDOW_NAMES[name] ?? name, percent: Math.round(window.utilization * 100), resets: resetText(window.resetsAt) });
+	}
+
+	return windows;
+}
+
+// stream-json is one event per line: the result, and on a subscription a rate-limit event carrying its usage windows, which
+// the result read here carries as planUsage.
+function readEvents(stdout) {
+	let result;
+	let planUsage;
+	for (const line of stdout.trim().split('\n')) {
+		let event;
+		try {
+			event = JSON.parse(line);
+		} catch {
+			throw failure('claude output was not JSON: ' + line.slice(0, 300), {});
+		}
+
+		if (event.type === 'result') result = event;
+		if (event.type === 'rate_limit_event') planUsage = planWindows(event.rate_limit_info);
+	}
+
+	if (result === undefined) throw failure('claude gave no result: ' + stdout.slice(0, 300), {});
+
+	return { ...result, planUsage: planUsage };
+}
+
+// Every token the call sent or got back, cached or not: what the account's usage counts.
+function tokensOf(usage) {
+	if (usage === undefined) return 0;
+
+	return usage.input_tokens + usage.cache_creation_input_tokens + usage.cache_read_input_tokens + usage.output_tokens;
+}
+
 export function readResult(output, model, call, sessionId) {
 	if (output.is_error) {
 		let message = output.result;
@@ -173,7 +221,7 @@ export function readResult(output, model, call, sessionId) {
 				+ ' budget';
 		}
 
-		throw failure(message, { cost: output.total_cost_usd, sessionId: sessionId, retryable: isRetryable(message) });
+		throw failure(message, { cost: output.total_cost_usd, tokens: tokensOf(output.usage), sessionId: sessionId, retryable: isRetryable(message) });
 	}
 
 	const text = typeof output.result === 'string' ? output.result : '';
@@ -214,6 +262,8 @@ export function readResult(output, model, call, sessionId) {
 		metrics: {
 			model: usedModel,
 			cost: cost,
+			tokens: tokensOf(output.usage),
+			planUsage: output.planUsage,
 			turns: output.num_turns,
 			durationMs: output.duration_ms,
 			promptChars: call.prompt.length,
@@ -285,14 +335,7 @@ async function claudeOnce(model, call) {
 			throw failure(message, { retryable: isRetryable(message) });
 		}
 
-		let output;
-		try {
-			output = JSON.parse(outcome.stdout);
-		} catch {
-			throw failure('claude output was not JSON: ' + outcome.stdout.slice(0, 300), {});
-		}
-
-		return readResult(output, model, call, sessionId);
+		return readResult(readEvents(outcome.stdout), model, call, sessionId);
 	} finally {
 		await rm(scratch, { recursive: true, force: true });
 	}

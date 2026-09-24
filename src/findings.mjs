@@ -67,7 +67,7 @@ export async function fileFindings(run, findings, limit, originNote) {
 		const body = note(run, 'finding', {
 			findings: sections.join('\n\n'),
 			origin: origin,
-		}, { verdict: 'proposed', cost: 0 });
+		}, { verdict: 'proposed', cost: 0, tokens: 0 });
 
 		const existing = await run.github.comments(number);
 		const previous = existing.find(comment => comment.body.includes(origin));
@@ -132,24 +132,26 @@ async function judgeProposal(run, diffText, section) {
 // clone when it has one, the rendered document from GitHub when it does not.
 export async function closeCoveredProposals(run, pull, diffText) {
 	let cost = 0;
+	let tokens = 0;
 	let model;
 	try {
 		const title = proposalsTitle(run.lead);
 		const issue = run.board.cards.find(card => card.title === title);
 
-		if (issue === undefined) return { cost: cost, model: model };
+		if (issue === undefined) return { cost: cost, tokens: tokens, model: model };
 
 		const sections = [];
 		for (const comment of await run.github.comments(issue.number)) {
 			sections.push(...findingSections(run, comment));
 		}
 
-		if (sections.length === 0) return { cost: cost, model: model };
+		if (sections.length === 0) return { cost: cost, tokens: tokens, model: model };
 
 		let allCovered = true;
 		for (const section of sections) {
 			const reading = await judgeProposal(run, diffText, section);
 			cost += reading.cost;
+			tokens += reading.tokens;
 
 			if (reading.verdict === undefined) {
 				allCovered = false;
@@ -172,7 +174,7 @@ export async function closeCoveredProposals(run, pull, diffText) {
 		console.log(run.tag + ': proposals issue not checked: ' + error.message);
 	}
 
-	return { cost: cost, model: model };
+	return { cost: cost, tokens: tokens, model: model };
 }
 
 // A card a person merged closes with no `merged` note from us, so its proposals issue never gets `closeCoveredProposals`'s one
@@ -227,7 +229,7 @@ export async function sweepMergedProposals(github, board) {
 			const run = { repo: github.repo, tag: tag, github: github, lead: card, board: board, stage: { name: 'merge' }, area: undefined, conversation: conversation };
 			const diffText = await github.diff(pull.number);
 			const proposals = await closeCoveredProposals(run, pull, diffText);
-			const measured = { verdict: 'proposals-swept', cost: proposals.cost, model: proposals.model };
+			const measured = { verdict: 'proposals-swept', cost: proposals.cost, tokens: proposals.tokens, model: proposals.model };
 			const body = note(run, 'proposals-swept', { sha: pull.head.sha, number: pull.number }, measured);
 
 			await github.comment(proposalsIssue.number, redactSecrets(body));

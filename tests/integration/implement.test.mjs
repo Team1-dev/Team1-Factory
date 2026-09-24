@@ -170,7 +170,7 @@ test('a verdict other than advance with nothing pushed posts the section and rou
 
 	expect(pass.changed).toBe(true);
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
-	expect(pass.writes[0].body).toBe(SECTION + '\n\n— team1-factory · implement · questions · $0.50 · total $0.60 · sonnet');
+	expect(pass.writes[0].body).toBe(SECTION + '\n\n— team1-factory · implement · questions · 0 tokens · $0.50 API · total 0 tokens · $0.60 API · sonnet');
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:questions']);
 	expect(ledgerLines()[1].resumed).toBe(false);
@@ -198,7 +198,7 @@ test('a section that is only headings still leaves a readable comment for a pers
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
 	expect(pass.writes[0].body).toBe(fragment('_notes.md', 'implement-section-missing', { outcome: 'questions' })
-		+ '\n\n— team1-factory · implement · questions · $0.50 · total $0.60 · sonnet');
+		+ '\n\n— team1-factory · implement · questions · 0 tokens · $0.50 API · total 0 tokens · $0.60 API · sonnet');
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
 });
 
@@ -208,12 +208,12 @@ test('the same long section as the previous round is replaced by the same-as-bef
 	const long = '## Implementation\n\n' + 'The plan is the same as before, in the same words, at length. '.repeat(3);
 	model.answers.push(modelAnswer({ section: long, verdict: 'questions' }, 0.5));
 
-	const previous = mine(long + '\n\n' + stampLine('implement', 'questions', 0.5, { total: 0.6 }));
+	const previous = mine(long + '\n\n' + stampLine('implement', 'questions', { cost: 0.5, tokens: 0 }, { cost: 0.6, tokens: 0 }));
 
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged(), previous] } }, CARD);
 
 	expect(pass.writes[0].body).toBe('_This round reached the same plan and the same outcome as the previous one,'
-		+ ' word for word — see the comment above._\n\n— team1-factory · implement · questions · $0.50 · total $1.10 · sonnet');
+		+ ' word for word — see the comment above._\n\n— team1-factory · implement · questions · 0 tokens · $0.50 API · total 0 tokens · $1.10 API · sonnet');
 });
 
 test('advance with nothing pushed and a pull already open is already-done and goes to review', async () => {
@@ -227,7 +227,7 @@ test('advance with nothing pushed and a pull already open is already-done and go
 	}, CARD);
 
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
-	expect(pass.writes[0].body).toBe(SECTION + '\n\n— team1-factory · implement · already-done · $0.50 · total $0.60 · sonnet');
+	expect(pass.writes[0].body).toBe(SECTION + '\n\n— team1-factory · implement · already-done · 0 tokens · $0.50 API · total 0 tokens · $0.60 API · sonnet');
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: review']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:already-done']);
 });
@@ -240,7 +240,7 @@ test('advance with nothing pushed and no pull is no-change and fails the card', 
 
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain(SECTION + '\n\nNothing was pushed and the card is not progressing, so it needs a');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · no-change · $0.50 · total $0.60 · sonnet')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · no-change · 0 tokens · $0.50 API · total 0 tokens · $0.60 API · sonnet')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'failed']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:no-change']);
 });
@@ -254,7 +254,7 @@ test('advance with commits but no changed files closes the card as already on th
 
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels', 'close', 'deleteBranch']);
 	expect(pass.writes[0].body).toContain(SECTION + '\n\n---\n\n`' + BRANCH + '` carries no change against `main`');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · already-done · $0.50 · total $0.60 · sonnet')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · already-done · 0 tokens · $0.50 API · total 0 tokens · $0.60 API · sonnet')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained']);
 	expect(pass.writes[2]).toEqual({ name: 'close', number: CARD, reason: 'completed' });
 	expect(pass.writes[3]).toEqual({ name: 'deleteBranch', branch: BRANCH });
@@ -287,7 +287,7 @@ test('red gates go back to the session with the output; still red after the fix 
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain(SECTION + '\n\n---\n\n**Gates failed:** `npm test` exited 1, after 2 fix rounds in'
 		+ ' the same session. Nothing was pushed.\n\n```\n1 failing\n```');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · gates-failed · $1.00 · total $1.10 · sonnet')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · gates-failed · 0 tokens · $1.00 API · total 0 tokens · $1.10 API · sonnet')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'failed']);
 	expect(ledgerLines()[1].gatesPassed).toBe(false);
 	expect(ledgerLines()[1].verdict).toBe('gates-failed');
@@ -313,7 +313,7 @@ test('red gates that the session turns green: pushed as usual, one fix round on 
 	expect(callNames(pass.writes)).toEqual(['createPull', 'comment', 'setLabels']);
 	expect(pass.writes[1].body).toContain('Implemented on https://github.com/acme/app/pull/');
 	expect(pass.writes[1].body).not.toContain('Gates failed');
-	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · implement · advance · $0.75 · total $0.85 · sonnet')).toBe(true);
+	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · implement · advance · 0 tokens · $0.75 API · total 0 tokens · $0.85 API · sonnet')).toBe(true);
 	expect(pass.writes[2].labels).toEqual(['tier: contained', 'stage: review']);
 	expect(ledgerLines()[1].gateFixes).toBe(1);
 	expect(ledgerLines()[1].gatesPassed).toBe(true);
@@ -388,11 +388,11 @@ test('green gates: commit, push, open the pull, post findings, note the files an
 	expect(pass.writes[1].labels).toEqual(['findings']);
 	expect(pass.writes[2].number).toBe(902);
 	expect(pass.writes[2].body).toBe('### Help text is stale\n\nThe help text still lists --verbose.\n\nNoticed by implement while building #5,'
-		+ ' outside what that card asked for.\n\n— team1-factory · implement · proposed · $0.00 · total $0.10');
+		+ ' outside what that card asked for.\n\n— team1-factory · implement · proposed · 0 tokens · $0.00 API · total 0 tokens · $0.10 API');
 	expect(pass.writes[3].body).toBe('Implemented on https://github.com/acme/app/pull/77. Noted on the findings card: #902.'
 		+ '\n\n**Not in the stage\'s own list:** `README.md`. **Listed but untouched:** `src/help.mjs`.'
 		+ ' **Left out of the commit, untracked and not in the stage\'s own list:** `node_modules/x/index.js`.'
-		+ '\n\n— team1-factory · implement · advance · $0.50 · total $0.60 · sonnet');
+		+ '\n\n— team1-factory · implement · advance · 0 tokens · $0.50 API · total 0 tokens · $0.60 API · sonnet');
 	expect(pass.writes[4].labels).toEqual(['tier: contained', 'stage: review']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:advance']);
 	expect(ledgerLines()[1].gatesPassed).toBe(true);
@@ -831,7 +831,7 @@ test('more changed files outside the stage\'s own list than a card plausibly tou
 		+ ' `lib/generated-1.js`, ');
 	expect(pass.writes[0].body).toContain('`lib/generated-20.js`, and 1 more. Nothing was pushed.');
 	expect(pass.writes[0].body).not.toContain('generated-21');
-	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · fail · $0.50 · total $0.60 · sonnet')).toBe(true);
+	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · fail · 0 tokens · $0.50 API · total 0 tokens · $0.60 API · sonnet')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'failed']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:fail']);
 	expect(ledgerLines()[1].gatesPassed).toBe(false);
@@ -856,7 +856,7 @@ test('a rework round listing every file its branch changed reports nothing unlis
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
 	expect(pass.writes[1].body).toMatch(
-		/^Implemented on https:\/\/github\.com\/acme\/app\/pull\/\d+\.\n\n— team1-factory · implement · advance · \$0\.50 · total \$0\.60 · sonnet$/,
+		/^Implemented on https:\/\/github\.com\/acme\/app\/pull\/\d+\.\n\n— team1-factory · implement · advance · 0 tokens · \$0\.50 API · total 0 tokens · \$0\.60 API · sonnet$/,
 	);
 	expect(pass.writes[1].body).not.toContain('Not in the stage\'s own list');
 	expect(pass.writes[1].body).not.toContain('Listed but untouched');

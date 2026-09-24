@@ -6,7 +6,7 @@ import { filesNamedOnCards, inlineFiles } from './files.mjs';
 import { install, runGates } from './gates.mjs';
 import { newestSession } from './ledger.mjs';
 import { fileFindings } from './findings.mjs';
-import { alreadyDone, batchOutcome, costTotal, hold, note, start, unreadableOutcome } from './outcomes.mjs';
+import { alreadyDone, batchOutcome, hold, spentTotal, note, start, unreadableOutcome } from './outcomes.mjs';
 import { cardHeading, fragment, joinSections, resumeSince, RULE, systemPrompt, userPrompt } from './prompts.mjs';
 import { route } from './routes.mjs';
 import { verdictOutcome } from './verdict.mjs';
@@ -41,7 +41,6 @@ async function settleUnpushed(run, worktree, attempt) {
 	const reply = attempt.reply;
 	const outcome = reply.output.verdict;
 	const measured = attempt.measured;
-	const cost = measured.cost;
 	let section = reply.section;
 	if (outcome !== 'advance' && !attempt.changes.unpushed) {
 		const previous = run.conversation.newest.implement;
@@ -60,7 +59,7 @@ async function settleUnpushed(run, worktree, attempt) {
 			measured.verdict = 'already-done';
 
 			const label = route('implement', 'advance', needsReview(run, attempt.changes.files));
-			const stamp = stampLine('implement', 'already-done', cost, { total: costTotal(run, cost), model: measured.model });
+			const stamp = stampLine('implement', 'already-done', measured, spentTotal(run, measured));
 
 			return batchOutcome(run.batch, section + '\n\n' + stamp, label, measured);
 		}
@@ -202,17 +201,19 @@ async function buildUntilGreen(run, worktree, prompts, options) {
 	const base = run.board.defaultBranch;
 	let reply = await promptClaude(run.role, run, prompts.prompt, options);
 	let spent = 0;
+	let spentTokens = 0;
 	let turns = 0;
 	let gateMs = 0;
 	for (let fixes = 0; ; fixes += 1) {
 		if (reply.output.verdict === undefined) return { outcome: unreadableOutcome(run, reply.metrics) };
 
 		spent += reply.metrics.cost;
+		spentTokens += reply.metrics.tokens;
 		turns += reply.metrics.turns;
 
 		const raw = await run.git.changes(worktree.root, run.branch, base);
 		const changes = committedChanges(raw, reply.output.touches ?? [], run.area.path, worktree.forceInclude);
-		const attempt = { reply: reply, changes: changes, measured: { ...reply.metrics, cost: spent, turns: turns } };
+		const attempt = { reply: reply, changes: changes, measured: { ...reply.metrics, cost: spent, tokens: spentTokens, turns: turns } };
 		const settled = await settleUnpushed(run, worktree, attempt);
 
 		if (settled !== undefined) return { outcome: settled };
@@ -336,7 +337,7 @@ async function pushedOutcome(run, worktree, attempt) {
 		branch: run.branch,
 		error: pullError,
 		filed: filedText,
-	}, { verdict: 'advance', cost: measured.cost, model: measured.model });
+	}, { verdict: 'advance', cost: measured.cost, tokens: measured.tokens, model: measured.model });
 
 	measured.verdict     = outcome;
 	measured.gatesPassed = true;

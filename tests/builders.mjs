@@ -32,7 +32,7 @@ export function mine(body) {
 }
 
 export function stamped(stage, verdict, cost) {
-	return mine('## ' + stage + '\n\n' + stampLine(stage, verdict, cost, { total: cost }));
+	return mine('## ' + stage + '\n\n' + stampLine(stage, verdict, { cost: cost, tokens: 0 }, { cost: cost, tokens: 0 }));
 }
 
 export function person(body) {

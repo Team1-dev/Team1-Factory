@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { state } from './config.mjs';
+import { spentText } from './cards.mjs';
 
 function ledgerLine(fields) {
 	mkdirSync(dirname(state.ledgerPath), { recursive: true });
@@ -38,13 +39,14 @@ export function ledgerEnd(run, entries, measured) {
 		Object.assign(fields, measured);
 		if (entry.card.number !== run.lead.number) {
 			fields.cost        = 0;
+			fields.tokens      = 0;
 			fields.turns       = 0;
 			fields.batchedInto = run.lead.number;
 		}
 
 		if (entry.ledger !== undefined) Object.assign(fields, entry.ledger);
 
-		if (entry.card === run.lead) console.log(run.tag + ': ' + fields.verdict + ' $' + fields.cost.toFixed(2));
+		if (entry.card === run.lead) console.log(run.tag + ': ' + fields.verdict + ' ' + spentText(fields));
 		ledgerLine(fields);
 	}
 }
@@ -61,6 +63,7 @@ export function ledgerClassify(run, commentId, reading) {
 	const fields = ledgerFields(run, run.lead, 'classify');
 	fields.verdict = reading.verdict;
 	fields.cost    = reading.cost;
+	fields.tokens  = reading.tokens;
 	if (commentId !== '') fields.commentId = commentId;
 
 	ledgerLine(fields);

@@ -19,7 +19,7 @@ beforeEach(() => {
 
 function answered(structured, modelId) {
 	const output = {
-		result: 'ok', structured_output: structured, total_cost_usd: 0.01, num_turns: 1, duration_ms: 5, session_id: 'sid', modelUsage: { [modelId]: {} },
+		type: 'result', result: 'ok', structured_output: structured, total_cost_usd: 0.01, num_turns: 1, duration_ms: 5, session_id: 'sid', modelUsage: { [modelId]: {} },
 	};
 
 	return { code: 0, stdout: JSON.stringify(output), stderr: '', timedOut: false };
@@ -44,6 +44,8 @@ test('one classify call: the child gets the role model, effort, budget and cache
 	expect(after(call.args, '--effort')).toBe('low');
 	expect(after(call.args, '--max-budget-usd')).toBe('0.5');
 	expect(after(call.args, '--permission-mode')).toBe('acceptEdits');
+	expect(after(call.args, '--output-format')).toBe('stream-json');
+	expect(call.args).toContain('--verbose');
 	expect(after(call.args, '--json-schema')).toBe('{"type":"object"}');
 	expect(after(call.args, '--setting-sources')).toBe('user');
 	expect(call.args).toContain('--strict-mcp-config');
@@ -62,6 +64,26 @@ test('one classify call: the child gets the role model, effort, budget and cache
 	expect(reply.metrics.model).toBe('claude-sonnet-5');
 	expect(reply.metrics.cost).toBe(0.01);
 	expect(timers.waits).toEqual([]);
+});
+
+test('the subscription\'s usage windows are read from the stream\'s rate-limit event; a stream with no result is a failure', async () => {
+	const limits = {
+		type: 'rate_limit_event',
+		rate_limit_info: { unifiedWindows: { five_hour: { utilization: 0.2, resetsAt: 1790291400 }, seven_day: { utilization: 0.694, resetsAt: 1790316000 } } },
+	};
+	const result = answered({ verdict: 'placeholder', reason: 'r' }, 'claude-sonnet-5');
+	shell.given.push({ ...result, stdout: JSON.stringify({ type: 'system', subtype: 'init' }) + '\n' + JSON.stringify(limits) + '\n' + result.stdout });
+
+	const reply = await realPromptClaude('classify', undefined, 'hello', { tools: [], schema: { type: 'object' } });
+
+	expect(reply.metrics.planUsage).toEqual([
+		{ name: '5h', percent: 20, resets: 'Thu 23:10 UTC' },
+		{ name: 'week', percent: 69, resets: 'Fri 06:00 UTC' },
+	]);
+
+	shell.given.push({ code: 0, stdout: JSON.stringify(limits), stderr: '', timedOut: false });
+
+	await expect(realPromptClaude('classify', undefined, 'hello', { tools: [] })).rejects.toThrow('claude gave no result');
 });
 
 test('the child keeps one home on the work volume across calls, so a later call can resume a session', async () => {
@@ -140,7 +162,7 @@ test('an expired login on a resumed session is not retried cold', async () => {
 
 test('an account limit stops after one child, is never retried, and lifts a minute past the limit', async () => {
 	const limit = { is_error: true, result: 'Claude AI usage limit reached|1760000000', total_cost_usd: 0, subtype: 'error' };
-	shell.given.push({ code: 1, stdout: JSON.stringify(limit), stderr: '', timedOut: false });
+	shell.given.push({ code: 1, stdout: JSON.stringify({ type: 'result', ...limit }), stderr: '', timedOut: false });
 
 	await expect(realPromptClaude('classify', undefined, 'hello', { tools: [], priorSession: 'old' })).rejects
 		.toMatchObject({ exhaustedUntil: (1760000000 * 1000) + 60000, retryable: false });

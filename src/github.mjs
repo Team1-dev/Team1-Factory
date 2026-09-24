@@ -144,6 +144,12 @@ export function client(repo, token, apiBase) {
 		return request('GET', base + '/pulls/' + number);
 	}
 
+	async function openPullBranches() {
+		const pulls = await requestAll(base + '/pulls?state=open');
+
+		return pulls.map(openPull => openPull.head.ref);
+	}
+
 	async function closedPullsFor(branch) {
 		return requestAll(base + '/pulls?state=closed&head=' + owner + ':' + branch);
 	}
@@ -217,6 +223,7 @@ export function client(repo, token, apiBase) {
 		close: close,
 		pullFor: pullFor,
 		pull: pull,
+		openPullBranches: openPullBranches,
 		closedPullsFor: closedPullsFor,
 		createPull: createPull,
 		updatePull: updatePull,

@@ -110,7 +110,7 @@ export function callNames(calls) {
 export function modelAnswer(output, cost, cutOn, normalize) {
 	const printed = {
 		result: '', structured_output: output, total_cost_usd: cost, num_turns: 1, duration_ms: 1000, session_id: 'session-' + cost,
-		modelUsage: { sonnet: {} }, usage: {},
+		modelUsage: { sonnet: {} }, usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 },
 	};
 
 	return readResult(printed, 'sonnet', { prompt: 'x'.repeat(100), budget: 1, cutOn: cutOn, normalize: normalize }, printed.session_id);
@@ -191,6 +191,10 @@ export function fakeGithub(given) {
 		}
 
 		return undefined;
+	}
+
+	async function openPullBranches() {
+		return Object.keys(given.pulls);
 	}
 
 	async function closedPullsFor(branch) {
@@ -281,6 +285,7 @@ export function fakeGithub(given) {
 		close: close,
 		pullFor: pullFor,
 		pull: pull,
+		openPullBranches: openPullBranches,
 		closedPullsFor: closedPullsFor,
 		createPull: createPull,
 		updatePull: updatePull,

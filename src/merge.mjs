@@ -34,14 +34,16 @@ async function answerComments(run, pull, unanswered) {
 	let objection;
 	let newestReading;
 	let cost = 0;
+	let tokens = 0;
 	for (const comment of unanswered) {
 		const reading = await classifyComment(run.tag, run.lead.title, comment);
 		cost += reading.cost;
+		tokens += reading.tokens;
 
 		if (reading.verdict === undefined) {
 			start(run);
 
-			const measured = { verdict: 'unreadable-comment', cost: cost };
+			const measured = { verdict: 'unreadable-comment', cost: cost, tokens: tokens };
 			const body = note(run, 'comment-unreadable', { number: pull.number }, measured);
 
 			return batchOutcome(run.batch, body, undefined, measured);
@@ -59,7 +61,7 @@ async function answerComments(run, pull, unanswered) {
 	if (objection !== undefined) {
 		const path = objection.path !== undefined ? fragment('_notes.md', 'objection-path', { path: objection.path }) + ' ' : '';
 
-		const measured = { verdict: 'objection', cost: cost };
+		const measured = { verdict: 'objection', cost: cost, tokens: tokens };
 		const body = note(run, 'objection', {
 			author: objection.login,
 			number: pull.number,
@@ -74,7 +76,7 @@ async function answerComments(run, pull, unanswered) {
 	const earlier = unanswered.length > 1 ? fragment('_notes.md', 'comment-noted-earlier', { count: unanswered.length - 1 }) : '';
 	const reason = newestReading.reason !== '' ? ': ' + newestReading.reason : '.';
 
-	const measured = { verdict: 'comment-noted', cost: cost };
+	const measured = { verdict: 'comment-noted', cost: cost, tokens: tokens };
 	const body = note(run, 'comment-noted', {
 		author: newest.login,
 		quote: squash(newest.body, false).slice(0, 200),
@@ -91,13 +93,13 @@ async function closePullAsAttack(run, pull, body, ledgerVerdict) {
 	start(run);
 	await run.github.closePull(pull.number);
 
-	return batchOutcome(run.batch, body, 'attack', { verdict: ledgerVerdict, cost: 0 });
+	return batchOutcome(run.batch, body, 'attack', { verdict: ledgerVerdict, cost: 0, tokens: 0 });
 }
 
 // A pull already marked hostile, or one opened from any repository but this one, is closed unread with its card.
 async function refusedPull(run, pull) {
 	if (findLabel(pull.labels, 'attack') !== undefined) {
-		const body = note(run, 'attack-label', { number: pull.number }, { verdict: 'attack', cost: 0 });
+		const body = note(run, 'attack-label', { number: pull.number }, { verdict: 'attack', cost: 0, tokens: 0 });
 
 		return closePullAsAttack(run, pull, body, 'attack-pull');
 	}
@@ -112,7 +114,7 @@ async function refusedPull(run, pull) {
 		console.log(run.tag + ': labelling the pull failed: ' + error.message);
 	}
 
-	const body = note(run, 'foreign-pull', { number: pull.number, branch: run.branch, head: head }, { verdict: 'attack', cost: 0 });
+	const body = note(run, 'foreign-pull', { number: pull.number, branch: run.branch, head: head }, { verdict: 'attack', cost: 0, tokens: 0 });
 
 	return closePullAsAttack(run, pull, body, 'foreign-pull');
 }
@@ -185,7 +187,7 @@ async function landPull(run, pull) {
 			// next implement would read them as unpushed work on a branch the remote has moved, and hold for a person.
 			await run.git.resetTo(worktree.root, pull.head.sha);
 
-			const measured = { verdict: 'base-moved', cost: 0, gatesPassed: false };
+			const measured = { verdict: 'base-moved', cost: 0, tokens: 0, gatesPassed: false };
 			const body = note(run, 'base-moved', {
 				base: base, number: pull.number, where: run.where, command: gate.command, code: gate.code, output: gate.output,
 			}, measured);
@@ -206,7 +208,7 @@ async function landPull(run, pull) {
 		const kind = refusalKind(error.message);
 		console.log(run.tag + ': merge refused' + (kind === 'retry' ? ' for now, retrying next pass: ' : ': ') + error.message);
 		if (kind === 'retry') {
-			ledgerEnd(run, run.batch.map(card => ({ card: card })), { verdict: 'merge-retry', cost: 0 });
+			ledgerEnd(run, run.batch.map(card => ({ card: card })), { verdict: 'merge-retry', cost: 0, tokens: 0 });
 
 			return undefined;
 		}
@@ -219,7 +221,7 @@ async function landPull(run, pull) {
 	const diffText = await run.git.diff(worktree.root, base);
 	const proposals = await closeCoveredProposals(run, pull, diffText);
 
-	const measured = { verdict: 'merged', cost: proposals.cost, model: proposals.model };
+	const measured = { verdict: 'merged', cost: proposals.cost, tokens: proposals.tokens, model: proposals.model };
 
 	return landed(run, note(run, 'merged', { number: pull.number }, measured), measured, worktree.root);
 }

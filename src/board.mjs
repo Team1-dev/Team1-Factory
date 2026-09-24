@@ -1,4 +1,4 @@
-import { bootstrapLabels, createProjectLabels, readCard, TIERS } from './cards.mjs';
+import { bootstrapLabels, branchOf, createProjectLabels, readCard, TIERS } from './cards.mjs';
 import { repoState, state } from './config.mjs';
 import { STAGES } from './routes.mjs';
 import { splitCommaList } from './stringUtils.mjs';
@@ -95,6 +95,7 @@ function newScope(declared, texts, root, mono) {
 		repoWide: mono && declared.name === '',
 		active: 0,
 		capped: false,
+		hasPull: false,
 		queues: queues,
 	};
 }
@@ -137,17 +138,21 @@ function byRank(card, other) {
 	return card.rank !== other.rank ? card.rank - other.rank : card.number - other.number;
 }
 
-function placeCards(board) {
+// A card has a pull when a pull is open from its branch; an area with one starts no other card's pull until it lands.
+function placeCards(board, pullBranches) {
 	for (const card of board.cards) {
 		const wantedArea = !board.mono || card.project === 'all' ? '' : card.project;
 		card.area         = board.scopes.find(scope => scope.name === wantedArea);
 		card.bodyBlockers = collectBlockers(board.openNumbers, card.number, card.body);
+		card.hasPull      = pullBranches.includes(branchOf(card));
 		if (card.routingLabel === '') continue;
 		if (card.hostile) board.hostileCards.push(card);
 		if (card.area === undefined) {
 			board.unassignedCards.push(card);
 			continue;
 		}
+
+		if (card.hasPull) card.area.hasPull = true;
 
 		if (card.started && !card.terminal) card.area.active += 1;
 		if (card.area.queues[card.routingLabel] !== undefined) card.area.queues[card.routingLabel].push(card);
@@ -205,7 +210,7 @@ export async function loadBoard(github, runnerLogin) {
 	board.styleText   = await github.file('.agents/style.md');
 	await readScopes(github, board);
 
-	placeCards(board);
+	placeCards(board, await github.openPullBranches());
 
 	return board;
 }

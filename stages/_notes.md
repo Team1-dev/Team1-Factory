@@ -7,7 +7,7 @@ the stage returned output nothing could read
 <!-- stage-failed -->
 **{stage}** could not complete: {error}
 
-The card stays on `{label}`. {retry} This card has cost **${total}** so far.
+The card stays on `{label}`. {retry} This card has used **{total}** so far.
 
 {stamp}
 <!-- stage-failed-retry -->
@@ -25,7 +25,7 @@ After {rounds} rounds of this it goes to a person rather than round again.
 
 {stamp}
 <!-- over-budget -->
-This card has cost **${spent}**, over the ${budget} budget. Work has stopped. Raise the budget, narrow the card, or close it.
+This card has used **${spent} API**, over the ${budget} API budget. Work has stopped. Raise the budget, narrow the card, or close it.
 
 {stamp}
 <!-- too-big -->
@@ -155,7 +155,7 @@ No open pull request for `{branch}`, which is {ahead} commit(s) ahead of `{base}
 <!-- objection-path -->
 On `{path}`.
 <!-- comment-unreadable -->
-Could not read a comment on #{number} — held until it can be read. This card has cost **${total}** so far.
+Could not read a comment on #{number} — held until it can be read. This card has used **{total}** so far.
 
 {stamp}
 <!-- comment-noted -->
@@ -189,7 +189,7 @@ Could not merge #{number}.
 <!-- merge-refused-conflict -->
 The branch conflicts with the base — it needs rebasing onto the current default branch before this can land.
 <!-- merged -->
-Merged #{number}. This card cost **${total}** in total.
+Merged #{number}. This card used **{total}** in total.
 
 {stamp}
 <!-- proposals-swept -->
