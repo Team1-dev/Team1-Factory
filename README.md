@@ -278,7 +278,7 @@ Settings. All are optional:
 | `human-approvals` | Required approvals before merging          | `0`                                                      |
 | `auto-merge`      | Allow Team1 to merge reviewed, passing PRs | `false` — a person merges                                |
 | `review-ignore`   | Files excluded from review                 | only generated files are excluded                        |
-| `uses`            | Projects whose gates should also run       | none. Monorepos only                                     |
+| `uses`            | Projects this one builds on; a change to one runs this project's gates at review | none. Monorepos only |
 | `projects`        | Projects within a monorepo                 | one project. Monorepos only, root file only              |
 
 Use `.agents/style.md` for detailed coding conventions.
@@ -309,6 +309,26 @@ projects:
 ```
 
 Each project can have its own `.agents/project.md` and `.agents/style.md` at its path; their settings override the root's. Use `project: <name>` labels to target a project, or `project: all` for repository-wide work.
+
+### How gates run in a monorepo
+
+* **Implement** runs the gates of the issue's project and of every project it changed a file in, after every round.
+* **Review** runs, once, the gates of every project that `uses` those, before the model reads the change. A red one sends the issue back to implement with the output.
+* **Merge** runs both again only when the default branch moved and the pull request had to be rebased.
+
+Projects run in waves: a project starts once every project it `uses` has passed, and the projects of one wave run side by side. Installs run one at a time first, because they share the repository's dependency tree.
+
+### Fast .NET builds in a monorepo
+
+Team1 runs each project's `gates` command separately. If every .NET project's gate is its own `dotnet build`, the projects they share (a core library, an auth library) are built again by each one, and each build pays the MSBuild start-up again: seven small projects took 44 seconds that way on a 2-core machine. Building them side by side does not help there, since one `dotnet build` already uses every core.
+
+Build them once instead. Give every .NET project the same gate script, and have it:
+
+1. build every .NET project in the repository in **one** `dotnet build` of a solution it generates (say in a gitignored `.gates/`),
+2. record a fingerprint of the working tree — the commit, `git diff HEAD`, and the content of untracked files — and skip the build when the fingerprint is unchanged, so the other projects' gates on the same tree only run their tests (`dotnet test --no-build`),
+3. hold a lock (`flock`) around the build, so gates started side by side wait for the one build instead of racing it.
+
+The same projects then built in 15 seconds, and a gate on a tree already built takes under a second.
 
 ## What stops it merging bad code
 

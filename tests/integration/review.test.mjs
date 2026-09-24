@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { branchOf, stampLine } from '../../src/cards.mjs';
-import { model, git } from '../doubles.mjs';
+import { model, gates, git } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { issue, mine, openPull, stamped } from '../builders.mjs';
 
@@ -89,6 +89,21 @@ test('a pull GitHub cannot merge is stale: back to implement before any reading'
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:stale']);
 	expect(model.calls).toEqual([]);
+});
+
+test('what uses the change is built once, before any reading; red, the card goes back to implement with the output', async () => {
+	setup();
+	gates.given.dependentGate = { passed: false, command: 'npm run check', code: 2, output: 'app broke', area: { name: 'app' } };
+
+	const pass = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
+
+	expect(gates.calls).toEqual([{ name: 'runDependentGates', root: REVIEW_ROOT, area: '', files: ['src/cli.mjs', 'dist/bundle.js'] }]);
+	expect(model.calls).toEqual([]);
+	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
+	expect(pass.writes[0].body).toContain('#50 breaks `app`, which uses what it changed: `npm run check` exited 2. Sent back to implement before review');
+	expect(pass.writes[0].body).toContain('```\napp broke\n```');
+	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
+	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:dependents-red']);
 });
 
 test('the prompt: the pull, the files, the diff less generated files, added comments, author withheld', async () => {

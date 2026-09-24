@@ -102,9 +102,9 @@ export async function install(worktreeRoot, area) {
 	return gates.given.install;
 }
 
-export async function runGates(worktreeRoot, cardRun, changedFiles) {
+function gated(name, worktreeRoot, cardRun, changedFiles) {
 	gates.calls.push({
-		name: 'runGates',
+		name: name,
 		root: worktreeRoot,
 		area: cardRun.area.name,
 		fullGates: cardRun.conversation.fullGates,
@@ -114,4 +114,19 @@ export async function runGates(worktreeRoot, cardRun, changedFiles) {
 	if (gates.sequence.length > 0) return gates.sequence.shift();
 
 	return gates.given.gate;
+}
+
+export async function runGates(worktreeRoot, cardRun, changedFiles) {
+	return gated('runGates', worktreeRoot, cardRun, changedFiles);
+}
+
+export async function runOwnGates(worktreeRoot, cardRun, changedFiles) {
+	return gated('runOwnGates', worktreeRoot, cardRun, changedFiles);
+}
+
+// Review builds what uses the change; green unless a test gives dependentGate.
+export async function runDependentGates(worktreeRoot, cardRun, changedFiles) {
+	gates.calls.push({ name: 'runDependentGates', root: worktreeRoot, area: cardRun.area.name, files: changedFiles });
+
+	return gates.given.dependentGate ?? { passed: true, command: '', code: 0, output: '', area: cardRun.area };
 }

@@ -38,12 +38,19 @@ from the issue text.
 
 ## Then: build
 
+**Deliver everything the card asks for, in this one change.** Files in other projects are yours
+when the card asks for them. Never leave part of the ask for a follow-up card and call the rest
+`advance`: `cards` is only for what the card did not ask for. A card too big for one change is
+`reject-shape`, naming the split — never a partial build.
+
 1. **Work to your own plan.** Where the code contradicts it, do the right thing and record what
    the plan got wrong. This is the most valuable thing you will write.
 2. **Match the code you are changing** — naming, file layout, how the neighbouring component
    receives its data. Where the style guide is silent, existing code settles the question.
-3. **Run the gates yourself** (`gates` in `project.md`) and fix what they find. Team1 re-runs them
-   and re-checks the worktree: **never claim something checkable that you did not run.**
+3. **Do not run the gates, or build the projects that depend on yours.** Team1 runs them the moment
+   you finish and hands any failure back to you in this same session. While working, run only what
+   you need to see your own change work — the one test you wrote, one build — never the full
+   suites. **Never claim something checkable that you did not run.**
    **A tool the gates need and this machine lacks — a compiler, a runtime, a library — is yours to
    install:** `brew install …` where `brew` is on `PATH`, the language's own installer otherwise,
    never `sudo`. Install what the repo asks for, at the version it asks for; do not change the
@@ -134,11 +141,11 @@ This branch already carries work from an earlier pass. Read the card for what ca
 <!-- deps-installed -->
 Dependencies are already installed — do not install them again.
 <!-- finish -->
-Run the gates yourself before you finish. Do not commit, push, or open a pull request — Team1 does that once the gates pass. Do not stage anything either: move, rename and delete files with `mv` and `rm`, never `git mv`, `git rm` or `git add`.
+Do not run the gates — Team1 runs them as soon as you finish. Do not commit, push, or open a pull request — Team1 does that once the gates pass. Do not stage anything either: move, rename and delete files with `mv` and `rm`, never `git mv`, `git rm` or `git add`.
 <!-- full-bar -->
-**This card is owed the full bar**, not only the fast gates: run `{command}` from the repository root before you finish, and fix what it finds. Team1 re-runs the same command.
+**This card is owed the full bar**, not only the fast gates: Team1 runs `{command}` from the repository root when you finish, and hands back what it finds.
 <!-- dependents -->
-**Other projects build on yours and their gates run on your change too:** {dependents}. Run those as well before you finish — that is where the tests for your project live.
+**Other projects build on yours:** {dependents}. Team1 builds them once, at review, and sends the card back here if your change breaks them — keep them in mind, since that is where the tests for your project live.
 <!-- file-list -->
 # Every file in {scope}
 
@@ -164,15 +171,15 @@ They are all `{tier}`, and they share this branch, this diff and one pull reques
 <!-- resume -->
 # What came back
 
-You are resuming the session that built this branch. The worktree is as you left it, and everything said on the card since your last run is below — nothing else you were given has changed, so do not re-read files you have not changed and do not start over. Do what it asks, run the gates again, and finish with the same JSON object as before.
+You are resuming the session that built this branch. The worktree is as you left it, and everything said on the card since your last run is below — nothing else you were given has changed, so do not re-read files you have not changed and do not start over. Do what it asks and finish with the same JSON object as before; Team1 runs the gates.
 <!-- resume-cut -->
 # Carry on
 
-Your last run was cut off — by the budget ceiling or a fault — before it answered. The worktree is as you left it. Pick up where you stopped, keep it short, run the gates, and finish with the JSON object.
+Your last run was cut off — by the budget ceiling or a fault — before it answered. The worktree is as you left it. Pick up where you stopped, keep it short, and finish with the JSON object; Team1 runs the gates.
 <!-- gates-red -->
 # The gates are red
 
-You finished, and Team1 ran the gates{where}: `{command}` exited {code}. Nothing was pushed and the card has not been told. This is attempt {attempt} of {of} to make them green in this session. Fix the cause, not the test's expectation — unless the card changed what the test checks — run the gates yourself until they pass, and finish with the same JSON object as before. If the failure is not yours to fix, say exactly why in your section and return `questions`.
+You finished, and Team1 ran the gates{where}: `{command}` exited {code}. Nothing was pushed and the card has not been told. This is attempt {attempt} of {of} to make them green in this session. Fix the cause, not the test's expectation — unless the card changed what the test checks — re-run the command that failed until it passes, and finish with the same JSON object as before. If the failure is not yours to fix, say exactly why in your section and return `questions`.
 
 ```
 {output}

@@ -3,7 +3,7 @@ import { branchOf, readLabels, stampLine } from './cards.mjs';
 import { IMPLEMENT_TIMEOUT_MS, promptClaude, verdictSchema } from './claude.mjs';
 import { state } from './config.mjs';
 import { filesNamedOnCards, inlineFiles } from './files.mjs';
-import { install, runGates } from './gates.mjs';
+import { install, runOwnGates } from './gates.mjs';
 import { newestSession } from './ledger.mjs';
 import { fileFindings } from './findings.mjs';
 import { researchOutcome } from './research.mjs';
@@ -230,7 +230,7 @@ async function buildUntilGreen(run, worktree, prompts, options) {
 		if (settled !== undefined) return { outcome: settled };
 
 		const gateStarted = Date.now();
-		const gate = await runGates(worktree.root, run, changes.files);
+		const gate = await runOwnGates(worktree.root, run, changes.files);
 		gateMs += Date.now() - gateStarted;
 		attempt.measured.gateMs = gateMs;
 

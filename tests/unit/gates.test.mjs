@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadEnv } from '../../src/config.mjs';
-import { runGates } from '../../src/gates.mjs';
+import { runDependentGates, runGates, runOwnGates } from '../../src/gates.mjs';
 
 // A single-project repository whose one area has this gate command.
 function gated(root, command, changedFiles) {
@@ -101,3 +101,68 @@ test('an install that fails is the red gate, its output neutralised; full gates 
 	expect(full.command).toBe('echo full bar');
 	expect(full.output).toBe('full bar');
 }, 60000);
+
+test('gates run in waves: an area starts once what it uses has passed, the areas of a wave run side by side, and a red wave stops the rest', async () => {
+	loadEnv({ PATH: process.env.PATH, HOME: process.env.HOME });
+
+	const root = mkdtempSync(join(tmpdir(), 'waves-'));
+	const log = join(root, 'ran');
+	for (const name of ['base', 'left', 'right', 'top']) {
+		mkdirSync(join(root, 'apps', name), { recursive: true });
+	}
+
+	// Each gate notes when it starts and ends, a second apart.
+	function scope(name, uses, exit) {
+		const gates = 'echo start ' + name + ' >> ' + log + '; sleep 1; echo end ' + name + ' >> ' + log + '; exit ' + exit;
+
+		return { name: name, path: 'apps/' + name, gates: gates, fullGates: undefined, uses: uses, repoWide: false };
+	}
+
+	const base = scope('base', [], 0);
+	const board = { mono: true, scopes: [base, scope('left', ['base'], 0), scope('right', ['base'], 0), scope('top', ['left'], 0)] };
+	const began = Date.now();
+	const gate = await runGates(root, { area: base, board: board, conversation: { fullGates: false } }, ['apps/base/x.cs']);
+	const lines = readFileSync(log, 'utf8').trim().split('\n');
+
+	expect(gate.passed).toBe(true);
+	expect(lines.slice(0, 2)).toEqual(['start base', 'end base']);
+	expect(lines.slice(2, 4).sort()).toEqual(['start left', 'start right']);
+	expect(lines.slice(4, 6).sort()).toEqual(['end left', 'end right']);
+	expect(lines.slice(6)).toEqual(['start top', 'end top']);
+	// Three waves of a second each, not four gates one after another.
+	expect(Date.now() - began).toBeLessThan(3900);
+
+	writeFileSync(log, '');
+
+	const red = { mono: true, scopes: [base, scope('left', ['base'], 4), scope('right', ['base'], 5), scope('top', ['left'], 0)] };
+	const failed = await runGates(root, { area: base, board: red, conversation: { fullGates: false } }, ['apps/base/x.cs']);
+
+	expect(failed.passed).toBe(false);
+	expect(failed.area.name).toBe('left');
+	expect(failed.code).toBe(4);
+	expect(readFileSync(log, 'utf8')).not.toContain('top');
+}, 30000);
+
+test('implement gates only what the card changed; review gates only what uses it', async () => {
+	loadEnv({ PATH: process.env.PATH, HOME: process.env.HOME });
+
+	const root = mkdtempSync(join(tmpdir(), 'split-'));
+	for (const name of ['lib', 'app', 'docs']) {
+		mkdirSync(join(root, 'apps', name), { recursive: true });
+	}
+
+	function scope(name, uses) {
+		return { name: name, path: 'apps/' + name, gates: 'echo ' + name + ' >> ' + join(root, 'ran'), fullGates: undefined, uses: uses, repoWide: false };
+	}
+
+	const lib = scope('lib', []);
+	const board = { mono: true, scopes: [lib, scope('app', ['lib']), scope('docs', [])] };
+	const cardRun = { area: lib, board: board, conversation: { fullGates: false } };
+
+	expect((await runOwnGates(root, cardRun, ['apps/lib/x.js'])).passed).toBe(true);
+	expect(readFileSync(join(root, 'ran'), 'utf8')).toBe('lib\n');
+
+	writeFileSync(join(root, 'ran'), '');
+	expect((await runDependentGates(root, cardRun, ['apps/lib/x.js'])).passed).toBe(true);
+	expect(readFileSync(join(root, 'ran'), 'utf8')).toBe('app\n');
+});

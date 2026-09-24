@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { githubMock, install, model, repository, runGates, shell, timers } from '../doubles.mjs';
+import { githubMock, install, model, repository, runDependentGates, runGates, runOwnGates, shell, timers } from '../doubles.mjs';
 
 // The setup file of every integration test: the model, git, the gates, the shell, the clock and the GitHub client are all replaced.
 
@@ -28,7 +28,7 @@ vi.mock('../../src/shell.mjs', async importOriginal => ({ ...await importOrigina
 
 vi.mock('../../src/git.mjs', () => ({ repository: repository }));
 
-vi.mock('../../src/gates.mjs', () => ({ install: install, runGates: runGates }));
+vi.mock('../../src/gates.mjs', () => ({ install: install, runGates: runGates, runOwnGates: runOwnGates, runDependentGates: runDependentGates }));
 
 const realGithub = await vi.importActual('../../src/github.mjs');
 

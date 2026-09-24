@@ -3,6 +3,7 @@ import { promptClaude, READ_TOOLS, verdictSchema } from './claude.mjs';
 import { hiddenInstruction } from './classify.mjs';
 import { state } from './config.mjs';
 import { compactDiff, inlineFiles, parseDiff } from './files.mjs';
+import { runDependentGates } from './gates.mjs';
 import { attackOutcome, backToImplement, missingPull, note, readClone, start, waitMergeable } from './outcomes.mjs';
 import { fragment, joinSections, systemPrompt, userPrompt, withholdAuthorSections } from './prompts.mjs';
 import { backticked } from './stringUtils.mjs';
@@ -115,6 +116,14 @@ export async function handleReview(run) {
 	const change = await changeUnderReview(run, pull, pullText);
 
 	if (change.finding !== undefined) return change.finding.unread ? undefined : hidingPull(run, pull.number, change.finding);
+
+	// Implement gated only the areas it changed; what uses them is built once, here, before any model reads the change.
+	const dependents = await runDependentGates(change.root, run, change.diff.files.concat(change.diff.dropped));
+	if (!dependents.passed) {
+		const slots = { number: pull.number, area: dependents.area.name, command: dependents.command, code: dependents.code, output: dependents.output };
+
+		return backToImplement(run, 'dependents-red', slots, 'dependents-red');
+	}
 
 	const reply = await promptClaude(run.role, run, await reviewPrompt(run, change), {
 		system: systemPrompt(run),

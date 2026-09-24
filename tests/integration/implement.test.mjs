@@ -104,7 +104,7 @@ test('the prompt: where you are, the file list, the card and the conversation; t
 	expect(call.options.system).toContain('# Implement');
 	expect(call.options.system).toContain('This project has no style guide');
 	expect(call.prompt).toContain('You are in a worktree of `acme/app` on branch `' + BRANCH + '`.');
-	expect(call.prompt).toContain('Dependencies are already installed — do not install them again. Run the gates yourself');
+	expect(call.prompt).toContain('Dependencies are already installed — do not install them again. Do not run the gates — Team1 runs them as soon as you finish.');
 	expect(call.prompt).toContain('# Every file in the repository\n\n');
 	expect(call.prompt).toContain('```\npackage.json\nsrc/cli.mjs\n```');
 	expect(call.prompt).toContain('# The card\n\n## Ask\n\nCard 5\n\nadd a --quiet flag');
@@ -327,7 +327,7 @@ test('red gates go back to the session with the output; still red after the fix 
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
 	expect(gates.calls[1]).toEqual({
-		name: 'runGates', root: ROOT, area: '', fullGates: false, files: ['src/cli.mjs'],
+		name: 'runOwnGates', root: ROOT, area: '', fullGates: false, files: ['src/cli.mjs'],
 	});
 	expect(model.calls.length).toBe(3);
 	expect(model.calls[1].priorSession).toBe('session-0.5');
@@ -349,7 +349,7 @@ test('red gates go back to the session with the output; still red after the fix 
 	expect(ledgerLines()[1].cost).toBe(1);
 	expect(ledgerLines()[1].turns).toBe(3);
 	expect(callNames(git.calls)).toEqual(['checkout', 'catchUp', 'ensureGitignore', 'listFiles', 'changes', 'changes', 'changes']);
-	expect(callNames(gates.calls)).toEqual(['install', 'runGates', 'runGates', 'runGates']);
+	expect(callNames(gates.calls)).toEqual(['install', 'runOwnGates', 'runOwnGates', 'runOwnGates']);
 });
 
 test('red gates that the session turns green: pushed as usual, one fix round on the ledger', async () => {
@@ -362,7 +362,7 @@ test('red gates that the session turns green: pushed as usual, one fix round on 
 	const pass = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
 
 	expect(model.calls.length).toBe(2);
-	expect(callNames(gates.calls)).toEqual(['install', 'runGates', 'runGates']);
+	expect(callNames(gates.calls)).toEqual(['install', 'runOwnGates', 'runOwnGates']);
 	expect(callNames(git.calls)).toEqual(['checkout', 'catchUp', 'ensureGitignore', 'listFiles', 'changes', 'changes', 'commitAndPush']);
 	expect(callNames(pass.writes)).toEqual(['createPull', 'comment', 'setLabels']);
 	expect(pass.writes[1].body).toContain('Implemented on https://github.com/acme/app/pull/');
@@ -412,7 +412,7 @@ test('full gates are asked for by a structural tier or by a person saying so', a
 
 	expect(gates.calls[1].fullGates).toBe(true);
 	expect(model.calls[0].prompt).toContain('**This card is owed the full bar**, not only the fast gates:'
-		+ ' run `npm run everything` from the repository root');
+		+ ' Team1 runs `npm run everything` from the repository root when you finish');
 });
 
 test('green gates: commit, push, open the pull, post findings, note the files and go to review', async () => {
@@ -702,8 +702,7 @@ test('in a monorepo the area is the working directory and its dependents are nam
 
 	const prompt = model.calls[0].prompt;
 	expect(prompt).toContain('**Yours is `packages/lib/`**');
-	expect(prompt).toContain('**Other projects build on yours and their gates run on your change too:** `app` at `packages/app/`'
-		+ ' (`npm run check`).');
+	expect(prompt).toContain('**Other projects build on yours:** `app` at `packages/app/` (`npm run check`). Team1 builds them once, at review');
 	expect(prompt).toContain('# Every file in `packages/lib/`\n\n');
 	expect(prompt).toContain('# Every file in `packages/app/` — its gates run on your change\n\n');
 	expect(prompt).toContain('```\n../app/index.js\n../app/lib.test.js\n```');

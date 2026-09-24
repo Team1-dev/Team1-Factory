@@ -190,6 +190,14 @@ Could not read a comment on #{number} — held until it can be read. This card h
 `{base}` has moved since #{number} was built and the branch no longer rebases onto it cleanly. It needs rebasing onto the current default branch, with the conflicts resolved, before this can land.
 
 {stamp}
+<!-- dependents-red -->
+#{number} breaks `{area}`, which uses what it changed: `{command}` exited {code}. Sent back to implement before review — fix it there.
+
+```
+{output}
+```
+
+{stamp}
 <!-- base-moved -->
 `{base}` has moved since #{number} was built. Rebased onto it the branch no longer passes the gates{where}: `{command}` exited {code}. Nothing was pushed — the pull request still holds the reviewed diff. Rebase onto the current default branch and fix what broke.
 
