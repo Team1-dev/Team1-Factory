@@ -249,6 +249,11 @@ export function repository(settings) {
 	// come from the same base. What an earlier attempt left uncommitted is stashed, the card's commits are rebased onto the base,
 	// and the stash is put back. When the rebase or putting the work back conflicts, the worktree is returned exactly as it was
 	// and the conflicting files are named, for the model to resolve.
+	// The worktree put back on a commit already on the remote, so a later stage finds nothing of its own to guard.
+	async function resetTo(root, sha) {
+		await git(root, ['reset', '--hard', sha]);
+	}
+
 	async function catchUp(root, base) {
 		await git(root, ['fetch', '--prune', 'origin']);
 
@@ -304,6 +309,7 @@ export function repository(settings) {
 		listFiles: listFiles,
 		forcePush: forcePush,
 		rebaseOnto: rebaseOnto,
+		resetTo: resetTo,
 		removeWorktree: removeWorktree,
 		deleteLocalBranch: deleteLocalBranch,
 	};

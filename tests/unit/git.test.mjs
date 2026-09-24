@@ -232,6 +232,28 @@ test('a failing git command keeps git\'s own reason when its arguments are long'
 	await expect(o.repo.diff(root, longBase)).rejects.toThrow(/… \(2 arguments\) in .* exited \d+: .*(unknown revision|ambiguous argument|bad revision)/s);
 }, 30000);
 
+test('a pushed branch rebased for a merge whose gates then fail is put back on its pushed head, so the next checkout does not hold', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '11-card');
+	await o.repo.checkout(root, 'card/11-x', false);
+	writeFileSync(join(root, 'feature.txt'), 'feature\n');
+	await o.repo.commitAndPush(root, 'card/11-x', 'feature', ['feature.txt']);
+
+	const pushed = await o.sh(root, ['rev-parse', 'HEAD']);
+
+	writeFileSync(join(o.seed, 'other.txt'), 'other\n');
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'add', '-A']);
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'commit', '-qm', 'other']);
+	await o.sh(o.seed, ['push', '-q', 'origin', 'main']);
+
+	expect(await o.repo.rebaseOnto(root, 'main', pushed)).toEqual({ moved: true, conflict: false });
+	await o.repo.resetTo(root, pushed);
+
+	const again = await o.repo.checkout(root, 'card/11-x', false);
+	expect(again.diverged).toBeUndefined();
+	expect(await o.sh(root, ['rev-parse', 'HEAD'])).toBe(pushed);
+}, 30000);
+
 test('diff reads the branch against its base straight from the clone, with no size limit and no download', async () => {
 	const o = await origin();
 	const root = join(o.base, 'work', '5-card');

@@ -181,6 +181,10 @@ async function landPull(run, pull) {
 		const gate = await runGates(worktree.root, run, changes.changed.concat(changes.untracked));
 
 		if (!gate.passed) {
+			// The rebase is never pushed, so the worktree goes back to the pull's pushed head: left on the rebased commits, the
+			// next implement would read them as unpushed work on a branch the remote has moved, and hold for a person.
+			await run.git.resetTo(worktree.root, pull.head.sha);
+
 			const measured = { verdict: 'base-moved', cost: 0, gatesPassed: false };
 			const body = note(run, 'base-moved', {
 				base: base, number: pull.number, where: run.where, command: gate.command, code: gate.code, output: gate.output,

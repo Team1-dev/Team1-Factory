@@ -389,6 +389,7 @@ test('the base moved and the rebased branch fails its gates: back to implement w
 	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · base-moved · $0.00 · total $0.00')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
 	expect(callNames(git.calls)).not.toContain('forcePush');
+	expect(git.calls.find(call => call.name === 'resetTo')).toEqual({ name: 'resetTo', root: git.calls[0].root, sha: git.calls[1].headSha });
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:base-moved']);
 	expect(ledgerLines()[1].gatesPassed).toBe(false);
 });

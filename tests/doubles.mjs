@@ -55,6 +55,10 @@ async function rebaseOnto(root, base, headSha) {
 	return git.given.rebase;
 }
 
+async function resetTo(root, sha) {
+	git.calls.push({ name: 'resetTo', root: root, sha: sha });
+}
+
 async function catchUp(root, base) {
 	git.calls.push({ name: 'catchUp', root: root, base: base });
 
@@ -86,6 +90,7 @@ export function repository() {
 		forcePush: forcePush,
 		rebaseOnto: rebaseOnto,
 		catchUp: catchUp,
+		resetTo: resetTo,
 		removeWorktree: removeWorktree,
 		deleteLocalBranch: deleteLocalBranch,
 	};
