@@ -140,7 +140,8 @@ export function sessionSettings() {
 function isRetryable(message) {
 	const lowered = message.toLowerCase();
 
-	return ['429', '529', '503', 'rate limit', 'overloaded'].some(sign => lowered.includes(sign));
+	// Status codes as whole words: a session id that starts 503… is not an HTTP 503.
+	return /\b(429|529|503)\b/.test(lowered) || ['rate limit', 'overloaded'].some(sign => lowered.includes(sign));
 }
 
 // exclude-dynamic-system-prompt-sections keeps the system prompt identical between calls so the prompt cache hits; setting-sources user and
@@ -225,12 +226,21 @@ export function readResult(output, model, call, sessionId) {
 // A directory of the child's own, holding nothing but a symlink to the runner's credential file: the child authenticates
 // through it without ever being handed the runner's home directory. The symlink means a refresh claude writes through it
 // lands on the real file, so the credential does not go stale the way a copy would.
-async function childConfigDir(scratch) {
-	const dir = join(scratch, 'config');
-	await mkdir(dir);
-	await symlink(join(process.env.HOME, '.claude', '.credentials.json'), join(dir, '.credentials.json'));
+// The child's own home and Claude config, holding the one credential and nothing else of the runner's. It lives on the work volume, not in
+// the call's scratch directory, so the session transcripts --resume reads and whatever the child installs under $HOME outlive the call.
+async function childHome() {
+	const home = join(state.workDir, 'child-home');
+	const config = join(home, 'config');
+	await mkdir(config, { recursive: true });
+	await symlink(join(process.env.HOME, '.claude', '.credentials.json'), join(config, '.credentials.json')).catch(error => {
+		if (error.code !== 'EEXIST') throw error;
+	});
 
-	return dir;
+	return { home, config };
+}
+
+function cardPrefix(cardRun) {
+	return cardRun === undefined ? '' : cardRun.repo + ' #' + cardRun.lead.number + ': ';
 }
 
 async function claudeOnce(model, call) {
@@ -246,10 +256,10 @@ async function claudeOnce(model, call) {
 
 	const sessionId = call.priorSession ?? randomUUID();
 
-	const configDir = await childConfigDir(scratch);
+	const child = await childHome();
 
 	// The flags, HOME and the config dir come after the caller's variables so no call can switch them off.
-	const environment = { ...modelEnvironment(), ...call.env, ...CHILD_FLAGS, HOME: scratch, CLAUDE_CONFIG_DIR: configDir };
+	const environment = { ...modelEnvironment(), ...call.env, ...CHILD_FLAGS, HOME: child.home, CLAUDE_CONFIG_DIR: child.config };
 	if (call.cacheTtl !== undefined) environment.CLAUDE_CODE_PROMPT_CACHE_TTL = call.cacheTtl;
 
 	const cwd = call.cwd ?? scratch;
@@ -317,7 +327,7 @@ export async function promptClaude(role, cardRun, prompt, options) {
 		} catch (error) {
 			if (!isColdFailure(error)) throw error;
 
-			console.log('resume failed — starting cold: ' + error.message);
+			console.log(cardPrefix(cardRun) + 'resume failed — starting cold: ' + error.message);
 		}
 	}
 
@@ -337,7 +347,7 @@ async function promptModelChain(chain, call) {
 			if (attempt === MODEL_ATTEMPTS) throw error;
 
 			const wait = Math.min(2000 * (2 ** (attempt - 1)), 60000) * (0.5 + Math.random());
-			console.log(model + ': retry ' + attempt + ' of ' + (MODEL_ATTEMPTS - 1) + ' in ' + Math.round(wait / 1000)
+			console.log(cardPrefix(call.run) + model + ': retry ' + attempt + ' of ' + (MODEL_ATTEMPTS - 1) + ' in ' + Math.round(wait / 1000)
 				+ 's: ' + error.message);
 			await sleep(wait);
 		}

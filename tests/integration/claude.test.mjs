@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { state } from '../../src/config.mjs';
@@ -62,6 +62,28 @@ test('one classify call: the child gets the role model, effort, budget and cache
 	expect(reply.metrics.model).toBe('claude-sonnet-5');
 	expect(reply.metrics.cost).toBe(0.01);
 	expect(timers.waits).toEqual([]);
+});
+
+test('the child keeps one home on the work volume across calls, so a later call can resume a session', async () => {
+	shell.given.push(answered({ verdict: 'placeholder', reason: 'r' }, 'claude-sonnet-5'), answered({ verdict: 'placeholder', reason: 'r' }, 'claude-sonnet-5'));
+
+	await realPromptClaude('classify', undefined, 'hello', { tools: [], schema: { type: 'object' } });
+	await realPromptClaude('classify', undefined, 'again', { tools: [], schema: { type: 'object' } });
+
+	const [first, second] = shell.calls.map(call => call.options.environment);
+	expect(first.HOME).toBe(second.HOME);
+	expect(first.HOME.startsWith(WORK + '/')).toBe(true);
+	expect(existsSync(first.CLAUDE_CONFIG_DIR)).toBe(true);
+});
+
+test('a session id that happens to contain 503 is not taken for an HTTP 503; the resume starts cold', async () => {
+	shell.given.push(died('No conversation found with session ID: 503aaaaa-0000-4000-8000-000000000000'), answered({ verdict: 'advance', section: '## Done' }, 'claude-sonnet-5'));
+
+	await realPromptClaude('classify', undefined, 'hello', { tools: [], priorSession: '503aaaaa-0000-4000-8000-000000000000', resumePrompt: 'carry on' });
+
+	expect(shell.calls.length).toBe(2);
+	expect(shell.calls[1].args).not.toContain('--resume');
+	expect(timers.waits.every(wait => wait <= 1500)).toBe(true);
 });
 
 test('a caller cannot switch the child flags or its config dir off through env', async () => {
