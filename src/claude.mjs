@@ -217,9 +217,10 @@ function tokensOf(usage) {
 export function readResult(output, model, call, sessionId) {
 	if (output.is_error) {
 		let message = output.result;
-		if (typeof message !== 'string') {
-			message = 'claude reported ' + output.subtype + ' after $' + output.total_cost_usd + ' of the $' + call.budget
-				+ ' budget';
+		if (typeof message !== 'string' && output.subtype === 'error_max_budget_usd') {
+			message = 'claude spent its $' + call.budget + ' budget ($' + output.total_cost_usd + ')';
+		} else if (typeof message !== 'string') {
+			message = 'claude reported ' + output.subtype + ': ' + (output.errors ?? []).join('; ');
 		}
 
 		throw failure(message, { cost: output.total_cost_usd, tokens: tokensOf(output.usage), sessionId: sessionId, retryable: isRetryable(message) });
@@ -274,6 +275,53 @@ export function readResult(output, model, call, sessionId) {
 	};
 }
 
+// Where a call's time went, from the timestamps the session's transcript keeps: each tool call from its request to its result.
+// Lines before `since` belong to earlier calls of a resumed session.
+export function timelineOf(transcript, since) {
+	const requested = new Map();
+	const calls = [];
+	let toolMs = 0;
+	for (const line of transcript.split('\n')) {
+		if (line === '') continue;
+
+		const entry = JSON.parse(line);
+		const at = Date.parse(entry.timestamp);
+		if (!(at >= since) || !Array.isArray(entry.message?.content)) continue;
+
+		for (const part of entry.message.content) {
+			if (part.type === 'tool_use') {
+				requested.set(part.id, { at: at, name: part.name, what: String(part.input.command ?? part.input.file_path ?? part.input.pattern ?? '').slice(0, 100) });
+			}
+
+			const call = part.type === 'tool_result' ? requested.get(part.tool_use_id) : undefined;
+			if (call === undefined) continue;
+
+			calls.push({ name: call.name, what: call.what, ms: at - call.at });
+			toolMs += at - call.at;
+		}
+	}
+
+	calls.sort((first, second) => second.ms - first.ms);
+
+	return { toolMs: toolMs, toolCalls: calls.length, slowest: calls.slice(0, 3) };
+}
+
+function minutes(ms) {
+	return (ms / 60000).toFixed(1) + 'm';
+}
+
+async function transcriptOf(place, configDirectory, sessionId) {
+	const read = await place.run('/', 'bash', ['-c', 'cat "$1"/projects/*/"$2".jsonl', 'transcript', configDirectory, sessionId], { environment: {}, timeoutMs: 30000 });
+
+	return read.code === 0 ? read.stdout : undefined;
+}
+
+function logTimeline(cardRun, metrics) {
+	const slowest = metrics.slowest.map(slow => slow.name + ' ' + Math.round(slow.ms / 1000) + 's `' + slow.what + '`').join(', ');
+	console.log(cardPrefix(cardRun) + minutes(metrics.durationMs) + ' in claude, ' + metrics.turns + ' turns: ' + metrics.toolCalls + ' tool calls took '
+		+ minutes(metrics.toolMs) + ', the model the rest. Slowest: ' + slowest);
+}
+
 // A directory of the child's own, holding nothing but a symlink to the runner's credential file: the child authenticates
 // through it without ever being handed the runner's home directory. The symlink means a refresh claude writes through it
 // lands on the real file, so the credential does not go stale the way a copy would.
@@ -306,6 +354,7 @@ async function claudeOnce(model, call) {
 	const timeoutMs = call.timeoutMs ?? 20 * MINUTE_MS;
 
 	if (call.run !== undefined) ledgerSession(call.run, sessionId, model);
+	const startedAt = Date.now();
 	try {
 		const outcome = await place.run(cwd, 'claude', claudeArguments(model, call, sessionId, systemPath), {
 			environment: environment,
@@ -324,7 +373,14 @@ async function claudeOnce(model, call) {
 			throw failure(message, { retryable: isRetryable(message) });
 		}
 
-		return readResult(readEvents(outcome.stdout), model, call, sessionId);
+		const reply = readResult(readEvents(outcome.stdout), model, call, sessionId);
+		const transcript = call.run === undefined ? undefined : await transcriptOf(place, child.config, sessionId);
+		if (transcript !== undefined) {
+			Object.assign(reply.metrics, timelineOf(transcript, startedAt));
+			logTimeline(call.run, reply.metrics);
+		}
+
+		return reply;
 	} finally {
 		// A sandbox that died mid-call cannot remove its scratch; that must not replace the reason the call failed.
 		await place.remove(scratch).catch(error => console.log(cardPrefix(call.run) + 'scratch not removed: ' + error.message));

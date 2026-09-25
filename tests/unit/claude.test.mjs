@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { claudeArguments, failure, readResult } from '../../src/claude.mjs';
+import { claudeArguments, failure, readResult, timelineOf } from '../../src/claude.mjs';
 import { loadEnv } from '../../src/config.mjs';
 import { localPlace } from '../../src/place.mjs';
 
@@ -49,8 +49,13 @@ test('readResult: an error reply throws with its cost and session; a good one is
 
 	expect(() => readResult({ is_error: true, result: 'overloaded, try later', total_cost_usd: 0.3, subtype: 'error' }, 'sonnet', call, 'sid'))
 		.toThrow(expect.objectContaining({ message: 'overloaded, try later', cost: 0.3, sessionId: 'sid', retryable: true }));
-	expect(() => readResult({ is_error: true, result: {}, total_cost_usd: 1, subtype: 'error_max_budget' }, 'sonnet', call, 'sid'))
-		.toThrow(expect.objectContaining({ message: 'claude reported error_max_budget after $1 of the $1 budget', retryable: false }));
+	expect(() => readResult({ is_error: true, result: {}, total_cost_usd: 1, subtype: 'error_max_budget_usd' }, 'sonnet', call, 'sid'))
+		.toThrow(expect.objectContaining({ message: 'claude spent its $1 budget ($1)', retryable: false }));
+
+	const missing = { is_error: true, total_cost_usd: 0, subtype: 'error_during_execution', errors: ['No conversation found with session ID: x'] };
+
+	expect(() => readResult(missing, 'sonnet', call, 'sid'))
+		.toThrow(expect.objectContaining({ message: 'claude reported error_during_execution: No conversation found with session ID: x' }));
 
 	const reply = readResult({
 		result: 'text\n## Done\n\nok', structured_output: { verdict: 'advance' }, total_cost_usd: 0.2, num_turns: 3, duration_ms: 10,
@@ -92,4 +97,23 @@ test('a section written as a JSON string is unwrapped; one with real newlines is
 	}, 'sonnet', call, 's');
 
 	expect(plain.section).toBe('## Reviews\n\nline one\\nstill one');
+});
+
+test('a call\'s timeline: each tool call from request to result, slowest first, the lines of earlier calls left out', () => {
+	const lines = [
+		{ timestamp: '2026-09-25T12:00:00.000Z', message: { content: [{ type: 'tool_use', id: 'old', name: 'Bash', input: { command: 'ls' } }] } },
+		{ timestamp: '2026-09-25T12:00:05.000Z', message: { content: [{ type: 'tool_result', tool_use_id: 'old' }] } },
+		{ timestamp: '2026-09-25T12:01:00.000Z', message: { content: [{ type: 'text', text: 'next' }, { type: 'tool_use', id: 'read', name: 'Read', input: { file_path: 'a.cs' } }] } },
+		{ timestamp: '2026-09-25T12:01:01.000Z', message: { content: [{ type: 'tool_result', tool_use_id: 'read' }] } },
+		{ timestamp: '2026-09-25T12:01:02.000Z', message: { content: [{ type: 'tool_use', id: 'build', name: 'Bash', input: { command: 'dotnet build' } }] } },
+		{ timestamp: '2026-09-25T12:01:32.000Z', message: { content: [{ type: 'tool_result', tool_use_id: 'build' }] } },
+		{ timestamp: '2026-09-25T12:01:33.000Z', type: 'summary' },
+	];
+
+	const timeline = timelineOf(lines.map(line => JSON.stringify(line)).join('\n') + '\n', Date.parse('2026-09-25T12:00:30.000Z'));
+
+	expect(timeline).toEqual({
+		toolMs: 31000, toolCalls: 2,
+		slowest: [{ name: 'Bash', what: 'dotnet build', ms: 30000 }, { name: 'Read', what: 'a.cs', ms: 1000 }],
+	});
 });

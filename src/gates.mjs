@@ -98,22 +98,22 @@ function gateWaves(gated) {
 
 // Installs run one at a time, since they write the worktree's shared dependency tree; the gates of one wave then run side by side,
 // and the first red gate in board order is the answer. No areas is a pass.
-async function gateScopes(worktreeRoot, cardRun, chosen) {
+async function gateScopes(place, board, worktreeRoot, chosen) {
 	const gated = [];
-	for (const scope of cardRun.board.scopes) {
+	for (const scope of board.scopes) {
 		if (!chosen.includes(scope)) continue;
 
-		const installed = await install(cardRun.place, worktreeRoot, scope);
+		const installed = await install(place, worktreeRoot, scope);
 
 		if (installed.error !== undefined) return failedInstall(scope, installed.error);
 
 		gated.push(scope);
 	}
 
-	let gate = { passed: true, command: '', code: 0, output: '', area: cardRun.area };
+	let gate = { passed: true, command: '', code: 0, output: '', area: undefined };
 	for (const wave of gateWaves(gated)) {
 		// Every gate of the wave starts before any is awaited, so they run side by side; run() never rejects.
-		const running = wave.map(scope => runGate(cardRun.place, join(worktreeRoot, scope.path), scope.gates, scope));
+		const running = wave.map(scope => runGate(place, join(worktreeRoot, scope.path), scope.gates, scope));
 		const results = [];
 		for (const pending of running) {
 			results.push(await pending);
@@ -141,7 +141,7 @@ export async function runOwnGates(worktreeRoot, cardRun, changedFiles) {
 		return runGate(cardRun.place, worktreeRoot, area.fullGates, area);
 	}
 
-	return gateScopes(worktreeRoot, cardRun, cardRun.board.mono ? changedScopes(cardRun.board, area, changedFiles) : [area]);
+	return gateScopes(cardRun.place, cardRun.board, worktreeRoot, cardRun.board.mono ? changedScopes(cardRun.board, area, changedFiles) : [area]);
 }
 
 function dependentsOf(cardRun, changedFiles) {
@@ -152,7 +152,12 @@ function dependentsOf(cardRun, changedFiles) {
 
 // What review runs once, before it reads the change: the areas that use what the card changed.
 export async function runDependentGates(worktreeRoot, cardRun, changedFiles) {
-	return gateScopes(worktreeRoot, cardRun, dependentsOf(cardRun, changedFiles));
+	return gateScopes(cardRun.place, cardRun.board, worktreeRoot, dependentsOf(cardRun, changedFiles));
+}
+
+// Every area's gates on the default branch, for the warm image: what they build and install is what a card starts from.
+export async function warmGates(place, board, worktreeRoot) {
+	return gateScopes(place, board, worktreeRoot, board.scopes);
 }
 
 // Both, for a change rebased onto a base that moved. The full bar already covers the repository.
@@ -164,5 +169,5 @@ export async function runGates(worktreeRoot, cardRun, changedFiles) {
 	const dependents = dependentsOf(cardRun, changedFiles);
 	if (dependents.length === 0) return own;
 
-	return gateScopes(worktreeRoot, cardRun, dependents);
+	return gateScopes(cardRun.place, cardRun.board, worktreeRoot, dependents);
 }

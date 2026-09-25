@@ -12,7 +12,7 @@ import { REPO, issue, mine, openPull, person, stamped } from '../builders.mjs';
 
 const CARD = 5;
 const BRANCH = branchOf({ number: CARD, title: 'Card ' + CARD, batch: '' });
-const ROOT = 'work/acme__app/5';
+const ROOT = 'work/acme__app/card';
 const SECTION = '## Implementation\n\nAdded the flag and a test.';
 const MONO = {
 	'.agents/project.md': 'projects:\n  app: packages/app\n  lib: packages/lib\n',
@@ -614,7 +614,7 @@ test('a batch: the batch label, the mates in the prompt, one commit closing ever
 		name: 'setLabels', number: 6, labels: ['stage: implement', 'tier: trivial', 'batch: 5'],
 	});
 	expect(git.calls[0].branch).toBe('card/5-batch');
-	expect(git.calls[0].root).toBe('work/acme__app/5');
+	expect(git.calls[0].root).toBe('work/acme__app/card');
 	expect(model.calls[0].prompt).toContain('# The other cards in this batch\n\nThey are all `trivial`');
 	expect(model.calls[0].prompt).toContain('## #6 Card 6\n\nsecond');
 	expect(model.calls[0].prompt).not.toContain('third');

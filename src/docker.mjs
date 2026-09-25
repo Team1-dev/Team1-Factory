@@ -73,15 +73,35 @@ export function dockerAt(socketPath) {
 		await call('DELETE', '/containers/' + encodeURIComponent(name) + '?force=true');
 	}
 
-	// An image's id, or undefined when Docker has no image by that name.
-	async function imageId(name) {
+	// An image's id and when it was made, or undefined when Docker has no image by that name.
+	async function inspectImage(name) {
 		try {
-			return (await call('GET', '/images/' + encodeURIComponent(name) + '/json')).Id;
+			const image = await call('GET', '/images/' + encodeURIComponent(name) + '/json');
+
+			return { id: image.Id, createdAt: Date.parse(image.Created) };
 		} catch (error) {
 			if (error.status === 404) return undefined;
 
 			throw error;
 		}
+	}
+
+	async function imageId(name) {
+		return (await inspectImage(name))?.id;
+	}
+
+	async function createVolume(name, labels) {
+		await call('POST', '/volumes/create', { Name: name, Labels: labels });
+	}
+
+	async function removeVolume(name) {
+		await call('DELETE', '/volumes/' + encodeURIComponent(name) + '?force=true');
+	}
+
+	async function volumesLabelled(label) {
+		const filters = encodeURIComponent(JSON.stringify({ label: [label] }));
+
+		return (await call('GET', '/volumes?filters=' + filters)).Volumes ?? [];
 	}
 
 	async function removeImage(name) {
@@ -119,7 +139,11 @@ export function dockerAt(socketPath) {
 		startContainer: startContainer,
 		inspectContainer: inspectContainer,
 		inspectNetwork: inspectNetwork,
+		inspectImage: inspectImage,
 		imageId: imageId,
+		createVolume: createVolume,
+		removeVolume: removeVolume,
+		volumesLabelled: volumesLabelled,
 		commit: commit,
 		removeImage: removeImage,
 		removeContainer: removeContainer,

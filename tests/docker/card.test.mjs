@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { loadEnv, repositoryFor, state } from '../../src/config.mjs';
 import { dockerAt } from '../../src/docker.mjs';
 import { environmentImage, environmentOf } from '../../src/environment.mjs';
-import { placeFor, startSandboxes, stopSandboxes, sweepRepo } from '../../src/sandboxes.mjs';
+import { environmentImageFor, imageFor, placeFor, startSandboxes, stopSandboxes, sweepRepo } from '../../src/sandboxes.mjs';
+import { cardDirectory } from '../../src/place.mjs';
 import { run } from '../../src/shell.mjs';
 import { gitHost } from '../githost.mjs';
 
@@ -18,8 +19,17 @@ const GIT = {
 	GIT_AUTHOR_NAME: 's', GIT_AUTHOR_EMAIL: 's@example.test', GIT_COMMITTER_NAME: 's', GIT_COMMITTER_EMAIL: 's@example.test',
 };
 
+// The repository as the board reads it: one area, whose gate leaves a build output behind as a compiler would.
+const GITHUB = { repo: REPO, tree: async () => ({ sha: 'seed', paths: ['README.md'] }), file: async () => undefined };
+const BOARD = {
+	defaultBranch: 'main', needs: [], services: [], runnerLogin: 'runner',
+	scopes: [{ name: '', path: '.', gates: 'echo "built from $(git rev-parse --short HEAD)" > build-output.txt', uses: [] }],
+};
+
 let root;
 let host;
+let plain;
+let warm;
 
 async function upstreamRef(ref) {
 	const outcome = await run(join(root, 'acme/app.git'), 'git', ['rev-parse', '--verify', '--quiet', ref], { environment: GIT });
@@ -50,6 +60,7 @@ beforeAll(async () => {
 	});
 	state.runnerEmails.GITHUB_TOKEN = 'runner@example.test';
 	await startSandboxes();
+	plain = { ...await environmentImageFor(REPO, PLAIN), environment: PLAIN };
 });
 
 afterAll(async () => {
@@ -58,11 +69,13 @@ afterAll(async () => {
 	host.server.close();
 
 	const docker = dockerAt(state.sandbox.socket);
+	if (warm !== undefined) await docker.removeImage(warm.name).catch(() => {});
+
 	await docker.removeImage(environmentImage(await docker.imageId('team1-sandbox'), PLAIN)).catch(() => {});
 });
 
 test('a card is checked out, committed and pushed from its own sandbox through the proxy; upstream alone sees the token', async () => {
-	const place = await placeFor(REPO, '5', BRANCH, PLAIN);
+	const place = await placeFor(REPO, '5', BRANCH, plain);
 	const git = repositoryFor(REPO, 'runner', place);
 
 	const worktree = await git.checkout(place.workDir + '/acme__app/5', BRANCH, false);
@@ -88,7 +101,7 @@ test('a card is checked out, committed and pushed from its own sandbox through t
 const SEARCH = '{ grep -l --binary-files=text "$1" /proc/[0-9]*/environ; sudo grep -rl --binary-files=text "$1" /home /tmp /runner /etc; } 2>/dev/null | wc -l';
 
 test('the fake GitHub token is nowhere in the sandbox, by a search that does find a marker put in a process environment there', async () => {
-	const place = await placeFor(REPO, '5', BRANCH, PLAIN);
+	const place = await placeFor(REPO, '5', BRANCH, plain);
 	const options = { environment: {}, timeoutMs: 120000 };
 
 	const token = await place.run('/', 'bash', ['-c', SEARCH, 'search', FAKE_GITHUB_TOKEN], options);
@@ -99,7 +112,7 @@ test('the fake GitHub token is nowhere in the sandbox, by a search that does fin
 });
 
 test('a card no longer in progress has its sandbox closed by the sweep', async () => {
-	await placeFor(REPO, '6', 'card/6-y', PLAIN);
+	await placeFor(REPO, '6', 'card/6-y', plain);
 
 	const docker = dockerAt(state.sandbox.socket);
 
@@ -108,3 +121,16 @@ test('a card no longer in progress has its sandbox closed by the sweep', async (
 	await expect(docker.inspectContainer('team1-acme-app-6')).rejects.toThrow('404');
 	expect((await docker.inspectContainer('team1-acme-app-5')).State.Running).toBe(true);
 });
+
+test('a card starts from the warm image: the default branch built where it works, switched to its branch with the build output kept', async () => {
+	warm = await imageFor(GITHUB, BOARD);
+
+	const place = await placeFor(REPO, '7', 'card/7-z', warm);
+
+	const worktree = await repositoryFor(REPO, 'runner', place).checkout(cardDirectory(place.workDir, REPO), 'card/7-z', false);
+	const branch = await place.run(worktree.root, 'git', ['branch', '--show-current'], { environment: {}, timeoutMs: 30000 });
+
+	expect(branch.stdout.trim()).toBe('card/7-z');
+	expect(await place.readText(worktree.root + '/build-output.txt')).toMatch(/^built from [0-9a-f]+\n$/);
+	expect((await imageFor(GITHUB, BOARD)).id).toBe(warm.id);
+}, 600000);

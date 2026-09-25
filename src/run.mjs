@@ -6,8 +6,8 @@ import { repositoryFor, sayOnce, state } from './config.mjs';
 import { readConversation } from './conversation.mjs';
 import { handleImplement } from './implement.mjs';
 import { handleMerge } from './merge.mjs';
-import { localPlace, repoDirectory } from './place.mjs';
-import { environmentFor, placeFor } from './sandboxes.mjs';
+import { cardDirectory, localPlace } from './place.mjs';
+import { imageFor, placeFor } from './sandboxes.mjs';
 import { apply, divert, failedOutcome, loginExpiredOutcome } from './outcomes.mjs';
 import { ledgerStart } from './ledger.mjs';
 import { fragment } from './prompts.mjs';
@@ -113,7 +113,7 @@ function held(run) {
 function workIn(run, place) {
 	run.place = place;
 	run.git = repositoryFor(run.repo, run.board.runnerLogin, place);
-	run.batchRoot = repoDirectory(place.workDir, run.repo) + '/' + run.key;
+	run.batchRoot = cardDirectory(place.workDir, run.repo);
 }
 
 // A stage that touches the checkout gets the card's sandbox, opened only once the card is known to go ahead: not hidden, blocked or
@@ -128,7 +128,7 @@ async function cardOutcome(run) {
 	if (holding !== undefined) return holding.outcome;
 
 	try {
-		if (CHECKOUT_STAGES.includes(run.stage.name)) await workIn(run, await placeFor(run.repo, run.key, run.branch, await environmentFor(run.github, run.board)));
+		if (CHECKOUT_STAGES.includes(run.stage.name)) await workIn(run, await placeFor(run.repo, run.key, run.branch, await imageFor(run.github, run.board)));
 
 		return await HANDLERS[run.stage.name](run);
 	} catch (error) {
@@ -178,7 +178,7 @@ export async function processCard(github, board, card, waiting) {
 		lead: card,
 		key: key,
 		branch: branchOf(card),
-		batchRoot: repoDirectory(place.workDir, github.repo) + '/' + key,
+		batchRoot: cardDirectory(place.workDir, github.repo),
 		ownArea: ownArea,
 		where: ownArea ? ' ' + fragment('_notes.md', 'in-area', { path: card.area.path }) : '',
 		comments: [],

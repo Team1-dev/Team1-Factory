@@ -346,7 +346,7 @@ Team1 sees the limit, waits until it lifts, and carries on.
 
 ### Does it work on repositories that are not Node?
 
-Yes. Gates can be any shell command. The image holds Node.js, npm, pnpm, git, jq and a C and C++ compiler. When a gate needs a compiler, a runtime or a library that is missing, the implement session installs it with Homebrew, without root, and runs the gate again. What it installs is kept in a Docker volume and survives an update.
+Yes. Gates can be any shell command. Team1 works out what each repository needs from its files (.NET, Node, Go, Python) and from `needs:` and `services:` in `.agents/project.md`, installs it once in a sandbox, and keeps that as an image. On top of it, once a day, it checks out the default branch and runs every area's gates, and keeps that too: every card starts from it, with packages downloaded and projects built, so its first build compiles only what it changes. A card's checkout and Claude's session sit on a volume of the card's own, so a restart picks the card up where it was. When a gate still needs something missing, the implement session installs it in its own sandbox (it may `sudo apt-get`) and runs the gate again.
 
 ## Community
 

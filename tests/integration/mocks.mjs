@@ -43,7 +43,7 @@ vi.mock('../../src/sandboxes.mjs', async () => {
 
 			return localPlace(state.workDir);
 		},
-		environmentFor: async () => ({ tools: {}, services: {} }),
+		imageFor: async () => ({ name: 'team1-warm:test', id: 'sha256:test', environment: { tools: {}, services: {} } }),
 		sweepRepo: async () => {},
 	};
 });

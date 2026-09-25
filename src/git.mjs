@@ -175,6 +175,13 @@ export function repository(settings) {
 			return { root: root, resumed: true };
 		}
 
+		// Switched, not recreated, so the warm image's build outputs stay and a build compiles only what differs.
+		if (await place.exists(join(root, '.git')) && await git(root, ['status', '--porcelain', '--untracked-files=no']) === '') {
+			await git(root, ['checkout', '-B', branch, from.start]);
+
+			return { root: root, resumed: from.resumed };
+		}
+
 		await removeWorktree(root);
 		await git(store, ['worktree', 'add', '-B', branch, root, from.start]);
 

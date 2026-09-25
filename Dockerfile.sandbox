@@ -15,6 +15,8 @@ USER team1
 ENV PATH=/home/team1/.local/bin:/home/team1/.dotnet:/home/team1/.dotnet/tools:/usr/local/go/bin:$PATH \
 	DOTNET_ROOT=/home/team1/.dotnet DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 RUN curl -fsSL https://claude.ai/install.sh | bash
+# A card's work volume starts as a copy of this directory, owner included.
+RUN mkdir /home/team1/work
 
 USER root
 COPY src/runner.mjs src/shell.mjs /runner/src/

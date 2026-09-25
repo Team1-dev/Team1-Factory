@@ -204,8 +204,8 @@ test('a rebase conflict sends the card back to implement', async () => {
 
 	expect(pass.changed).toBe(true);
 	expect(callNames(git.calls)).toEqual(['checkout', 'rebaseOnto']);
-	expect(git.calls[0]).toEqual({ name: 'checkout', root: 'work/acme__app/5', branch: BRANCH, readOnly: false });
-	expect(git.calls[1]).toEqual({ name: 'rebaseOnto', root: 'work/acme__app/5', base: 'main', headSha: 'deadbeef' });
+	expect(git.calls[0]).toEqual({ name: 'checkout', root: 'work/acme__app/card', branch: BRANCH, readOnly: false });
+	expect(git.calls[1]).toEqual({ name: 'rebaseOnto', root: 'work/acme__app/card', base: 'main', headSha: 'deadbeef' });
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain('`main` has moved since #50 was built and the branch no longer rebases onto it');
 	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · merge · conflict · 0 tokens · $0.00 API · total 0 tokens · $0.00 API')).toBe(true);

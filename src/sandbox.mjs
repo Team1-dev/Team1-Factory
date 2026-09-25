@@ -4,8 +4,11 @@ import { runnerAt } from './shell.mjs';
 
 const LABEL = 'team1.sandbox';
 const READY_TIMEOUT_MS = 60000;
+// A card's work directory: its checkout, its build outputs and Claude's sessions. It is a volume of the card's own, so a sandbox
+// replaced under a card (the poller restarted onto a new environment image) keeps all three.
+const WORK_DIRECTORY = '/home/team1/work';
 
-function sandboxSpec(name, settings) {
+function sandboxSpec(name, settings, mounts) {
 	return {
 		Image: settings.image,
 		Hostname: name,
@@ -16,6 +19,7 @@ function sandboxSpec(name, settings) {
 			Memory: settings.memoryBytes,
 			NanoCpus: settings.cpus * 1000000000,
 			PidsLimit: 4096,
+			Mounts: mounts,
 		},
 	};
 }
@@ -32,9 +36,9 @@ async function waitForRunner(run) {
 }
 
 // pollerContainer is '' when the poller runs on the host, which reaches bridge networks without joining them.
-export async function openSandbox(docker, name, settings) {
+async function openContainer(docker, name, settings, mounts) {
 	await docker.createNetwork(name, { [LABEL]: name });
-	await docker.createContainer(name, sandboxSpec(name, settings));
+	await docker.createContainer(name, sandboxSpec(name, settings, mounts));
 	await docker.startContainer(name);
 	if (settings.pollerContainer !== '') await docker.connectNetwork(name, settings.pollerContainer);
 
@@ -43,12 +47,24 @@ export async function openSandbox(docker, name, settings) {
 	const sandbox = { name: name, address: address, run: runnerAt(address) };
 
 	if (!await waitForRunner(sandbox.run)) {
-		await closeSandbox(docker, name, settings);
+		await closeContainer(docker, name, settings);
 
 		throw new Error('sandbox ' + name + ': its runner did not answer within ' + (READY_TIMEOUT_MS / 1000) + 's');
 	}
 
 	return sandbox;
+}
+
+// A card's sandbox. A new volume starts as a copy of the image's work directory, which is how a card gets the warm checkout.
+export async function openSandbox(docker, name, settings) {
+	await docker.createVolume(name, { [LABEL]: name });
+
+	return openContainer(docker, name, settings, [{ Type: 'volume', Source: name, Target: WORK_DIRECTORY }]);
+}
+
+// A sandbox that builds an image: what it leaves in the work directory is saved with the rest.
+export async function openBuilder(docker, name, settings) {
+	return openContainer(docker, name, settings, []);
 }
 
 // A card's sandbox still running from before the poller restarted, when it runs the current environment's image; any other is closed
@@ -64,7 +80,7 @@ export async function adoptSandbox(docker, name, settings, imageId) {
 	}
 
 	if (!inspected.State.Running || inspected.Image !== imageId) {
-		await closeSandbox(docker, name, settings);
+		await closeContainer(docker, name, settings);
 
 		return undefined;
 	}
@@ -82,12 +98,14 @@ export async function adoptSandbox(docker, name, settings, imageId) {
 	return { name: name, address: address, run: runnerAt(address) };
 }
 
-export async function closeSandbox(docker, name, settings) {
+// The container and its network; the card's work volume stays for the sandbox that replaces it.
+export async function closeContainer(docker, name, settings) {
 	if (settings.pollerContainer !== '') {
 		try {
 			await docker.disconnectNetwork(name, settings.pollerContainer);
 		} catch (error) {
-			if (error.status !== 404) console.log('sandbox ' + name + ': poller not disconnected: ' + error.message);
+			// A poller that restarted since is not on the network: Docker answers that with a 500.
+			if (error.status !== 404 && !error.message.includes('is not connected')) console.log('sandbox ' + name + ': poller not disconnected: ' + error.message);
 		}
 	}
 
@@ -104,16 +122,19 @@ export async function closeSandbox(docker, name, settings) {
 	}
 }
 
-// Every sandbox name Docker knows, from its containers and its networks both, so a half-made one is found too.
+export async function closeSandbox(docker, name, settings) {
+	await closeContainer(docker, name, settings);
+
+	try {
+		await docker.removeVolume(name);
+	} catch (error) {
+		if (error.status !== 404) console.log('sandbox ' + name + ': work volume not removed: ' + error.message);
+	}
+}
+
+// Every sandbox name Docker knows, from its containers, networks and volumes, so a half-made or replaced one is found too.
 export async function sandboxesLabelled(docker) {
-	const names = [];
-	for (const container of await docker.containersLabelled(LABEL)) {
-		names.push(container.Labels[LABEL]);
-	}
+	const labelled = (await docker.containersLabelled(LABEL)).concat(await docker.networksLabelled(LABEL), await docker.volumesLabelled(LABEL));
 
-	for (const network of await docker.networksLabelled(LABEL)) {
-		if (!names.includes(network.Labels[LABEL])) names.push(network.Labels[LABEL]);
-	}
-
-	return names;
+	return [...new Set(labelled.map(item => item.Labels[LABEL]))];
 }

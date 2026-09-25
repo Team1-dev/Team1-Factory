@@ -71,7 +71,7 @@ test('no pull and the branch already on the base: closed as already done', async
 	expect(pass.writes[0].body).toContain('`' + BRANCH + '` carries no change against `main`');
 	expect(pass.writes[2]).toEqual({ name: 'close', number: CARD, reason: 'completed' });
 	expect(git.calls).toEqual([
-		{ name: 'removeWorktree', root: 'work/acme__app/5' }, { name: 'deleteLocalBranch', branch: BRANCH },
+		{ name: 'removeWorktree', root: 'work/acme__app/card' }, { name: 'deleteLocalBranch', branch: BRANCH },
 	]);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:already-done']);
 });

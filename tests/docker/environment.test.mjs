@@ -5,12 +5,18 @@ import { join } from 'node:path';
 import { loadEnv, state } from '../../src/config.mjs';
 import { dockerAt } from '../../src/docker.mjs';
 import { environmentImage, environmentOf } from '../../src/environment.mjs';
-import { placeFor, startSandboxes, stopSandboxes, sweepRepo } from '../../src/sandboxes.mjs';
+import { environmentImageFor, placeFor, startSandboxes, stopSandboxes, sweepRepo } from '../../src/sandboxes.mjs';
 
 const REPO = 'acme/envtest';
-const ENVIRONMENT = environmentOf({ dotnet: '10.0' }, [], ['postgres']);
+// .NET alone: installed with a service, Postgres would pull in the ICU library .NET needs and hide it missing.
+const ENVIRONMENT = environmentOf({ dotnet: '10.0' }, [], []);
+const WITH_POSTGRES = environmentOf({}, [], ['postgres']);
 const RUN = { environment: {}, timeoutMs: 120000 };
 let docker;
+
+async function imageWith(environment) {
+	return { ...await environmentImageFor(REPO, environment), environment: environment };
+}
 
 beforeAll(async () => {
 	loadEnv({
@@ -25,31 +31,38 @@ afterAll(async () => {
 	await sweepRepo(REPO, []);
 	await stopSandboxes();
 
-	const image = environmentImage(await docker.imageId('team1-sandbox'), ENVIRONMENT);
-	await docker.removeImage(image);
+	const base = await docker.imageId('team1-sandbox');
+	for (const environment of [ENVIRONMENT, WITH_POSTGRES]) {
+		await docker.removeImage(environmentImage(base, environment)).catch(() => {});
+	}
 });
 
-test('the first card\'s sandbox builds the environment and saves it; .NET works for every command and Postgres lets team1 in', async () => {
-	const place = await placeFor(REPO, '1', 'card/1-x', ENVIRONMENT);
+test('the first card\'s sandbox builds the environment and saves it; .NET alone starts and works for every command', async () => {
+	const place = await placeFor(REPO, '1', 'card/1-x', await imageWith(ENVIRONMENT));
 
 	const dotnet = await place.run('/home/team1', 'dotnet', ['--version'], RUN);
-	const postgres = await place.run('/home/team1', 'psql', ['-d', 'postgres', '-tAc', 'select 1'], RUN);
 
 	expect(dotnet.code, dotnet.output).toBe(0);
 	expect(dotnet.stdout).toMatch(/^10\.0\./);
-	expect(postgres.stdout.trim(), postgres.output).toBe('1');
 	expect(await docker.imageId(environmentImage(await docker.imageId('team1-sandbox'), ENVIRONMENT))).toBeDefined();
 }, 1200000);
 
-test('the next card\'s sandbox starts from the saved environment, ready, with its services running', async () => {
+test('the next card\'s sandbox starts from the saved environment, ready', async () => {
+	const image = await imageWith(ENVIRONMENT);
 	const began = Date.now();
-	const place = await placeFor(REPO, '2', 'card/2-y', ENVIRONMENT);
+	const place = await placeFor(REPO, '2', 'card/2-y', image);
 	const opened = Date.now() - began;
 
 	const dotnet = await place.run('/home/team1', 'dotnet', ['--version'], RUN);
-	const postgres = await place.run('/home/team1', 'psql', ['-d', 'postgres', '-tAc', 'select 1'], RUN);
 
 	expect(dotnet.stdout).toMatch(/^10\.0\./);
-	expect(postgres.stdout.trim()).toBe('1');
 	expect(opened).toBeLessThan(30000);
 }, 120000);
+
+test('a service is installed and started, and lets team1 in', async () => {
+	const place = await placeFor(REPO, '3', 'card/3-z', await imageWith(WITH_POSTGRES));
+
+	const postgres = await place.run('/home/team1', 'psql', ['-d', 'postgres', '-tAc', 'select 1'], RUN);
+
+	expect(postgres.stdout.trim(), postgres.output).toBe('1');
+}, 1200000);

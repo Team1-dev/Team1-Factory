@@ -51,10 +51,10 @@ when the card asks for them. Never leave part of the ask for a follow-up card an
    you finish and hands any failure back to you in this same session. While working, run only what
    you need to see your own change work — the one test you wrote, one build — never the full
    suites. **Never claim something checkable that you did not run.**
-   **A tool the gates need and this machine lacks — a compiler, a runtime, a library — is yours to
-   install:** `brew install …` where `brew` is on `PATH`, the language's own installer otherwise,
-   never `sudo`. Install what the repo asks for, at the version it asks for; do not change the
-   repo to suit the machine.
+   **A tool the gates need and this machine lacks — a compiler, a runtime, a system library — is yours
+   to install:** you work in a sandbox of your own that is thrown away when the card is done, so
+   `sudo apt-get install …` is allowed, as is the language's own installer. Install what the repo
+   asks for, at the version it asks for; do not change the repo to suit the machine.
 4. **Stop at your additions list.** Do not tidy neighbouring code, rename things you dislike, or
    fix unrelated defects — **put them in `cards` instead**; as prose in your section they are lost
    the moment this card merges. You are the only agent that reads this code with the intent to

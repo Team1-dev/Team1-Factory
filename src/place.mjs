@@ -7,6 +7,12 @@ export function repoDirectory(workDir, repo) {
 	return join(workDir, repo.replace('/', '__'));
 }
 
+// Where a card is checked out. A sandbox holds one card, so the path is the same for every card: the warm image builds the default
+// branch here, and build outputs, whose paths are absolute, still match when the card takes it over.
+export function cardDirectory(workDir, repo) {
+	return join(repoDirectory(workDir, repo), 'card');
+}
+
 export function localPlace(workDir) {
 	// Claude's home for the child: the runner's one credential linked in, and the session transcripts --resume reads kept between calls.
 	async function claudeHome() {

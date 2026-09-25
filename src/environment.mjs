@@ -70,7 +70,9 @@ export function environmentOf(detected, needs, services) {
 
 function toolScript(name, version) {
 	if (name === 'dotnet') {
-		return 'curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && bash /tmp/dotnet-install.sh --channel ' + version + ' --install-dir "$HOME/.dotnet"';
+		// The installer brings the SDK, not the system libraries it needs: without ICU, dotnet will not even start.
+		return 'sudo apt-get install -y --no-install-recommends libicu72'
+			+ ' && curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && bash /tmp/dotnet-install.sh --channel ' + version + ' --install-dir "$HOME/.dotnet"';
 	}
 
 	if (name === 'node') {
@@ -136,8 +138,9 @@ export function startScript(environment) {
 	return steps.join('\n');
 }
 
+// Named by the base image and the exact install script, so a change to either, how a tool is installed included, builds a new one.
 export function environmentImage(baseImageId, environment) {
-	const hash = createHash('sha256').update(baseImageId + JSON.stringify(environment)).digest('hex').slice(0, 16);
+	const hash = createHash('sha256').update(baseImageId + installScript(environment)).digest('hex').slice(0, 16);
 
 	return 'team1-env:' + hash;
 }
