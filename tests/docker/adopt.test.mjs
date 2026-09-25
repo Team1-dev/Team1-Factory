@@ -5,16 +5,21 @@ import { join } from 'node:path';
 import { loadEnv, state } from '../../src/config.mjs';
 import { dockerAt } from '../../src/docker.mjs';
 import { environmentImage, environmentOf } from '../../src/environment.mjs';
+import { run } from '../../src/shell.mjs';
 import { environmentImageFor, placeFor, startSandboxes, stopSandboxes, sweepRepo } from '../../src/sandboxes.mjs';
 
 const REPO = 'acme/adopttest';
 const NAME = 'team1-acme-adopttest-1';
+// A newer warm image of the same environment, as the daily refresh makes.
+const REFRESHED = 'team1-warm:adopttest';
 const PLAIN = environmentOf({}, [], []);
 const WITH_JQ = environmentOf({}, ['jq'], []);
 let docker;
 
 async function imageWith(environment) {
-	return { ...await environmentImageFor(REPO, environment), environment: environment };
+	const image = await environmentImageFor(REPO, environment);
+
+	return { ...image, environment: environment, environmentName: image.name };
 }
 
 async function restart() {
@@ -39,45 +44,57 @@ afterAll(async () => {
 	await sweepRepo(REPO, []);
 	await stopSandboxes();
 
-	const base = await docker.imageId('team1-sandbox');
+	const base = (await docker.inspectImage('team1-sandbox')).layers.join(',');
 	for (const environment of [PLAIN, WITH_JQ]) {
 		await docker.removeImage(environmentImage(base, environment)).catch(() => {});
 	}
+
+	await docker.removeImage(REFRESHED).catch(() => {});
 });
 
-test('after a restart a sandbox is taken over only when it runs the current image; replaced otherwise, with the card\'s work kept', async () => {
+test('a card keeps its sandbox, work and all, across restarts, a newer warm image and a stop; a new environment replaces it', async () => {
 	const plain = await imageWith(PLAIN);
 	const first = await placeFor(REPO, '1', 'card/1-x', plain);
+	const work = first.workDir + '/acme__adopttest/card/work.txt';
 	await first.makeDirectory(first.workDir + '/acme__adopttest/card');
-	await first.writeText(first.workDir + '/acme__adopttest/card/work.txt', 'uncommitted\n');
+	await first.writeText(work, 'uncommitted\n');
 
 	const opened = await containerId();
-
-	expect((await docker.inspectContainer(NAME)).Image).toBe(plain.id);
 
 	await restart();
 	await placeFor(REPO, '1', 'card/1-x', plain);
 
 	expect(await containerId()).toBe(opened);
 
+	await docker.commit(NAME, REFRESHED, 'team1.repo=' + REPO);
+	await restart();
+	await placeFor(REPO, '1', 'card/1-x', { ...plain, name: REFRESHED, id: await docker.imageId(REFRESHED) });
+
+	expect(await containerId()).toBe(opened);
+
+	await run('/', 'docker', ['stop', NAME], { environment: { PATH: process.env.PATH } });
 	await restart();
 
-	const place = await placeFor(REPO, '1', 'card/1-x', await imageWith(WITH_JQ));
-	const kept = await place.readText(place.workDir + '/acme__adopttest/card/work.txt');
+	const started = await placeFor(REPO, '1', 'card/1-x', plain);
+
+	expect(await containerId()).toBe(opened);
+	expect(await started.readText(work)).toBe('uncommitted\n');
+
+	await restart();
+
+	const replaced = await placeFor(REPO, '1', 'card/1-x', await imageWith(WITH_JQ));
 
 	expect(await containerId()).not.toBe(opened);
-	expect((await place.run('/', 'jq', ['--version'], { environment: {}, timeoutMs: 30000 })).code).toBe(0);
-	expect(kept).toBe('uncommitted\n');
+	expect((await replaced.run('/', 'jq', ['--version'], { environment: {}, timeoutMs: 30000 })).code).toBe(0);
+	expect(await replaced.exists(work)).toBe(false);
 }, 600000);
 
-test('a card whose sandbox was removed under it gets a fresh one the next time it needs it, instead of a runner that is gone', async () => {
+test('a card whose container was removed under it, its network and work left, gets a fresh one the next time it needs it, instead of a runner that is gone', async () => {
 	const plain = await imageWith(PLAIN);
 	await placeFor(REPO, '2', 'card/2-y', plain);
 
 	const first = (await docker.inspectContainer('team1-acme-adopttest-2')).Id;
 	await docker.removeContainer('team1-acme-adopttest-2');
-	await docker.removeNetwork('team1-acme-adopttest-2');
-	await docker.removeVolume('team1-acme-adopttest-2');
 
 	const place = await placeFor(REPO, '2', 'card/2-y', plain);
 

@@ -5,7 +5,9 @@ import { readConversation } from './conversation.mjs';
 import { ledgerClassify } from './ledger.mjs';
 import { note } from './outcomes.mjs';
 import { fragment } from './prompts.mjs';
-import { redactSecrets } from './stringUtils.mjs';
+import { pluralSuffix, redactSecrets } from './stringUtils.mjs';
+
+const FROM_PROPOSALS = 'from proposals';
 
 const ORIGIN_NOTES = ['proposal-origin-implement', 'proposal-origin-review'];
 const DIFF_LIMIT = 60000;
@@ -35,7 +37,9 @@ async function proposalsCard(run, title) {
 		}
 	}
 
+	// One generation: a card that was itself a proposal files its own for a person to pick up, so proposals cannot breed without end.
 	const labels = ['findings'];
+	if (!run.lead.labels.includes(FROM_PROPOSALS)) labels.push('stage: triage');
 	if (run.board.mono && run.area.name !== '') labels.push(projectLabel);
 
 	const issue = await run.github.createIssue(title, fragment('_shared.md', 'findings-card', { number: run.lead.number }), labels);
@@ -56,6 +60,7 @@ export async function openCards(run, findings) {
 
 		const project = run.board.areaNames.includes(finding.project) ? finding.project : run.area.name;
 		const labels = ['stage: triage'];
+		if (run.lead.labels.includes('findings') || run.lead.labels.includes(FROM_PROPOSALS)) labels.push(FROM_PROPOSALS);
 		if (run.board.mono && project !== '') labels.push('project: ' + project);
 
 		const body = redactSecrets(finding.body ?? '') + '\n\n' + fragment('_notes.md', 'split-from', { number: run.lead.number });
@@ -179,6 +184,9 @@ export async function closeCoveredProposals(run, pull, diffText) {
 		}
 
 		if (sections.length === 0) return { cost: cost, tokens: tokens, model: model };
+
+		const proposals = sections.length + ' proposal' + pluralSuffix(sections.length);
+		console.log(run.tag + ': checking which of the ' + proposals + ' on #' + issue.number + ' the merged #' + pull.number + ' covers…');
 
 		let allCovered = true;
 		for (const section of sections) {

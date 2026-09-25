@@ -42,6 +42,32 @@ test('a card is blocked by the open cards its body, a person or a stamp names as
 	}
 });
 
+test('cards that wait on each other in a ring: the card whose blocked-by line closed the ring, the newest, goes ahead; the others wait', async () => {
+	setup();
+	model.answers.push(implementAnswer());
+
+	const lead = implementCard('x');
+	const umbrella = issue(6, ['stage: implement'], 'blocked-by: #7');
+	const piece = issue(7, ['stage: implement'], 'blocked-by: #5');
+	const closing = mine('## Triage\n\nblocked-by: #6\n\n— team1-factory · triage · advance · $0.10');
+
+	const pass = await passOver({ issues: [lead, umbrella, piece], comments: { [CARD]: [TRIAGED, closing] } }, CARD);
+
+	expect(pass.changed).toBe(true);
+	expect(model.calls.length).toBe(1);
+
+	setup();
+
+	const waiting = implementCard('blocked-by: #6');
+	const other = issue(6, ['stage: implement'], 'x');
+	const newer = person('blocked-by: #5');
+
+	const held = await passOver({ issues: [waiting, other], comments: { [CARD]: [TRIAGED], 6: [newer] } }, CARD);
+
+	expect(held.changed).toBe(false);
+	expect(model.calls).toEqual([]);
+});
+
 test('a card that goes ahead gets its sandbox for implement, named by its own key and branch', async () => {
 	setup();
 	model.answers.push(implementAnswer());

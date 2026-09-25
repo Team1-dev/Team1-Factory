@@ -385,3 +385,33 @@ test('a resumed card caught up with a base that moved counts only its own files 
 
 	expect(await o.repo.changes(root, 'card/5-x', 'main')).toEqual({ unpushed: true, changed: ['more.txt', 'new.txt'], round: ['more.txt'], untracked: [] });
 }, 30000);
+
+test('a merge of the base the session made and resolved but could not commit is concluded, so only the card\'s files read as its changes', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '9-card');
+	await o.repo.checkout(root, 'card/9-x', false);
+	writeFileSync(join(root, 'README.md'), 'ours\n');
+	writeFileSync(join(root, 'card.txt'), 'the card\n');
+	await o.sh(root, ['add', '-A']);
+	await o.sh(root, ['-c', 'user.name=r', '-c', 'user.email=r@x', 'commit', '-qm', 'ours']);
+
+	writeFileSync(join(o.seed, 'README.md'), 'theirs\n');
+	writeFileSync(join(o.seed, 'base.txt'), 'the base\n');
+	await o.sh(o.seed, ['add', '-A']);
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'commit', '-qm', 'theirs']);
+	await o.sh(o.seed, ['push', '-q', 'origin', 'main']);
+
+	await o.sh(root, ['fetch', '-q', 'origin']);
+
+	const environment = { PATH: process.env.PATH, HOME: o.home, GIT_CONFIG_GLOBAL: '/dev/null' };
+	const merge = await run(root, 'git', ['-c', 'user.name=r', '-c', 'user.email=r@x', 'merge', 'origin/main'], { environment: environment });
+	expect(merge.code).not.toBe(0);
+	writeFileSync(join(root, 'README.md'), 'ours and theirs\n');
+	writeFileSync(join(root, 'card.txt'), 'the card, carried on\n');
+
+	const changes = await o.repo.changes(root, 'card/9-x', 'main');
+
+	expect(changes.changed.sort()).toEqual(['README.md', 'card.txt']);
+	expect(await o.sh(root, ['status', '--porcelain'])).toBe('M card.txt');
+	expect(await o.sh(root, ['merge-base', '--is-ancestor', 'origin/main', 'HEAD'])).toBe('');
+}, 30000);

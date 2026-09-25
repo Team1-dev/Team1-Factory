@@ -73,12 +73,13 @@ export function dockerAt(socketPath) {
 		await call('DELETE', '/containers/' + encodeURIComponent(name) + '?force=true');
 	}
 
-	// An image's id and when it was made, or undefined when Docker has no image by that name.
+	// An image's id, when it was made and its layers, or undefined when Docker has no image by that name. A rebuild from cache gives a new
+	// id but the same layers.
 	async function inspectImage(name) {
 		try {
 			const image = await call('GET', '/images/' + encodeURIComponent(name) + '/json');
 
-			return { id: image.Id, createdAt: Date.parse(image.Created) };
+			return { id: image.Id, createdAt: Date.parse(image.Created), layers: image.RootFS.Layers };
 		} catch (error) {
 			if (error.status === 404) return undefined;
 
@@ -88,10 +89,6 @@ export function dockerAt(socketPath) {
 
 	async function imageId(name) {
 		return (await inspectImage(name))?.id;
-	}
-
-	async function createVolume(name, labels) {
-		await call('POST', '/volumes/create', { Name: name, Labels: labels });
 	}
 
 	async function removeVolume(name) {
@@ -104,13 +101,21 @@ export function dockerAt(socketPath) {
 		return (await call('GET', '/volumes?filters=' + filters)).Volumes ?? [];
 	}
 
+	// Never forced: an image any container still uses, stopped or not, stays.
 	async function removeImage(name) {
-		await call('DELETE', '/images/' + encodeURIComponent(name) + '?force=true');
+		await call('DELETE', '/images/' + encodeURIComponent(name));
 	}
 
-	async function commit(container, image) {
+	async function commit(container, image, label) {
 		const [repository, tag] = image.split(':');
-		await call('POST', '/commit?container=' + encodeURIComponent(container) + '&repo=' + encodeURIComponent(repository) + '&tag=' + encodeURIComponent(tag));
+		await call('POST', '/commit?container=' + encodeURIComponent(container) + '&repo=' + encodeURIComponent(repository) + '&tag=' + encodeURIComponent(tag)
+			+ '&changes=' + encodeURIComponent('LABEL ' + label));
+	}
+
+	async function imagesLabelled(label) {
+		const filters = encodeURIComponent(JSON.stringify({ label: [label] }));
+
+		return call('GET', '/images/json?filters=' + filters);
 	}
 
 	async function inspectNetwork(name) {
@@ -141,10 +146,10 @@ export function dockerAt(socketPath) {
 		inspectNetwork: inspectNetwork,
 		inspectImage: inspectImage,
 		imageId: imageId,
-		createVolume: createVolume,
 		removeVolume: removeVolume,
 		volumesLabelled: volumesLabelled,
 		commit: commit,
+		imagesLabelled: imagesLabelled,
 		removeImage: removeImage,
 		removeContainer: removeContainer,
 		containersLabelled: containersLabelled,

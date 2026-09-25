@@ -172,6 +172,8 @@ function refusalKind(message) {
 
 async function landPull(run, pull) {
 	const base = pull.base.ref;
+	console.log(run.tag + ': rebasing #' + pull.number + ' onto ' + base + '…');
+
 	const worktree = await run.git.checkout(run.batchRoot, run.branch, false);
 	const rebase = await run.git.rebaseOnto(worktree.root, base, pull.head.sha);
 
@@ -253,7 +255,7 @@ export async function handleMerge(run) {
 		if (Date.now() < readyAt) {
 			if (state.wakeAt === 0 || readyAt < state.wakeAt) state.wakeAt = readyAt;
 
-			return hold(run.repo, run.lead.number, 'holding until ' + new Date(readyAt).toISOString().slice(11, 16) + ' for comments on ' + pull.html_url);
+			return hold(run.repo, run.lead.number, 'holding until ' + new Date(readyAt).toISOString().slice(11, 19) + ' for comments on ' + pull.html_url);
 		}
 	}
 

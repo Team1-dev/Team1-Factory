@@ -3,23 +3,22 @@ import { RUNNER_PORT } from './runner.mjs';
 import { runnerAt } from './shell.mjs';
 
 const LABEL = 'team1.sandbox';
+// The environment image a card's sandbox was opened from. Its work lives in the container, so a sandbox is only replaced when this
+// changes: a newer warm image of the same environment leaves it be.
+const ENVIRONMENT_LABEL = 'team1.environment';
 const READY_TIMEOUT_MS = 60000;
-// A card's work directory: its checkout, its build outputs and Claude's sessions. It is a volume of the card's own, so a sandbox
-// replaced under a card (the poller restarted onto a new environment image) keeps all three.
-const WORK_DIRECTORY = '/home/team1/work';
 
-function sandboxSpec(name, settings, mounts) {
+function sandboxSpec(name, settings, environmentName) {
 	return {
 		Image: settings.image,
 		Hostname: name,
-		Labels: { [LABEL]: name },
+		Labels: { [LABEL]: name, [ENVIRONMENT_LABEL]: environmentName },
 		HostConfig: {
 			NetworkMode: name,
 			Init: true,
 			Memory: settings.memoryBytes,
 			NanoCpus: settings.cpus * 1000000000,
 			PidsLimit: 4096,
-			Mounts: mounts,
 		},
 	};
 }
@@ -35,19 +34,23 @@ async function waitForRunner(run) {
 	return false;
 }
 
-// pollerContainer is '' when the poller runs on the host, which reaches bridge networks without joining them.
-async function openContainer(docker, name, settings, mounts) {
-	await docker.createNetwork(name, { [LABEL]: name });
-	await docker.createContainer(name, sandboxSpec(name, settings, mounts));
-	await docker.startContainer(name);
-	if (settings.pollerContainer !== '') await docker.connectNetwork(name, settings.pollerContainer);
+// The running sandbox as the poller reaches it, once its runner answers. pollerContainer is '' when the poller runs on the host,
+// which reaches bridge networks without joining them.
+async function reach(docker, name, settings) {
+	if (settings.pollerContainer !== '') {
+		try {
+			await docker.connectNetwork(name, settings.pollerContainer);
+		} catch (error) {
+			if (error.status !== 403 && error.status !== 409) throw error;
+		}
+	}
 
 	const inspected = await docker.inspectContainer(name);
 	const address = 'http://' + inspected.NetworkSettings.Networks[name].IPAddress + ':' + RUNNER_PORT;
 	const sandbox = { name: name, address: address, run: runnerAt(address) };
 
 	if (!await waitForRunner(sandbox.run)) {
-		await closeContainer(docker, name, settings);
+		await closeSandbox(docker, name, settings);
 
 		throw new Error('sandbox ' + name + ': its runner did not answer within ' + (READY_TIMEOUT_MS / 1000) + 's');
 	}
@@ -55,21 +58,20 @@ async function openContainer(docker, name, settings, mounts) {
 	return sandbox;
 }
 
-// A card's sandbox. A new volume starts as a copy of the image's work directory, which is how a card gets the warm checkout.
-export async function openSandbox(docker, name, settings) {
-	await docker.createVolume(name, { [LABEL]: name });
+// The card's work (checkout, build outputs, Claude's sessions) is in the container itself, which starts from the image's files
+// without copying them. environmentName is '' for a sandbox that builds an image.
+export async function openSandbox(docker, name, settings, environmentName) {
+	// A container or network left behind (removed by hand, a crash) would make the create fail.
+	await closeSandbox(docker, name, settings);
+	await docker.createNetwork(name, { [LABEL]: name });
+	await docker.createContainer(name, sandboxSpec(name, settings, environmentName));
+	await docker.startContainer(name);
 
-	return openContainer(docker, name, settings, [{ Type: 'volume', Source: name, Target: WORK_DIRECTORY }]);
+	return reach(docker, name, settings);
 }
 
-// A sandbox that builds an image: what it leaves in the work directory is saved with the rest.
-export async function openBuilder(docker, name, settings) {
-	return openContainer(docker, name, settings, []);
-}
-
-// A card's sandbox still running from before the poller restarted, when it runs the current environment's image; any other is closed
-// so a fresh one opens from that image.
-export async function adoptSandbox(docker, name, settings, imageId) {
+// A card's sandbox from before: kept, and started again if it was stopped, while it has the current environment; replaced otherwise.
+export async function adoptSandbox(docker, name, settings, environmentName) {
 	let inspected;
 	try {
 		inspected = await docker.inspectContainer(name);
@@ -79,27 +81,19 @@ export async function adoptSandbox(docker, name, settings, imageId) {
 		throw error;
 	}
 
-	if (!inspected.State.Running || inspected.Image !== imageId) {
-		await closeContainer(docker, name, settings);
+	if (inspected.Config.Labels[ENVIRONMENT_LABEL] !== environmentName) {
+		await closeSandbox(docker, name, settings);
 
 		return undefined;
 	}
 
-	if (settings.pollerContainer !== '') {
-		try {
-			await docker.connectNetwork(name, settings.pollerContainer);
-		} catch (error) {
-			if (error.status !== 403 && error.status !== 409) throw error;
-		}
-	}
+	if (!inspected.State.Running) await docker.startContainer(name);
 
-	const address = 'http://' + inspected.NetworkSettings.Networks[name].IPAddress + ':' + RUNNER_PORT;
-
-	return { name: name, address: address, run: runnerAt(address) };
+	return reach(docker, name, settings);
 }
 
-// The container and its network; the card's work volume stays for the sandbox that replaces it.
-export async function closeContainer(docker, name, settings) {
+// The container, its network, and the work volume a sandbox opened before 2026-09-25 evening had.
+export async function closeSandbox(docker, name, settings) {
 	if (settings.pollerContainer !== '') {
 		try {
 			await docker.disconnectNetwork(name, settings.pollerContainer);
@@ -120,10 +114,6 @@ export async function closeContainer(docker, name, settings) {
 	} catch (error) {
 		if (error.status !== 404) console.log('sandbox ' + name + ': network not removed: ' + error.message);
 	}
-}
-
-export async function closeSandbox(docker, name, settings) {
-	await closeContainer(docker, name, settings);
 
 	try {
 		await docker.removeVolume(name);

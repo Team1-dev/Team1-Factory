@@ -25,6 +25,7 @@ const KNOB_DEFAULTS = {
 	MAX_UNLISTED_FILES: 20,
 	SANDBOX_MEMORY_MB: 1536,
 	SANDBOX_CPUS: 1,
+	WARM_REFRESH_HOURS: 24,
 };
 
 // Settings from the environment, then the process state and the caches, all reset by loadEnv.

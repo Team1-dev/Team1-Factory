@@ -12,6 +12,7 @@ const CARD = 5;
 const PULL = 50;
 const BRANCH = branchOf({ number: CARD, title: 'Card ' + CARD, batch: '' });
 const REVIEW_ROOT = 'work/acme__app/5-review';
+const CARD_ROOT = 'work/acme__app/card';
 // The model's own heading; the stage replaces it with the one it owns.
 const SECTION = '## Reviews\n\nThe flag is parsed twice.';
 const NOTE = '## Review\n\nThe flag is parsed twice.';
@@ -98,7 +99,7 @@ test('what uses the change is built once, before any reading; red, the card goes
 
 	const pass = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
 
-	expect(gates.calls).toEqual([{ name: 'runDependentGates', root: REVIEW_ROOT, area: '', files: ['src/cli.mjs', 'dist/bundle.js'] }]);
+	expect(gates.calls).toEqual([{ name: 'runDependentGates', root: CARD_ROOT, area: '', files: ['src/cli.mjs', 'dist/bundle.js'] }]);
 	expect(model.calls).toEqual([]);
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain('#50 breaks `app`, which uses what it changed: `npm run check` exited 2. Sent back to implement before review');
@@ -131,14 +132,14 @@ test('the prompt: the pull, the files, the diff less generated files, added comm
 	await passOver(given, CARD);
 
 	expect(git.calls).toEqual([
-		{ name: 'checkout', root: REVIEW_ROOT, branch: BRANCH, readOnly: true },
-		{ name: 'diff', root: REVIEW_ROOT, base: 'main' },
-		{ name: 'removeWorktree', root: REVIEW_ROOT },
+		{ name: 'checkout', root: CARD_ROOT, branch: BRANCH, readOnly: false },
+		{ name: 'changes', root: CARD_ROOT, branch: BRANCH, base: 'main' },
+		{ name: 'diff', root: CARD_ROOT, base: 'main' },
 	]);
 
 	const call = model.calls[0];
 	expect(call.role).toBe('judge');
-	expect(call.options.cwd).toBe(REVIEW_ROOT);
+	expect(call.options.cwd).toBe(CARD_ROOT);
 	expect(call.options.tools).toEqual(['Read', 'Grep', 'Glob']);
 	expect(call.options.permissionMode).toBe('bypassPermissions');
 	expect(call.options.system).toContain('# Review');
@@ -358,7 +359,7 @@ test('findings are posted to the card\'s proposals issue as one comment, a blank
 
 	expect(callNames(pass.writes)).toEqual(['createIssue', 'comment', 'comment', 'setLabels']);
 	expect(pass.writes[0].title).toBe('Proposals from #5: Card 5');
-	expect(pass.writes[0].labels).toEqual(['findings']);
+	expect(pass.writes[0].labels).toEqual(['findings', 'stage: triage']);
 	expect(pass.writes[1].number).toBe(901);
 	expect(pass.writes[1].body).toContain('### Help text is stale');
 	expect(pass.writes[1].body).toContain('### Quiet flag is parsed twice');
@@ -369,6 +370,18 @@ test('findings are posted to the card\'s proposals issue as one comment, a blank
 	expect(pass.writes[1].body.endsWith('\n\n— team1-factory · review · proposed · 0 tokens · $0.00 API · total 0 tokens · $1.10 API')).toBe(true);
 	expect(pass.writes[2].body).toBe(NOTE + '\n\n---\n\nNoted on the findings card: #901.'
 		+ '\n\n— team1-factory · review · advance · 0 tokens · $0.40 API · total 0 tokens · $1.50 API · sonnet');
+});
+
+test('a card that was itself a proposal files its findings for a person, not straight to triage: one generation only', async () => {
+	setup();
+	answered('advance', { cards: [{ title: 'Help text is stale', body: 'Lists --verbose.' }] }, 0.4);
+
+	const given = underReview(openPull(PULL, BRANCH));
+	given.issues = [reviewCard(['from proposals'])];
+
+	const pass = await passOver(given, CARD);
+
+	expect(pass.writes[0].labels).toEqual(['findings']);
 });
 
 test('a missing section is said so and the verdict stands', async () => {
@@ -382,12 +395,17 @@ test('a missing section is said so and the verdict stands', async () => {
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'ready to merge']);
 });
 
-test('a failed model call discards the clone and posts stage-failed', async () => {
+test('work in the card\'s checkout that was never pushed is left alone: review reads a clean clone, which a failed model call discards', async () => {
 	setup();
+	git.given.changes = { unpushed: true, changed: ['src/cli.mjs'], round: [], untracked: [] };
 
 	const pass = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
 
-	expect(callNames(git.calls)).toEqual(['checkout', 'diff', 'removeWorktree']);
+	expect(git.calls.filter(call => call.name === 'checkout')).toEqual([
+		{ name: 'checkout', root: CARD_ROOT, branch: BRANCH, readOnly: false },
+		{ name: 'checkout', root: REVIEW_ROOT, branch: BRANCH, readOnly: true },
+	]);
+	expect(callNames(git.calls)).toEqual(['checkout', 'changes', 'checkout', 'diff', 'removeWorktree']);
 	expect(callNames(pass.writes)).toEqual(['comment']);
 	expect(pass.writes[0].body).toContain('**review** could not complete: the test queued no model answer for the judge role');
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:error']);

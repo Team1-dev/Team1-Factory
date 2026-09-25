@@ -91,12 +91,13 @@ export function sandboxPlace(sandbox, gitRemote) {
 		return kind.trim();
 	}
 
+	// The sandbox is the card's alone, so Claude runs with its HOME, and finds the tools and caches the gates use; its config, sessions
+	// included, is on the card's work volume.
 	async function claudeHome() {
-		const home = SANDBOX_WORK_DIR + '/child-home';
-		const config = home + '/config';
+		const config = SANDBOX_WORK_DIR + '/child-home/config';
 		await shell('mkdir -p "$1"', [config]);
 
-		return { home: home, config: config };
+		return { home: '/home/team1', config: config };
 	}
 
 	return {

@@ -6,7 +6,7 @@ import { state } from '../../src/config.mjs';
 import { PLAN_CUT, PLAN_NORMALIZE } from '../../src/implement.mjs';
 import { branchOf, stampLine } from '../../src/cards.mjs';
 import { fragment } from '../../src/prompts.mjs';
-import { model, git, gates } from '../doubles.mjs';
+import { model, git, gates, sandboxes } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { REPO, issue, mine, openPull, person, stamped } from '../builders.mjs';
 
@@ -328,8 +328,8 @@ test('a findings card opens what it does not fix here as cards of their own in t
 	const opened = pass.writes.filter(write => write.name === 'createIssue');
 
 	expect(opened.map(write => [write.title, write.labels])).toEqual([
-		['Rate limit the nonce route', ['stage: triage', 'project: lib']],
-		['Sign the ownership message', ['stage: triage', 'project: app']],
+		['Rate limit the nonce route', ['stage: triage', 'from proposals', 'project: lib']],
+		['Sign the ownership message', ['stage: triage', 'from proposals', 'project: app']],
 	]);
 	expect(opened[0].body).toBe('No limit on it.\n\nSplit out of #5.');
 
@@ -479,7 +479,7 @@ test('green gates: commit, push, open the pull, post findings, note the files an
 		name: 'createPull', title: 'Card 5', branch: BRANCH, base: 'main', body: 'Closes #5\n\n' + SECTION,
 	});
 	expect(pass.writes[1].title).toBe('Proposals from #5: Card 5');
-	expect(pass.writes[1].labels).toEqual(['findings']);
+	expect(pass.writes[1].labels).toEqual(['findings', 'stage: triage']);
 	expect(pass.writes[2].number).toBe(902);
 	expect(pass.writes[2].body).toBe('### Help text is stale\n\nThe help text still lists --verbose.\n\nNoticed by implement while building #5,'
 		+ ' outside what that card asked for.\n\n— team1-factory · implement · proposed · 0 tokens · $0.00 API · total 0 tokens · $0.10 API');
@@ -614,6 +614,7 @@ test('a batch: the batch label, the mates in the prompt, one commit closing ever
 		name: 'setLabels', number: 6, labels: ['stage: implement', 'tier: trivial', 'batch: 5'],
 	});
 	expect(git.calls[0].branch).toBe('card/5-batch');
+	expect(sandboxes.calls).toContainEqual({ allowed: 'card/5-batch' });
 	expect(git.calls[0].root).toBe('work/acme__app/card');
 	expect(model.calls[0].prompt).toContain('# The other cards in this batch\n\nThey are all `trivial`');
 	expect(model.calls[0].prompt).toContain('## #6 Card 6\n\nsecond');
@@ -819,7 +820,7 @@ test('a finding filed from an area in a monorepo tags the proposals issue with t
 	}, CARD);
 
 	const createIssue = pass.writes.find(write => write.name === 'createIssue');
-	expect(createIssue.labels).toEqual(['findings', 'project: lib']);
+	expect(createIssue.labels).toEqual(['findings', 'stage: triage', 'project: lib']);
 });
 
 test('the files note compares paths as the repo root sees them: an area-relative touch matches, a missing one is listed as untouched', async () => {

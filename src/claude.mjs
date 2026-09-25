@@ -306,20 +306,10 @@ export function timelineOf(transcript, since) {
 	return { toolMs: toolMs, toolCalls: calls.length, slowest: calls.slice(0, 3) };
 }
 
-function minutes(ms) {
-	return (ms / 60000).toFixed(1) + 'm';
-}
-
 async function transcriptOf(place, configDirectory, sessionId) {
 	const read = await place.run('/', 'bash', ['-c', 'cat "$1"/projects/*/"$2".jsonl', 'transcript', configDirectory, sessionId], { environment: {}, timeoutMs: 30000 });
 
 	return read.code === 0 ? read.stdout : undefined;
-}
-
-function logTimeline(cardRun, metrics) {
-	const slowest = metrics.slowest.map(slow => slow.name + ' ' + Math.round(slow.ms / 1000) + 's `' + slow.what + '`').join(', ');
-	console.log(cardPrefix(cardRun) + minutes(metrics.durationMs) + ' in claude, ' + metrics.turns + ' turns: ' + metrics.toolCalls + ' tool calls took '
-		+ minutes(metrics.toolMs) + ', the model the rest. Slowest: ' + slowest);
 }
 
 // A directory of the child's own, holding nothing but a symlink to the runner's credential file: the child authenticates
@@ -353,7 +343,11 @@ async function claudeOnce(model, call) {
 
 	const timeoutMs = call.timeoutMs ?? 20 * MINUTE_MS;
 
-	if (call.run !== undefined) ledgerSession(call.run, sessionId, model);
+	if (call.run !== undefined) {
+		ledgerSession(call.run, sessionId, model);
+		console.log(cardPrefix(call.run) + model + (call.priorSession === undefined ? ' starts on it…' : ' carries on…'));
+	}
+
 	const startedAt = Date.now();
 	try {
 		const outcome = await place.run(cwd, 'claude', claudeArguments(model, call, sessionId, systemPath), {
@@ -375,10 +369,7 @@ async function claudeOnce(model, call) {
 
 		const reply = readResult(readEvents(outcome.stdout), model, call, sessionId);
 		const transcript = call.run === undefined ? undefined : await transcriptOf(place, child.config, sessionId);
-		if (transcript !== undefined) {
-			Object.assign(reply.metrics, timelineOf(transcript, startedAt));
-			logTimeline(call.run, reply.metrics);
-		}
+		if (transcript !== undefined) Object.assign(reply.metrics, timelineOf(transcript, startedAt));
 
 		return reply;
 	} finally {
@@ -411,6 +402,11 @@ export async function promptClaude(role, cardRun, prompt, options) {
 		...CALL_DEFAULTS, place: localPlace(state.workDir), ...options,
 		run: cardRun, prompt: options.resumePrompt ?? prompt, budget: budget, effort: effort, cacheTtl: roleSettings.cacheTtl,
 	};
+
+	// A session kept in a sandbox that has since been replaced cannot be resumed.
+	if (call.priorSession !== undefined && await transcriptOf(call.place, (await call.place.claudeHome()).config, call.priorSession) === undefined) {
+		call.priorSession = undefined;
+	}
 
 	if (call.priorSession !== undefined) {
 		try {

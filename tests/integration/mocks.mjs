@@ -14,9 +14,9 @@ vi.mock('node:timers/promises', () => ({ setTimeout: sleep }));
 // The real shell runner: a child the test did not queue an outcome for runs for real.
 const realShell = await vi.importActual('../../src/shell.mjs');
 
-// A queued outcome answers the next child; with none queued the real child runs, except claude, which no test may spawn.
+// A queued outcome answers the next claude child, which no test may spawn; every other child runs for real.
 async function run(cwd, command, args, options) {
-	if (shell.given.length === 0 && command !== 'claude') return realShell.run(cwd, command, args, options);
+	if (command !== 'claude') return realShell.run(cwd, command, args, options);
 
 	shell.calls.push({ cwd: cwd, command: command, args: args, options: options });
 	if (shell.given.length === 0) throw new Error('the test queued no outcome for claude');
@@ -45,6 +45,7 @@ vi.mock('../../src/sandboxes.mjs', async () => {
 		},
 		imageFor: async () => ({ name: 'team1-warm:test', id: 'sha256:test', environment: { tools: {}, services: {} } }),
 		sweepRepo: async () => {},
+		allowBranch: (repo, key, branch) => sandboxes.calls.push({ allowed: branch }),
 	};
 });
 

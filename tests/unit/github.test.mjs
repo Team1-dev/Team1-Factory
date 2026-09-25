@@ -94,6 +94,7 @@ const ENDPOINTS = [
 	['user', [], 'GET', '/user', ''],
 	['defaultBranch', [], 'GET', '/repos/acme/app', ''],
 	['tree', ['main'], 'GET', '/repos/acme/app/git/trees/main?recursive=1', ''],
+	['fileIn', [{ blobs: new Map([['a.js', 'b1']]) }, 'a.js'], 'GET', '/repos/acme/app/git/blobs/b1', ''],
 	['labels', [], 'GET', '/repos/acme/app/labels?per_page=100&page=1', ''],
 	['createLabel', ['x', 'ff0000', 'd'], 'POST', '/repos/acme/app/labels', '{"name":"x","color":"ff0000","description":"d"}'],
 	['updateLabel', ['a b', 'ff0000', 'd'], 'PATCH', '/repos/acme/app/labels/a%20b', '{"color":"ff0000","description":"d"}'],
@@ -221,9 +222,39 @@ test('a GitHub call that never answers fails after the timeout instead of holdin
 
 	expect(failure).toBeInstanceOf(Error);
 	expect(Date.now() - began).toBeLessThan(5000);
-	for (const call of [api.defaultBranch(), api.file('README.md'), api.comment(5, 'hi')]) {
-		await expect(call).rejects.toThrow();
-	}
+	await expect(api.defaultBranch()).rejects.toThrow();
+	await expect(api.file('README.md')).rejects.toThrow();
+	await expect(api.comment(5, 'hi')).rejects.toThrow();
+
+	github.close();
+});
+
+test('a read GitHub holds past the timeout is asked once more and answered; a write that stalls is not sent twice', async () => {
+	let answered = 0;
+	const github = await listen((request, response) => {
+		if (request.method === 'GET' && answered++ === 0) return;
+		if (request.method === 'POST') return;
+
+		response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ default_branch: 'main' }));
+	});
+	const api = client('acme/app', 'tok', github.base, 300);
+
+	expect(await api.defaultBranch()).toBe('main');
+	await expect(api.comment(5, 'hi')).rejects.toThrow();
+	expect(github.seen.map(seen => seen.method)).toEqual(['GET', 'GET', 'POST']);
+
+	github.close();
+});
+
+test('a file read by its content sha is fetched once, however many trees name it', async () => {
+	const github = await listen((request, response) => response.writeHead(200).end('text of b2'));
+	const api = client('acme/app', 'tok', github.base);
+	const listing = { blobs: new Map([['a.js', 'b2'], ['copy/a.js', 'b2']]) };
+
+	expect(await api.fileIn(listing, 'a.js')).toBe('text of b2');
+	expect(await api.fileIn(listing, 'copy/a.js')).toBe('text of b2');
+	expect(await api.fileIn(listing, 'missing.js')).toBeUndefined();
+	expect(github.seen.length).toBe(1);
 
 	github.close();
 });

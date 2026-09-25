@@ -123,24 +123,26 @@ export function installScript(environment) {
 	return steps.join('\n');
 }
 
-// A saved image keeps what was installed, not what was running, so services start on every open.
+// A saved image keeps what was installed, not what was running, so services start on every open, and on a sandbox started again after
+// a stop; a service already running is left be.
 export function startScript(environment) {
 	const steps = ['set -eu'];
 	for (const name of Object.keys(environment.services)) {
 		if (name === 'postgres' || name === 'postgresql') {
-			steps.push('sudo pg_ctlcluster $(ls /etc/postgresql | sort -V | tail -n 1) main start',
+			steps.push('cluster=$(ls /etc/postgresql | sort -V | tail -n 1); sudo pg_ctlcluster "$cluster" main status >/dev/null || sudo pg_ctlcluster "$cluster" main start',
 				'sudo -u postgres psql -qc "DO \\$\\$ BEGIN CREATE ROLE team1 SUPERUSER LOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END \\$\\$;"');
 		}
 
-		if (name === 'redis') steps.push('sudo redis-server --daemonize yes');
+		if (name === 'redis') steps.push('redis-cli ping >/dev/null 2>&1 || sudo redis-server --daemonize yes');
 	}
 
 	return steps.join('\n');
 }
 
-// Named by the base image and the exact install script, so a change to either, how a tool is installed included, builds a new one.
-export function environmentImage(baseImageId, environment) {
-	const hash = createHash('sha256').update(baseImageId + installScript(environment)).digest('hex').slice(0, 16);
+// Named by the base image's layers and the exact install script, so a change to either, how a tool is installed included, builds a
+// new one, and a restart that changed nothing does not.
+export function environmentImage(baseLayers, environment) {
+	const hash = createHash('sha256').update(baseLayers + installScript(environment)).digest('hex').slice(0, 16);
 
 	return 'team1-env:' + hash;
 }

@@ -38,9 +38,9 @@ export function runnerServer() {
 			if (!response.writableFinished) abort.abort();
 		});
 
-		// PATH is always the sandbox's own; HOME is too, unless the call names one (Claude's own home).
+		// The sandbox's own environment (its PATH, tools and package stores) under the call's; PATH is always the sandbox's.
 		const outcome = await run(call.cwd, call.command, call.args, {
-			environment: { HOME: process.env.HOME, ...call.environment, PATH: process.env.PATH },
+			environment: { ...process.env, ...call.environment, PATH: process.env.PATH },
 			timeoutMs: call.timeoutMs,
 			input: call.input,
 			signal: abort.signal,

@@ -238,6 +238,15 @@ export function fakeGithub(given) {
 		return given.files[path];
 	}
 
+	// The default branch's files: its sha changes whenever they do, as a commit's would.
+	async function tree() {
+		return { sha: JSON.stringify(given.files), paths: Object.keys(given.files), blobs: new Map(Object.keys(given.files).map(path => [path, path])) };
+	}
+
+	async function fileIn(listing, path) {
+		return listing.blobs.has(path) ? given.files[path] : undefined;
+	}
+
 	async function compare() {
 		if (given.compareError !== undefined) throw new Error(given.compareError);
 
@@ -273,6 +282,8 @@ export function fakeGithub(given) {
 		writes: writes,
 		user: user,
 		defaultBranch: defaultBranch,
+		tree: tree,
+		fileIn: fileIn,
 		labels: labels,
 		createLabel: createLabel,
 		updateLabel: updateLabel,

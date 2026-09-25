@@ -42,6 +42,16 @@ function undelivered(files, output) {
 }
 
 // The pull's diff less generated files, a read clone of the branch, and the commit messages; or the finding that stops it.
+// The card's own checkout when it holds exactly what was pushed, so the dependents' gates build on what implement (or the warm image)
+// already built; anything else is reviewed in a clean read-only clone.
+async function reviewCheckout(run, pull) {
+	const own = await run.git.checkout(run.batchRoot, run.branch, false);
+	const pushed = await run.git.changes(own.root, run.branch, pull.base.ref);
+	if (!pushed.unpushed && pushed.untracked.length === 0) return own;
+
+	return readClone(run, '-review');
+}
+
 async function changeUnderReview(run, pull, pullText) {
 	const commits = await run.github.pullCommits(pull.number);
 	const change = { number: pull.number, body: pullText.body.trim(), root: undefined, diff: undefined, messages: [], finding: undefined };
@@ -58,7 +68,7 @@ async function changeUnderReview(run, pull, pullText) {
 		change.messages.push(text.body.trim());
 	}
 
-	const worktree = await readClone(run, '-review');
+	const worktree = await reviewCheckout(run, pull);
 
 	change.root = worktree.root;
 
@@ -110,6 +120,8 @@ export async function handleReview(run) {
 
 	start(run);
 	if (pullFinding.instruction) return hidingPull(run, pull.number, pullFinding);
+
+	console.log(run.tag + ': reading #' + pull.number + ' and checking it out for review…');
 
 	const mergeable = await waitMergeable(run.github, pull.number, 4, undefined);
 

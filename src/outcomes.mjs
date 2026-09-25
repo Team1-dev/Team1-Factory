@@ -44,9 +44,6 @@ export function backToImplement(run, name, slots, verdict) {
 }
 
 export function start(run) {
-	const batched = run.mates.length > 0 ? ' +' + run.mates.length + ' batched' : '';
-
-	console.log(run.tag + ' "' + run.lead.title + '" → ' + run.stage.label + batched);
 	ledgerStart(run, run.batch);
 }
 

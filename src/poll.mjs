@@ -44,14 +44,14 @@ function stopAsked() {
 }
 
 function skipsCard(repo, card, stage) {
-	if (stage.name === 'implement' && !card.hasPull && card.area.hasPull) {
-		sayOnce(repo, card.number, '#' + card.number + ' waits: ' + card.area.projectName + ' has a pull open');
+	if (card.bodyBlockers.length > 0) {
+		sayOnce(repo, card.number, '#' + card.number + ' blocked by #' + card.bodyBlockers.join(', #'));
 
 		return true;
 	}
 
-	if (card.bodyBlockers.length > 0) {
-		sayOnce(repo, card.number, '#' + card.number + ' blocked by #' + card.bodyBlockers.join(', #'));
+	if (stage.name === 'implement' && !card.hasPull && card.area.hasPull) {
+		sayOnce(repo, card.number, '#' + card.number + ' waits: ' + card.area.projectName + ' has a pull open');
 
 		return true;
 	}
@@ -199,8 +199,6 @@ export async function loop() {
 	for (;;) {
 		const changed = await processRepos();
 
-		if (!changed) console.log('idle ' + new Date().toISOString());
-
 		if (state.exhaustedUntil > Date.now()) {
 			console.log('account limit reached, lifts at ' + new Date(state.exhaustedUntil).toISOString());
 			await sleepCheckingHalt(state.exhaustedUntil - Date.now());
@@ -226,7 +224,7 @@ export async function loop() {
 		let wait = Math.min(state.knobs.POLL_INTERVAL_MS * (2 ** (quietPasses - 1)), state.knobs.IDLE_INTERVAL_MS);
 		// A held merge wakes the loop the moment it can go, however long the quiet has lasted.
 		if (state.wakeAt > 0) wait = Math.min(wait, Math.max(state.wakeAt - Date.now(), 1000));
-		if (wait > 4 * state.knobs.POLL_INTERVAL_MS) console.log('quiet — next look in ' + Math.round(wait / 60000) + ' minutes');
+		console.log('nothing to start; looking again in ' + (wait < 120000 ? Math.round(wait / 1000) + 's' : Math.round(wait / 60000) + ' minutes'));
 
 		await sleepCheckingHalt(wait);
 	}
@@ -243,6 +241,9 @@ async function boot() {
 		process.exit(1);
 	}
 
+	// Every line says when: a reader sees how long each step took.
+	const plainLog = console.log;
+	console.log = (...parts) => plainLog(new Date().toISOString().slice(11, 19), ...parts);
 	process.on('SIGINT', halt);
 	process.on('SIGTERM', halt);
 	state.onceOnly = process.argv.includes('--once');

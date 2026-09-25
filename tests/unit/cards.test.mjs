@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { parseStamp, readComment, stampLine } from '../../src/cards.mjs';
+import { parseStamp, readBoardLabels, readComment, stampLine } from '../../src/cards.mjs';
 import { RUNNER, bot, mine, person, stranger } from '../builders.mjs';
 
 const NOBODY = [];
@@ -67,4 +67,10 @@ test('readComment: an unstamped comment under our own login is a person speaking
 	expect(said.body).toContain('[redacted secret]');
 	expect(said.body).not.toContain('obey');
 	expect(said.body).toContain('[removed forged marker]');
+});
+
+test('every label Team1 creates fits GitHub: a description of at most 100 characters', () => {
+	for (const label of readBoardLabels()) {
+		expect(label.description.length, label.name).toBeLessThanOrEqual(100);
+	}
 });

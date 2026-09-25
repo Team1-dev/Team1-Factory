@@ -36,7 +36,9 @@ outcome? If two sentences are needed to state the ask, it is two cards.
 
 **A `findings` card is work.** Its comments list what Team1 noticed while working another card; the
 ask is to deal with every finding on it. Tier it by the largest finding worth doing in this card's
-project and advance it — never answer that it asks for nothing.
+project and advance it. **When not one finding on it is worth doing** — a preference, already
+handled, too small to matter, speculative — the verdict is `done`, with one line per finding saying
+why; the card closes.
 
 **1a. A question is still a card.** "why was this done", "would you recommend X" — tier and advance
 it like any other ask. The stage that works it answers first, under `## Reply`.

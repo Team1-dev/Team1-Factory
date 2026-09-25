@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { loadEnv, repositoryFor, state } from '../../src/config.mjs';
 import { dockerAt } from '../../src/docker.mjs';
 import { environmentImage, environmentOf } from '../../src/environment.mjs';
-import { environmentImageFor, imageFor, placeFor, startSandboxes, stopSandboxes, sweepRepo } from '../../src/sandboxes.mjs';
+import { allowBranch, environmentImageFor, imageFor, placeFor, startSandboxes, stopSandboxes, sweepRepo } from '../../src/sandboxes.mjs';
 import { cardDirectory } from '../../src/place.mjs';
 import { run } from '../../src/shell.mjs';
 import { gitHost } from '../githost.mjs';
@@ -19,11 +19,15 @@ const GIT = {
 	GIT_AUTHOR_NAME: 's', GIT_AUTHOR_EMAIL: 's@example.test', GIT_COMMITTER_NAME: 's', GIT_COMMITTER_EMAIL: 's@example.test',
 };
 
-// The repository as the board reads it: one area, whose gate leaves a build output behind as a compiler would.
+// The repository as the board reads it: a root whose gate is red, and an area built after it whose gate leaves a build output behind
+// as a compiler would.
 const GITHUB = { repo: REPO, tree: async () => ({ sha: 'seed', paths: ['README.md'] }), file: async () => undefined };
 const BOARD = {
 	defaultBranch: 'main', needs: [], services: [], runnerLogin: 'runner',
-	scopes: [{ name: '', path: '.', gates: 'echo "built from $(git rev-parse --short HEAD)" > build-output.txt', uses: [] }],
+	scopes: [
+		{ name: '', path: '.', gates: 'exit 1', uses: [] },
+		{ name: 'app', path: '.', gates: 'echo "built from $(git rev-parse --short HEAD)" > build-output.txt', uses: [''] },
+	],
 };
 
 let root;
@@ -60,8 +64,10 @@ beforeAll(async () => {
 	});
 	state.runnerEmails.GITHUB_TOKEN = 'runner@example.test';
 	await startSandboxes();
-	plain = { ...await environmentImageFor(REPO, PLAIN), environment: PLAIN };
-});
+
+	const image = await environmentImageFor(REPO, PLAIN);
+	plain = { ...image, environment: PLAIN, environmentName: image.name };
+}, 600000);
 
 afterAll(async () => {
 	await sweepRepo(REPO, []);
@@ -71,7 +77,7 @@ afterAll(async () => {
 	const docker = dockerAt(state.sandbox.socket);
 	if (warm !== undefined) await docker.removeImage(warm.name).catch(() => {});
 
-	await docker.removeImage(environmentImage(await docker.imageId('team1-sandbox'), PLAIN)).catch(() => {});
+	await docker.removeImage(environmentImage((await docker.inspectImage('team1-sandbox')).layers.join(','), PLAIN)).catch(() => {});
 });
 
 test('a card is checked out, committed and pushed from its own sandbox through the proxy; upstream alone sees the token', async () => {
@@ -122,10 +128,13 @@ test('a card no longer in progress has its sandbox closed by the sweep', async (
 	expect((await docker.inspectContainer('team1-acme-app-5')).State.Running).toBe(true);
 });
 
-test('a card starts from the warm image: the default branch built where it works, switched to its branch with the build output kept', async () => {
+test('a card starts from the warm image: the default branch built where it works, past a red gate, switched to its branch with the build output kept', async () => {
 	warm = await imageFor(GITHUB, BOARD);
 
+	const began = Date.now();
 	const place = await placeFor(REPO, '7', 'card/7-z', warm);
+
+	expect(Date.now() - began).toBeLessThan(10000);
 
 	const worktree = await repositoryFor(REPO, 'runner', place).checkout(cardDirectory(place.workDir, REPO), 'card/7-z', false);
 	const branch = await place.run(worktree.root, 'git', ['branch', '--show-current'], { environment: {}, timeoutMs: 30000 });
@@ -134,3 +143,44 @@ test('a card starts from the warm image: the default branch built where it works
 	expect(await place.readText(worktree.root + '/build-output.txt')).toMatch(/^built from [0-9a-f]+\n$/);
 	expect((await imageFor(GITHUB, BOARD)).id).toBe(warm.id);
 }, 600000);
+
+test('a day-old warm image is rebuilt beside the cards: they keep opening from the old one, the sweep leaves the build alone, the old one goes once unused', async () => {
+	const docker = dockerAt(state.sandbox.socket);
+	warm = await imageFor(GITHUB, BOARD);
+	await placeFor(REPO, '8', 'card/8-w', warm);
+	state.knobs.WARM_REFRESH_HOURS = 0;
+
+	const during = await imageFor(GITHUB, BOARD);
+	await sweepRepo(REPO, ['8']);
+
+	expect(during.id).toBe(warm.id);
+
+	let refreshed = warm.id;
+	for (let waited = 0; refreshed === warm.id && waited < 300; waited += 1) {
+		await new Promise(wait => setTimeout(wait, 1000));
+		refreshed = await docker.imageId(warm.name);
+	}
+
+	state.knobs.WARM_REFRESH_HOURS = 24;
+
+	expect(refreshed).not.toBe(warm.id);
+	expect(await docker.imageId(warm.id)).toBe(warm.id);
+
+	await sweepRepo(REPO, []);
+
+	expect(await docker.imageId(warm.id)).toBeUndefined();
+}, 600000);
+
+test('a card that becomes a batch pushes to the batch branch through the proxy', async () => {
+	const place = await placeFor(REPO, '9', 'card/9-alone', plain);
+	allowBranch(REPO, '9', 'card/9-batch');
+
+	const git = repositoryFor(REPO, 'runner', place);
+
+	const worktree = await git.checkout(place.workDir + '/acme__app/9', 'card/9-batch', false);
+	await place.writeText(worktree.root + '/batch.txt', 'batched\n');
+
+	const pushed = await git.commitAndPush(worktree.root, 'card/9-batch', 'Batch 9', ['batch.txt']);
+
+	expect((await upstreamRef('card/9-batch')).startsWith(pushed)).toBe(true);
+}, 300000);

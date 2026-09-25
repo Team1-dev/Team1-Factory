@@ -74,14 +74,85 @@ async function screened(run) {
 	return decided(divert(run, 'hides-instructions', { what: hiding.join(' and '), why: reasons.join('; ') }, { verdict: 'attack', cost: cost, tokens: tokens }));
 }
 
+// How far a chain of blocked-by lines is followed looking for a ring.
+const RING_DEPTH = 8;
+
+// The blocked-by lines on a card, in its body and in what a person or Team1 wrote on it, each with when it was written.
+function blockerLines(openNumbers, card, comments) {
+	const lines = [];
+	for (const source of [card].concat(comments.filter(comment => comment.kind !== 'other'))) {
+		for (const number of collectBlockers(openNumbers, card.number, source.body)) {
+			lines.push({ from: card.number, to: number, at: source.createdAtMs });
+		}
+	}
+
+	return lines;
+}
+
+// The blocked-by lines that lead from this card back to itself, if any do: a ring in which no card can ever start.
+async function ringBack(run, leadLines) {
+	const read = new Map([[run.lead.number, leadLines]]);
+	async function linesOf(number) {
+		if (!read.has(number)) {
+			const comments = [];
+			for (const githubComment of await run.github.comments(number)) {
+				comments.push(readComment(githubComment, run.board.runnerLogin, state.trustedLogins));
+			}
+
+			read.set(number, blockerLines(run.board.openNumbers, run.board.cards.find(card => card.number === number), comments));
+		}
+
+		return read.get(number);
+	}
+
+	async function walk(number, path) {
+		for (const line of await linesOf(number)) {
+			if (line.to === run.lead.number) return path.concat(line);
+			if (path.length >= RING_DEPTH || path.some(step => step.from === line.to)) continue;
+
+			const ring = await walk(line.to, path.concat(line));
+			if (ring !== undefined) return ring;
+		}
+
+		return undefined;
+	}
+
+	return walk(run.lead.number, []);
+}
+
+// The card's blockers. In a ring, the newest line is the one that closed it and is taken for the mistake: when it is this card's, it
+// is ignored, and the other cards in the ring then have someone to wait for.
+async function blockersOf(run) {
+	const lines = blockerLines(run.board.openNumbers, run.lead, run.comments);
+	const ring = lines.length > 0 ? await ringBack(run, lines) : undefined;
+	let newest;
+	for (const line of ring ?? []) {
+		if (newest === undefined || line.at > newest.at) newest = line;
+	}
+
+	const blockers = [];
+	for (const line of lines) {
+		if (newest !== undefined && newest.from === run.lead.number && line.to === newest.to) continue;
+		if (!blockers.includes(line.to)) blockers.push(line.to);
+	}
+
+	if (newest !== undefined && newest.from === run.lead.number) {
+		const path = ring.map(line => '#' + line.from).concat('#' + run.lead.number).join(' → ');
+		sayOnce(run.repo, run.lead.number, '#' + run.lead.number + ' ignores its blocked-by #' + newest.to + ': the cards wait on each other in a ring ('
+			+ path + '), and that line, the newest, closed it');
+	}
+
+	return blockers;
+}
+
 // The holds and diversions before a stage runs: not triaged, blocked, waiting for a person, over budget, round limits.
-function held(run) {
+async function held(run) {
 	const stage = run.stage;
 	const conversation = run.conversation;
 	if (stage.needsTriage && !conversation.triaged) return decided({ cards: [{ card: run.lead, label: 'stage: triage' }] });
 
 	if (stage.startsWork) {
-		const blockers = collectBlockers(run.board.openNumbers, run.lead.number, run.lead.body + '\n' + conversation.personText + '\n' + conversation.runnerText);
+		const blockers = await blockersOf(run);
 		if (blockers.length > 0) {
 			sayOnce(run.repo, run.lead.number, '#' + run.lead.number + ' blocked by #' + blockers.join(', #'));
 
@@ -123,10 +194,12 @@ async function cardOutcome(run) {
 
 	if (hidden !== undefined) return hidden.outcome;
 
-	const holding = held(run);
+	const holding = await held(run);
 
 	if (holding !== undefined) return holding.outcome;
 
+	const batched = run.mates.length > 0 ? ' +' + run.mates.length + ' batched' : '';
+	console.log(run.tag + ' "' + run.lead.title + '" → ' + run.stage.label + batched);
 	try {
 		if (CHECKOUT_STAGES.includes(run.stage.name)) await workIn(run, await placeFor(run.repo, run.key, run.branch, await imageFor(run.github, run.board)));
 

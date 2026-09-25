@@ -2,8 +2,10 @@ import { repoState } from './config.mjs';
 
 const API = 'https://api.github.com';
 const PAGE_SIZE = 100;
-// A GitHub call that stalls would otherwise hold the whole factory: nothing else runs while one is awaited.
+// A GitHub call that stalls would otherwise hold the whole factory: nothing else runs while one is awaited. A read GitHub has not
+// answered in 10s has stalled, and is asked again with the full time; a write gets that from the start, since it is never repeated.
 const REQUEST_TIMEOUT_MS = 60000;
+const READ_TIMEOUT_MS = 10000;
 
 // A path from the repository's own config goes into the URL one encoded segment at a time.
 function encodedPath(path) {
@@ -22,8 +24,24 @@ export function client(repo, token, apiBase, timeoutMs = REQUEST_TIMEOUT_MS) {
 		'Content-Type': 'application/json',
 	};
 
+	// A read that stalls or drops is asked once more: GitHub sometimes holds a response for a minute, then answers the next at once.
+	// A write is not, since the first may have landed.
+	async function fetchRetryingReads(url, options) {
+		if (options.method !== 'GET') return fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
+
+		try {
+			return await fetch(url, { ...options, signal: AbortSignal.timeout(Math.min(timeoutMs, READ_TIMEOUT_MS)) });
+		} catch (error) {
+			if (!['TimeoutError', 'TypeError'].includes(error.name)) throw error;
+
+			console.log(repo + ': GitHub did not answer ' + url.slice(api.length) + ' (' + error.name + '); asking again…');
+
+			return fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
+		}
+	}
+
 	async function request(method, url, body) {
-		const response = await fetch(url, { method: method, headers: headers, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
+		const response = await fetchRetryingReads(url, { method: method, headers: headers, body: JSON.stringify(body) });
 
 		if (!response.ok) {
 			const text = await response.text();
@@ -37,7 +55,7 @@ export function client(repo, token, apiBase, timeoutMs = REQUEST_TIMEOUT_MS) {
 	}
 
 	async function requestRaw(url, accept) {
-		const response = await fetch(url, { headers: { Accept: accept, Authorization: authorization }, signal: AbortSignal.timeout(timeoutMs) });
+		const response = await fetchRetryingReads(url, { method: 'GET', headers: { Accept: accept, Authorization: authorization } });
 
 		if (response.status === 404) return undefined;
 		if (!response.ok) throw new Error('GET ' + url + ' ' + response.status);
@@ -101,7 +119,7 @@ export function client(repo, token, apiBase, timeoutMs = REQUEST_TIMEOUT_MS) {
 		const cached = cache[url];
 		const conditionalHeaders = cached === undefined ? headers : { ...headers, 'If-None-Match': cached.etag };
 
-		const response = await fetch(url + '?per_page=' + PAGE_SIZE + '&page=1', { headers: conditionalHeaders, signal: AbortSignal.timeout(timeoutMs) });
+		const response = await fetchRetryingReads(url + '?per_page=' + PAGE_SIZE + '&page=1', { method: 'GET', headers: conditionalHeaders });
 
 		if (response.status === 304) return cached.items;
 		if (!response.ok) throw new Error('GET ' + url + ' ' + response.status);
@@ -180,15 +198,30 @@ export function client(repo, token, apiBase, timeoutMs = REQUEST_TIMEOUT_MS) {
 		return requestRaw(base + '/pulls/' + number, 'application/vnd.github.diff');
 	}
 
-	// Every file path on a branch, and the tree's sha, which changes whenever any of them does.
+	// Every file path on a branch with its content's sha, and the tree's sha, which changes whenever any of them does.
 	async function tree(branch) {
 		const listing = await request('GET', base + '/git/trees/' + encodeURIComponent(branch) + '?recursive=1');
 		const paths = [];
+		const blobs = new Map();
 		for (const entry of listing.tree) {
-			if (entry.type === 'blob') paths.push(entry.path);
+			if (entry.type !== 'blob') continue;
+
+			paths.push(entry.path);
+			blobs.set(entry.path, entry.sha);
 		}
 
-		return { sha: listing.sha, paths: paths };
+		return { sha: listing.sha, paths: paths, blobs: blobs };
+	}
+
+	// A file's content by its sha: the same sha is the same content, so what was read once is never asked for again.
+	async function fileIn(listing, path) {
+		const sha = listing.blobs.get(path);
+		if (sha === undefined) return undefined;
+
+		const texts = repoState(repo).blobTexts ??= new Map();
+		if (!texts.has(sha)) texts.set(sha, await requestRaw(base + '/git/blobs/' + sha, 'application/vnd.github.raw+json'));
+
+		return texts.get(sha);
 	}
 
 	async function file(path) {
@@ -224,6 +257,7 @@ export function client(repo, token, apiBase, timeoutMs = REQUEST_TIMEOUT_MS) {
 		user: user,
 		defaultBranch: defaultBranch,
 		tree: tree,
+		fileIn: fileIn,
 		labels: labels,
 		createLabel: createLabel,
 		updateLabel: updateLabel,

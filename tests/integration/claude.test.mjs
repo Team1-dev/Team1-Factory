@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from 'vitest';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { state } from '../../src/config.mjs';
@@ -27,6 +27,13 @@ function answered(structured, modelId) {
 
 function died(stderr) {
 	return { code: 1, stdout: '', stderr: stderr, timedOut: false };
+}
+
+// A session Claude saved on an earlier call, in the config directory the child runs with.
+function keptSession(sessionId) {
+	const project = join(WORK, 'child-home', 'config', 'projects', 'earlier');
+	mkdirSync(project, { recursive: true });
+	writeFileSync(join(project, sessionId + '.jsonl'), '');
 }
 
 function after(args, flag) {
@@ -99,6 +106,7 @@ test('the child keeps one home on the work volume across calls, so a later call 
 });
 
 test('a session id that happens to contain 503 is not taken for an HTTP 503; the resume starts cold', async () => {
+	keptSession('503aaaaa-0000-4000-8000-000000000000');
 	shell.given.push(died('No conversation found with session ID: 503aaaaa-0000-4000-8000-000000000000'), answered({ verdict: 'advance', section: '## Done' }, 'claude-sonnet-5'));
 
 	await realPromptClaude('classify', undefined, 'hello', { tools: [], priorSession: '503aaaaa-0000-4000-8000-000000000000', resumePrompt: 'carry on' });
@@ -140,6 +148,7 @@ test('a rate-limited child is retried on the next model of the chain after a bac
 });
 
 test('a resume that dies before it costs anything is started cold with the original prompt and a new session', async () => {
+	keptSession('old');
 	shell.given.push(died('claude exited 1'), answered({ verdict: 'advance', section: '## Done' }, 'claude-sonnet-5'));
 
 	await realPromptClaude('classify', undefined, 'hello', { tools: [], priorSession: 'old', resumePrompt: 'carry on' });
@@ -153,6 +162,7 @@ test('a resume that dies before it costs anything is started cold with the origi
 });
 
 test('an expired login on a resumed session is not retried cold', async () => {
+	keptSession('old');
 	shell.given.push(died('Failed to authenticate: OAuth session expired and could not be refreshed'));
 
 	await expect(realPromptClaude('classify', undefined, 'hello', { tools: [], priorSession: 'old' })).rejects
@@ -161,6 +171,8 @@ test('an expired login on a resumed session is not retried cold', async () => {
 });
 
 test('an account limit stops after one child, is never retried, and lifts a minute past the limit', async () => {
+	keptSession('old');
+
 	const limit = { is_error: true, result: 'Claude AI usage limit reached|1760000000', total_cost_usd: 0, subtype: 'error' };
 	shell.given.push({ code: 1, stdout: JSON.stringify({ type: 'result', ...limit }), stderr: '', timedOut: false });
 
@@ -195,4 +207,14 @@ test('a child that prints something other than JSON is one failed call, not retr
 
 	await expect(realPromptClaude('classify', undefined, 'hello', { tools: [] })).rejects.toThrow('claude output was not JSON: garbage from the child');
 	expect(shell.calls.length).toBe(1);
+});
+
+test('a session that is not kept here, its sandbox replaced since, is started fresh without trying to resume it', async () => {
+	shell.given.push(answered({ verdict: 'advance', section: '## Done' }, 'claude-sonnet-5'));
+
+	await realPromptClaude('classify', undefined, 'hello', { tools: [], priorSession: 'gone', resumePrompt: 'carry on' });
+
+	expect(shell.calls.length).toBe(1);
+	expect(shell.calls[0].args).not.toContain('--resume');
+	expect(shell.calls[0].options.input).toBe('hello');
 });

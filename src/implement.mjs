@@ -7,6 +7,7 @@ import { install, runOwnGates } from './gates.mjs';
 import { newestSession } from './ledger.mjs';
 import { fileFindings, openCards } from './findings.mjs';
 import { researchOutcome } from './research.mjs';
+import { allowBranch } from './sandboxes.mjs';
 import { alreadyDone, batchOutcome, hold, spentTotal, note, start, unreadableOutcome } from './outcomes.mjs';
 import { cardHeading, fragment, joinSections, resumeSince, RULE, systemPrompt, userPrompt } from './prompts.mjs';
 import { route } from './routes.mjs';
@@ -221,6 +222,7 @@ async function labelBatch(run) {
 	}
 
 	run.branch = branchOf(run.lead);
+	allowBranch(run.repo, run.key, run.branch);
 }
 
 // The first build, then fix rounds in the same session while the gates are red, up to MAX_GATE_FIXES. Either a settled outcome, or

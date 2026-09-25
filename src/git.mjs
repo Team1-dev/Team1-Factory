@@ -194,6 +194,15 @@ export function repository(settings) {
 	// merge base), so a reworked card does not read its own earlier rounds as unlisted. round keeps only files the branch changed:
 	// once the card catches up with a base that moved, the pushed sha is behind it, and what the base gained is not the card's.
 	async function changes(root, branch, base) {
+		// The conflict prompt has the session merge the base, and the session may not stage or commit: the merge is concluded here, or
+		// every file the base brought would read as the card's.
+		if ((await tryGit(root, ['rev-parse', '--verify', '--quiet', 'MERGE_HEAD'])).code === 0) {
+			const unmerged = await conflictedFiles(root);
+			if (unmerged.length > 0) await git(root, ['add', '--', ...unmerged]);
+
+			await git(root, ['commit', '--no-edit']);
+		}
+
 		const mergeBase = await git(root, ['merge-base', 'HEAD', 'origin/' + base]);
 		const remoteBranch = await tryGit(root, ['rev-parse', '--verify', '--quiet', 'origin/' + branch]);
 		const pushedSha = remoteBranch.code === 0 ? remoteBranch.output.trim() : mergeBase;

@@ -97,6 +97,8 @@ Run it again to add or remove a repository, or to change a token.
 
 It starts Team1, creates Team1's labels in each repository, and shows whether it came up.
 
+**The first card of each repository waits while Team1 builds that repository's images** (see [Sandboxes](#sandboxes)): a few minutes, once. On a 2-CPU server, for a monorepo with .NET and a dozen Node apps: about 1 minute for the tools, then about 6 for the default branch built. The log says what it is building. Later restarts reuse both images.
+
 ## Run Team1
 
 ```sh
@@ -123,18 +125,19 @@ docker compose stop && git pull && ./start.sh
 
 When Claude's login expires, Team1 says so in its log and on the issue it was working on. Run `./login.sh`: it logs in again and restarts Team1.
 
-Team1's working files are in Docker volumes and survive an update. The sandboxes of cards in progress keep running across an update, and Team1 picks them up again.
+Team1's working files are in Docker volumes and survive an update. The sandboxes of cards in progress keep running across an update, and Team1 picks them up again, with the card's checkout and Claude session as they were; a sandbox that was stopped is started again. Only a change to what the repository needs (its environment) replaces a card's sandbox.
 
 ## Sandboxes
 
 Every card runs in a container of its own, and Team1's own container keeps the secrets:
 
 * **A sandbox per card**, opened when the card first needs a checkout (implement, review or merge) and removed once the card is merged, closed or stopped. Each has a network of its own, so sandboxes cannot reach each other.
+* **Every sandbox starts warm.** For each repository Team1 keeps two images: the **environment** (the tools the repository needs, worked out from its files and from `needs:` and `services:` in `.agents/project.md`) and, on top of it, the **warm image** (the default branch checked out where a card works, with every area's gates run, so packages are downloaded and projects built). A card's checkout moves to its own branch, cut from the current default branch, so its code is always up to date, and its first build compiles only what it changes. The warm image is rebuilt in the background once a day while cards carry on in the sandboxes they have. A sandbox opens in about a second: it shares the image's files and copies only what the card changes. Only the very first build of a repository is waited for; see [Start it](#4-start-it).
 * **Inside, the agent can install anything** (it may `sudo`), because nothing of value is in there.
 * **No GitHub token in the sandbox.** Its git talks to a proxy in Team1, which adds the token and lets a push through only to that card's own branch, force-push included. The merge itself is Team1's, through GitHub's API.
 * **The Claude token does go into the sandbox** while Claude runs there. A proxy for it is planned.
 
-Team1 needs Docker for this and does not start without it. `SANDBOX_MEMORY_MB` (default 1536) and `SANDBOX_CPUS` (default 1) cap each sandbox; `GITHUB_URL` (default `https://github.com`) is where the proxy sends git.
+Team1 needs Docker for this and does not start without it. `SANDBOX_MEMORY_MB` (default 1536) and `SANDBOX_CPUS` (default 1) cap each sandbox; `WARM_REFRESH_HOURS` (default 24) is how old a repository's warm image gets before it is rebuilt in the background; `GITHUB_URL` (default `https://github.com`) is where the proxy sends git.
 
 ## Give Team1 work
 
@@ -164,7 +167,8 @@ Issues without `stage: triage` are ignored.
 | `failed`           | Team1 could not complete the work                        |
 | `attack`           | Hostile or hidden instructions detected                  |
 | `duplicate`        | Already covered elsewhere; Team1 closes it. Reopen it and re-add `stage: triage` if it is not |
-| `findings`         | An issue Team1 opens to list what it noticed while working another. Add `stage: triage` and Team1 works it: it fixes what belongs to that project and opens an issue for the rest |
+| `findings`         | An issue Team1 opens to list what it noticed while working another. Team1 triages it on its own: it fixes what is worth doing and belongs to that project, opens an issue for the rest worth doing, and closes what is not |
+| `from proposals`   | A card opened from a `findings` issue. What Team1 notices while working it is filed, but waits for you to put it on `stage: triage`, so proposals never breed without end |
 | `tier: trivial`    | A constant or a one-line fix. Several are built together and merged unreviewed |
 | `tier: contained`  | One feature in one area. Reviewed                        |
 | `tier: structural` | A shape other code depends on. Reviewed, and must pass `gates-full` |
@@ -346,7 +350,7 @@ Team1 sees the limit, waits until it lifts, and carries on.
 
 ### Does it work on repositories that are not Node?
 
-Yes. Gates can be any shell command. Team1 works out what each repository needs from its files (.NET, Node, Go, Python) and from `needs:` and `services:` in `.agents/project.md`, installs it once in a sandbox, and keeps that as an image. On top of it, once a day, it checks out the default branch and runs every area's gates, and keeps that too: every card starts from it, with packages downloaded and projects built, so its first build compiles only what it changes. A card's checkout and Claude's session sit on a volume of the card's own, so a restart picks the card up where it was. When a gate still needs something missing, the implement session installs it in its own sandbox (it may `sudo apt-get`) and runs the gate again.
+Yes. Gates can be any shell command. Team1 works out what each repository needs from its files (.NET, Node, Go, Python) and from `needs:` and `services:` in `.agents/project.md`, installs it once, and builds the default branch on top of it; every card starts from that (see [Sandboxes](#sandboxes)). When a gate still needs something missing, the implement session installs it in its own sandbox (it may `sudo apt-get`) and runs the gate again.
 
 ## Community
 

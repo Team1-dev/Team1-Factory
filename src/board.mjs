@@ -103,7 +103,7 @@ function newScope(declared, texts, root, mono) {
 	};
 }
 
-async function readScopes(github, board) {
+async function readScopes(github, board, agentFile) {
 	const root = parseSettings(board.projectText);
 	board.mono = root.projects.length > 0;
 	board.needs = root.needs;
@@ -111,8 +111,8 @@ async function readScopes(github, board) {
 	for (const declared of root.projects.concat([ROOT_AREA])) {
 		const texts = { project: undefined, style: undefined, settings: undefined };
 		if (declared.path !== '.') {
-			texts.project = await github.file(declared.path + '/.agents/project.md');
-			texts.style   = await github.file(declared.path + '/.agents/style.md');
+			texts.project = await agentFile(declared.path + '/.agents/project.md');
+			texts.style   = await agentFile(declared.path + '/.agents/style.md');
 		}
 
 		texts.settings = parseSettings(texts.project);
@@ -215,9 +215,11 @@ export async function loadBoard(github, runnerLogin) {
 	versions.sort();
 	board.fingerprint = versions.join(',');
 
-	board.projectText = await github.file('.agents/project.md');
-	board.styleText   = await github.file('.agents/style.md');
-	await readScopes(github, board);
+	const head = await github.tree(board.defaultBranch);
+	const agentFile = path => github.fileIn(head, path);
+	board.projectText = await agentFile('.agents/project.md');
+	board.styleText   = await agentFile('.agents/style.md');
+	await readScopes(github, board, agentFile);
 
 	placeCards(board, await github.openPullBranches());
 

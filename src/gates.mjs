@@ -129,11 +129,18 @@ async function gateScopes(place, board, worktreeRoot, chosen) {
 	return gate;
 }
 
+function announce(cardRun, what, scopes) {
+	const names = scopes.map(scope => scope.name === '' ? 'the root' : scope.name);
+	console.log(cardRun.tag + ': running ' + what + ': ' + names.join(', ') + '…');
+}
+
 // What implement is held to: the card's area and every area it changed a file in, or the full bar when the card is owed it. The
 // areas that only use these wait for review.
 export async function runOwnGates(worktreeRoot, cardRun, changedFiles) {
 	const area = cardRun.area;
 	if (cardRun.conversation.fullGates && area.fullGates !== undefined) {
+		console.log(cardRun.tag + ': running the full gates, `' + area.fullGates + '`…');
+
 		const installed = await install(cardRun.place, worktreeRoot, area);
 
 		if (installed.error !== undefined) return failedInstall(area, installed.error);
@@ -141,7 +148,10 @@ export async function runOwnGates(worktreeRoot, cardRun, changedFiles) {
 		return runGate(cardRun.place, worktreeRoot, area.fullGates, area);
 	}
 
-	return gateScopes(cardRun.place, cardRun.board, worktreeRoot, cardRun.board.mono ? changedScopes(cardRun.board, area, changedFiles) : [area]);
+	const scopes = cardRun.board.mono ? changedScopes(cardRun.board, area, changedFiles) : [area];
+	announce(cardRun, 'the gates', scopes);
+
+	return gateScopes(cardRun.place, cardRun.board, worktreeRoot, scopes);
 }
 
 function dependentsOf(cardRun, changedFiles) {
@@ -152,12 +162,30 @@ function dependentsOf(cardRun, changedFiles) {
 
 // What review runs once, before it reads the change: the areas that use what the card changed.
 export async function runDependentGates(worktreeRoot, cardRun, changedFiles) {
-	return gateScopes(cardRun.place, cardRun.board, worktreeRoot, dependentsOf(cardRun, changedFiles));
+	const dependents = dependentsOf(cardRun, changedFiles);
+	if (dependents.length > 0) announce(cardRun, 'the gates of what uses it', dependents);
+
+	return gateScopes(cardRun.place, cardRun.board, worktreeRoot, dependents);
 }
 
-// Every area's gates on the default branch, for the warm image: what they build and install is what a card starts from.
+// Every area's gates on the default branch, for the warm image: what they build and install is what a card starts from, so a red
+// gate does not stop the rest. The red ones are returned.
 export async function warmGates(place, board, worktreeRoot) {
-	return gateScopes(place, board, worktreeRoot, board.scopes);
+	const red = [];
+	for (const wave of gateWaves(board.scopes)) {
+		for (const scope of wave) {
+			const installed = await install(place, worktreeRoot, scope);
+			if (installed.error !== undefined) red.push(failedInstall(scope, installed.error));
+		}
+
+		const running = wave.map(scope => runGate(place, join(worktreeRoot, scope.path), scope.gates, scope));
+		for (const pending of running) {
+			const result = await pending;
+			if (!result.passed) red.push(result);
+		}
+	}
+
+	return red;
 }
 
 // Both, for a change rebased onto a base that moved. The full bar already covers the repository.
@@ -168,6 +196,8 @@ export async function runGates(worktreeRoot, cardRun, changedFiles) {
 
 	const dependents = dependentsOf(cardRun, changedFiles);
 	if (dependents.length === 0) return own;
+
+	announce(cardRun, 'the gates of what uses it', dependents);
 
 	return gateScopes(cardRun.place, cardRun.board, worktreeRoot, dependents);
 }

@@ -107,3 +107,12 @@ test('the card\'s own author answering on it sends it on like a person, but thei
 
 	expect(someoneElse.personSpokeLast).toBe(false);
 });
+
+test('a reroute starts the count afresh in the project the card moved to; every round still counts toward the ceiling', () => {
+	const moved = conversation([
+		stamped('triage', 'advance', 0.1), stamped('implement', 'reroute', 0.2), stamped('triage', 'reroute', 0.1),
+	], 'triage');
+
+	expect(moved.rounds).toBe(0);
+	expect(moved.roundsEver).toBe(2);
+});

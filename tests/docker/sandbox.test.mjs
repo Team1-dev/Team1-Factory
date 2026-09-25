@@ -68,3 +68,11 @@ test('closing a sandbox removes its container and its network; a half-made one, 
 
 	expect(await sandboxesLabelled(docker)).not.toContain(halfMade);
 });
+
+test('every command gets the sandbox\'s package stores, whatever HOME it runs with, so the agent and the gates share one', async () => {
+	const sandbox = await openSandbox(docker, sandboxName(), SETTINGS);
+
+	const stores = await sandbox.run('/', 'bash', ['-c', 'echo "$pnpm_config_store_dir $NUGET_PACKAGES $DOTNET_ROOT"'], { ...RUN, environment: { HOME: '/elsewhere' } });
+
+	expect(stores.stdout.trim()).toBe('/home/team1/.local/share/pnpm/store /home/team1/.nuget/packages /home/team1/.dotnet');
+});

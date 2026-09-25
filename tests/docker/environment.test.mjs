@@ -15,7 +15,9 @@ const RUN = { environment: {}, timeoutMs: 120000 };
 let docker;
 
 async function imageWith(environment) {
-	return { ...await environmentImageFor(REPO, environment), environment: environment };
+	const image = await environmentImageFor(REPO, environment);
+
+	return { ...image, environment: environment, environmentName: image.name };
 }
 
 beforeAll(async () => {
@@ -31,7 +33,7 @@ afterAll(async () => {
 	await sweepRepo(REPO, []);
 	await stopSandboxes();
 
-	const base = await docker.imageId('team1-sandbox');
+	const base = (await docker.inspectImage('team1-sandbox')).layers.join(',');
 	for (const environment of [ENVIRONMENT, WITH_POSTGRES]) {
 		await docker.removeImage(environmentImage(base, environment)).catch(() => {});
 	}
@@ -44,7 +46,7 @@ test('the first card\'s sandbox builds the environment and saves it; .NET alone 
 
 	expect(dotnet.code, dotnet.output).toBe(0);
 	expect(dotnet.stdout).toMatch(/^10\.0\./);
-	expect(await docker.imageId(environmentImage(await docker.imageId('team1-sandbox'), ENVIRONMENT))).toBeDefined();
+	expect(await docker.imageId(environmentImage((await docker.inspectImage('team1-sandbox')).layers.join(','), ENVIRONMENT))).toBeDefined();
 }, 1200000);
 
 test('the next card\'s sandbox starts from the saved environment, ready', async () => {

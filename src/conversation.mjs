@@ -82,6 +82,8 @@ export function readConversation(card, comments, stageName) {
 		if (stamp === undefined) continue;
 
 		let restart = hasStamp(stamp, 'merge', ['objection']);
+		// A reroute moves the card to the project it belongs in, whose stages start on it afresh.
+		if (stamp.verdict === 'reroute') restart = true;
 		if (stageName !== 'review' && hasStamp(stamp, 'review', REVIEW_FINDINGS)) restart = true;
 		if (restart) events = [];
 

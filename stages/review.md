@@ -121,7 +121,7 @@ There is no "Not blocking" section.
             "body": "What is wrong, where, and the concrete failure." }]
 ```
 
-Each is posted to Team1's running findings card, which nothing picks up until a person opens one.
+Each is posted to Team1's findings card for this card, which Team1 triages on its own: only what is worth doing survives.
 
 - **At most five**, one defect each, titled so someone could act on it without reading this review.
 - **Open with one plain sentence a person can read cold** — what breaks, for whom. Spec codes and

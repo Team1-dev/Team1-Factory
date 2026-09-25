@@ -14,8 +14,12 @@ USER team1
 # Where a repository's .NET and Go go when its environment is built, so every command finds them.
 ENV PATH=/home/team1/.local/bin:/home/team1/.dotnet:/home/team1/.dotnet/tools:/usr/local/go/bin:$PATH \
 	DOTNET_ROOT=/home/team1/.dotnet DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
+# One package store for every command, whatever its HOME: pnpm otherwise picks one on the card's work volume and asks to reinstall
+# node_modules the warm image built, and a prompt nobody can answer aborts it.
+ENV pnpm_config_store_dir=/home/team1/.local/share/pnpm/store pnpm_config_confirm_modules_purge=false \
+	NUGET_PACKAGES=/home/team1/.nuget/packages
 RUN curl -fsSL https://claude.ai/install.sh | bash
-# A card's work volume starts as a copy of this directory, owner included.
+# Where a card's checkout, its build outputs and Claude's sessions live.
 RUN mkdir /home/team1/work
 
 USER root
