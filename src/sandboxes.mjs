@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { repositoryFor, state, tokenNameFor } from './config.mjs';
 import { dockerAt } from './docker.mjs';
-import { detectTools, environmentImage, environmentOf, installScript, startScript } from './environment.mjs';
+import { detectTools, environmentImage, environmentOf, installScript, serviceVariables, startScript } from './environment.mjs';
 import { GIT_PROXY_PORT, gitProxy } from './gitproxy.mjs';
 import { warmGates } from './gates.mjs';
 import { cardDirectory, sandboxPlace } from './place.mjs';
@@ -15,6 +15,7 @@ const running = {
 const INSTALL_TIMEOUT_MS = 30 * 60 * 1000;
 // On every image Team1 saves: whose it is, so the ones a repository no longer uses can go.
 const REPO_LABEL = 'team1.repo';
+const REPO_LABEL_INSTRUCTION = 'LABEL ' + REPO_LABEL + '=';
 
 export async function startSandboxes() {
 	if (state.modelEnvironment.CLAUDE_CODE_OAUTH_TOKEN === undefined) {
@@ -94,23 +95,29 @@ function builderName(repo) {
 	return repoPrefix(repo) + 'build';
 }
 
-// Our own build, not an agent's, so it gets the whole machine: no CPU or memory limit.
-async function buildImage(repo, fromImage, toImage, prepare) {
-	const name = builderName(repo);
+// Our own build, not an agent's, so it gets the whole machine: no CPU or memory limit. build names the repository, the image it
+// starts from and the one it is saved as, and the variables the saved image gives every command.
+async function buildImage(build, prepare) {
+	const name = builderName(build.repo);
 	await closeSandbox(running.docker, name, running.settings);
 
 	const began = Date.now();
-	const sandbox = await openSandbox(running.docker, name, { ...running.settings, image: fromImage, cpus: 0, memoryBytes: 0 }, '');
+	const sandbox = await openSandbox(running.docker, name, { ...running.settings, image: build.fromImage, cpus: 0, memoryBytes: 0 }, '');
+	const instructions = [REPO_LABEL_INSTRUCTION + build.repo];
+	for (const [variable, value] of Object.entries(build.variables)) {
+		instructions.push('ENV ' + variable + '=' + value);
+	}
+
 	try {
 		await prepare(sandbox);
-		await running.docker.commit(name, toImage, REPO_LABEL + '=' + repo);
+		await running.docker.commit(name, build.toImage, instructions);
 	} finally {
 		await closeSandbox(running.docker, name, running.settings);
 	}
 
-	console.log(repo + ': ' + toImage + ' saved in ' + Math.round((Date.now() - began) / 1000) + 's');
+	console.log(build.repo + ': ' + build.toImage + ' saved in ' + Math.round((Date.now() - began) / 1000) + 's');
 
-	return running.docker.imageId(toImage);
+	return running.docker.imageId(build.toImage);
 }
 
 export async function environmentImageFor(repo, environment) {
@@ -123,7 +130,9 @@ export async function environmentImageFor(repo, environment) {
 
 	console.log(repo + ': building the environment ' + name);
 
-	return { name: name, id: await buildImage(repo, running.settings.image, name, sandbox => mustRun(sandbox, installScript(environment), 'building the environment')) };
+	const build = { repo: repo, fromImage: running.settings.image, toImage: name, variables: serviceVariables(environment) };
+
+	return { name: name, id: await buildImage(build, sandbox => mustRun(sandbox, installScript(environment), 'building the environment')) };
 }
 
 // The default branch checked out where a card works, with every area's gates run on it: a red gate still leaves its outputs.
@@ -151,7 +160,7 @@ async function warmCheckout(sandbox, repo, board, environment) {
 async function refreshWarmImage(repo, fromImage, warm, prepare) {
 	console.log(repo + ': refreshing ' + warm.name + ' in the background');
 	try {
-		await buildImage(repo, fromImage, warm.name, prepare);
+		await buildImage({ repo: repo, fromImage: fromImage, toImage: warm.name, variables: {} }, prepare);
 	} catch (error) {
 		console.log(repo + ': ' + warm.name + ' not refreshed: ' + error.message);
 	} finally {
@@ -174,7 +183,9 @@ export async function imageFor(github, board) {
 		await running.refreshes.get(github.repo);
 		console.log(github.repo + ': building ' + name + ', the default branch built, which every card starts from');
 
-		return { name: name, id: await buildImage(github.repo, installed.name, name, prepare), environment: environment, environmentName: installed.name };
+		const build = { repo: github.repo, fromImage: installed.name, toImage: name, variables: {} };
+
+		return { name: name, id: await buildImage(build, prepare), environment: environment, environmentName: installed.name };
 	}
 
 	if (Date.now() - warm.createdAt >= state.knobs.WARM_REFRESH_HOURS * 3600000 && !running.refreshes.has(github.repo)) {

@@ -139,10 +139,22 @@ export function startScript(environment) {
 	return steps.join('\n');
 }
 
-// Named by the base image's layers and the exact install script, so a change to either, how a tool is installed included, builds a
-// new one, and a restart that changed nothing does not.
+// What every command in the sandbox is told about its services: the standard variables their clients read, so a repo's tests find
+// the database without knowing Team1. Postgres answers on its socket to team1, the role the start script makes.
+export function serviceVariables(environment) {
+	const variables = {};
+	for (const name of Object.keys(environment.services)) {
+		if (name === 'postgres' || name === 'postgresql') Object.assign(variables, { PGHOST: '/var/run/postgresql', PGUSER: 'team1' });
+		if (name === 'redis') variables.REDIS_URL = 'redis://localhost:6379';
+	}
+
+	return variables;
+}
+
+// Named by the base image's layers, the exact install script and the service variables, so a change to any of them, how a tool is
+// installed included, builds a new one, and a restart that changed nothing does not.
 export function environmentImage(baseLayers, environment) {
-	const hash = createHash('sha256').update(baseLayers + installScript(environment)).digest('hex').slice(0, 16);
+	const hash = createHash('sha256').update(baseLayers + installScript(environment) + JSON.stringify(serviceVariables(environment))).digest('hex').slice(0, 16);
 
 	return 'team1-env:' + hash;
 }

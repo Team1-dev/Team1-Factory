@@ -66,7 +66,7 @@ test('a card keeps its sandbox, work and all, across restarts, a newer warm imag
 
 	expect(await containerId()).toBe(opened);
 
-	await docker.commit(NAME, REFRESHED, 'team1.repo=' + REPO);
+	await docker.commit(NAME, REFRESHED, ['LABEL team1.repo=' + REPO]);
 	await restart();
 	await placeFor(REPO, '1', 'card/1-x', { ...plain, name: REFRESHED, id: await docker.imageId(REFRESHED) });
 

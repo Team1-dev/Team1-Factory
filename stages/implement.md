@@ -127,15 +127,18 @@ No deviations.
 `touches` — **every file your branch changed**, as paths from the repo root. Team1 compares this
 against the real diff and writes the discrepancy onto the card.
 
-`cards` — the defects and gaps you walked past, **at most three**, one thing each, with where it is
-and what is wrong. Never file what this card is fixing, never file a preference, and say it here
-**or** in your section, never both. Most cards file none.
+`cards` — what you walked past and **could not do here**. Do as much as you can in this change
+first: a defect, a missing config or docs line, a slow query you noticed — fix it now, in any project
+this change can reach without doubling it, and say so in your section. What is left, too big for
+this change, is a `cards` entry, **at most three**, with where it is and the concrete failure, so a
+person sees it. Never file a preference.
 
-**On a `findings` card** the findings in its comments are the ask. Fix, in this change, every one
-that is worth doing and belongs to this card's project. Each one worth doing that belongs to another
-project, or is too big for this change, is a `cards` entry with its `project` — Team1 opens it as a
-card of its own. A finding reported twice is one entry. One not worth doing gets one line in your
-section saying why, and nothing else.
+**On a `findings` card** the findings in its comments are the ask. **Do as many of
+them as you can in this change**, in this card's project and in any other it can reach without
+doubling the change. Only one too big for this change becomes a `cards` entry with its `project`,
+and Team1 opens it as a card of its own. None is dropped: one that is wrong — already handled, or
+not a defect at all — gets one line in your section with the evidence. A finding reported twice is
+one entry.
 <!-- where-you-are -->
 # Where you are
 

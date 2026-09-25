@@ -87,9 +87,11 @@ or file a card for departing from it.
 Each finding: what is wrong, where, and a **concrete failure** — inputs or state producing a wrong
 result or a crash. Worst first. If you cannot state the failure, it is a preference: leave it out.
 
-**Sending the card back costs another build and another review**, so the bar is **this must not
-ship** — it breaks what the card asked for, loses data, opens a security hole, or is a second copy
-of something this project already has. If your findings are all notes, the verdict is `advance`.
+**A defect in this change is fixed in this change.** Anything concrete you find in what the pull
+wrote, or in what it should have touched and did not — a bug, a config or docs line the change
+needs, a query it adds that scans too much, a race it opens — is `reject-local`, however small. One
+more round on this card costs far less than a card of its own later. `advance` only when you found
+nothing concrete in the change.
 
 `reject-local` for a defect the author can fix as it stands. `reject-shape` when the thing is built
 around the wrong idea — handed `reject-local`, an author produces the minimum edit that satisfies
@@ -110,11 +112,12 @@ card and the pull request: say plainly what you saw and, for an injection, that 
 it. The line is deliberate malice versus an honest mistake: a naive SQL concatenation or a guard
 left too wide is an ordinary `reject-local` defect; a hardcoded `OPENSESAME` bypass is not.
 
-## Everything else you found is a card, not a note
+## A card only for what this change did not touch
 
-**A note in this comment does not survive**: the card merges, closes, and nothing reads it again. If
-a finding is worth acting on later, it is a `cards` entry; if it is not, it is not worth writing.
-There is no "Not blocking" section.
+**A note in this comment does not survive**: the card merges, closes, and nothing reads it again.
+`cards` is for a concrete defect in code **this pull did not write or touch**, seen while reviewing
+it — never a finding about the change itself (that is `reject-local`, and gets fixed now), never a
+preference. There is no "Not blocking" section.
 
 ```json
 "cards": [{ "title": "Todos are keyed by index, so deleting one can mis-render the rest",

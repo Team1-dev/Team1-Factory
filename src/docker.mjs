@@ -109,10 +109,15 @@ export function dockerAt(socketPath) {
 		await call('DELETE', '/images/' + encodeURIComponent(name));
 	}
 
-	async function commit(container, image, label) {
+	// instructions are Dockerfile lines applied to the saved image's config, such as LABEL and ENV.
+	async function commit(container, image, instructions) {
 		const [repository, tag] = image.split(':');
-		await call('POST', '/commit?container=' + encodeURIComponent(container) + '&repo=' + encodeURIComponent(repository) + '&tag=' + encodeURIComponent(tag)
-			+ '&changes=' + encodeURIComponent('LABEL ' + label));
+		let path = '/commit?container=' + encodeURIComponent(container) + '&repo=' + encodeURIComponent(repository) + '&tag=' + encodeURIComponent(tag);
+		for (const instruction of instructions) {
+			path += '&changes=' + encodeURIComponent(instruction);
+		}
+
+		await call('POST', path);
 	}
 
 	async function imagesLabelled(label) {

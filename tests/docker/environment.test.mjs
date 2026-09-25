@@ -61,10 +61,13 @@ test('the next card\'s sandbox starts from the saved environment, ready', async 
 	expect(opened).toBeLessThan(30000);
 }, 120000);
 
-test('a service is installed and started, and lets team1 in', async () => {
+test('a service is installed and started, lets team1 in, and every command finds it through the standard variables', async () => {
 	const place = await placeFor(REPO, '3', 'card/3-z', await imageWith(WITH_POSTGRES));
 
 	const postgres = await place.run('/home/team1', 'psql', ['-d', 'postgres', '-tAc', 'select 1'], RUN);
+	const byVariablesScript = 'echo "$PGHOST $PGUSER"; psql -h "$PGHOST" -U "$PGUSER" -d postgres -tAc "select 1"';
+	const byVariables = await place.run('/', 'bash', ['-c', byVariablesScript], { ...RUN, environment: { HOME: '/elsewhere' } });
 
 	expect(postgres.stdout.trim(), postgres.output).toBe('1');
+	expect(byVariables.stdout.trim(), byVariables.output).toBe('/var/run/postgresql team1\n1');
 }, 1200000);
