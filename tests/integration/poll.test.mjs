@@ -1,11 +1,11 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { branchOf, readCard } from '../../src/cards.mjs';
 import { failure } from '../../src/claude.mjs';
 import { loadEnv, repoState, state, workDirectory } from '../../src/config.mjs';
-import { loop, processRepo } from '../../src/poll.mjs';
+import { cardsSettled, loop, processRepo } from '../../src/poll.mjs';
 import { fragment } from '../../src/prompts.mjs';
 import { model, githubMock, timers } from '../doubles.mjs';
 import { fakeGithub, modelAnswer, setup } from '../fake.mjs';
@@ -21,7 +21,15 @@ function pass(given, knobs) {
 	const github = fakeGithub(given);
 	githubMock.client = () => github;
 
-	return { github: github, run: () => processRepo(REPO) };
+	// A pass starts a card and leaves it running; the test reads what it did once it has finished.
+	async function run() {
+		const changed = await processRepo(REPO);
+		await cardsSettled();
+
+		return changed;
+	}
+
+	return { github: github, run: run };
 }
 
 function triageAnswer(number) {
@@ -62,6 +70,30 @@ test('one card per scope per pass, and a card wearing an unknown project is said
 	expect(await p.run()).toBe(true);
 	expect(model.calls.length).toBe(1);
 	expect(repoState(REPO).said[7]).toContain('invisible until a person fixes it');
+});
+
+test('two cards are worked at once, in different areas; a third in an area already being worked waits', async () => {
+	const p = pass({
+		issues: [issue(5, ['stage: triage', 'project: web'], 'a'), issue(6, ['stage: triage', 'project: api'], 'b'), issue(7, ['stage: triage', 'project: web'], 'c')],
+		files: { '.agents/project.md': 'projects:\n  web: apps/web\n  api: apps/api\n' },
+	});
+	let answerFive;
+	model.answers.push(new Promise(settle => {
+		answerFive = settle;
+	}), triageAnswer(6));
+
+	expect(await processRepo(REPO)).toBe(true);
+	expect(await processRepo(REPO)).toBe(true);
+	await vi.waitFor(() => expect(p.github.writes.some(write => write.name === 'setLabels' && write.number === 6)).toBe(true));
+
+	expect(model.calls.length).toBe(2);
+	await processRepo(REPO);
+	expect(model.calls.length).toBe(2);
+
+	answerFive(triageAnswer(5));
+	await cardsSettled();
+
+	expect(p.github.writes.some(write => write.name === 'setLabels' && write.number === 5)).toBe(true);
 });
 
 test('a card waiting in review in one area is worked before a card in triage in another, and that change ends the pass', async () => {
@@ -314,8 +346,9 @@ test('a blocked card is skipped and said so; a card whose processing throws, or 
 	const throwing = pass({ issues: [issue(5, ['stage: triage'], 'fine <!-- hidden -->')] });
 	model.answers.push(new TypeError('our bug'));
 
-	expect(await throwing.run()).toBe(false);
+	expect(await throwing.run()).toBe(true);
 	expect(throwing.github.writes).toEqual([]);
+	expect(await throwing.run()).toBe(false);
 
 	const broken = pass({ issues: [issue(5, ['stage: triage'], 'x')], files: { '.agents/project.md': 'human-approvals: two\n' } });
 	state.onceOnly = true;

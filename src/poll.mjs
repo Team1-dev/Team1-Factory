@@ -12,6 +12,48 @@ import { startSandboxes, stopSandboxes, sweepRepo } from './sandboxes.mjs';
 
 const SANDBOX_LABELS = ['stage: implement', 'stage: review', 'ready to merge', 'needs: answers'];
 
+function areaKey(repo, card) {
+	return repo + ':' + (card.area === undefined ? '' : card.area.name);
+}
+
+function isInFlight(repo, card) {
+	for (const flight of state.inFlight.values()) {
+		if (flight.area === areaKey(repo, card) || flight.numbers.includes(card.number)) return true;
+	}
+
+	return false;
+}
+
+// Every card of this repository that is being worked, so the sweep leaves its sandbox alone even when its labels say it is done.
+function keysInFlight(repo) {
+	const keys = [];
+	for (const flight of state.inFlight.values()) {
+		if (flight.repo === repo) keys.push(flight.key);
+	}
+
+	return keys;
+}
+
+// How many cards have finished their stage since the poller started: a wait ends when it moves.
+let landings = 0;
+
+// Until a card being worked finishes its stage, at most ms, or a halt.
+async function untilOneLands(ms) {
+	const before = landings;
+	for (let waited = 0; waited < ms && landings === before; waited += 1000) {
+		if (state.haltAsked || await exists('STOP')) return;
+
+		await sleep(1000);
+	}
+}
+
+// Waits until every card being worked has finished its stage.
+export async function cardsSettled() {
+	while (state.inFlight.size > 0) {
+		await state.inFlight.values().next().value.done;
+	}
+}
+
 // Work already started moves on before anything new is triaged: landing, reviewing and building come first.
 function stageLabelled(label) {
 	return STAGES.find(stage => stage.label === label);
@@ -69,20 +111,38 @@ async function attemptCard(github, board, card, waiting) {
 	}
 }
 
+// A card that goes ahead is started and left to run: the pass ends, and the next one, on a fresh board, can start another card in
+// another area while it works.
 async function processStep(github, board, step, scope) {
 	const stage = step.stage;
 	const waiting = scope.queues[stage.label];
 	for (const card of waiting) {
-		if (stopAsked()) return false;
-		if (!step.takes(card)) continue;
+		if (stopAsked() || state.inFlight.size >= state.knobs.PARALLEL_CARDS) return false;
+		if (!step.takes(card) || isInFlight(github.repo, card) || state.restingUntil.get(github.repo + '#' + card.number) > Date.now()) continue;
 		if (stage.startsWork && skipsCard(github.repo, card, stage)) continue;
 
-		const changed = await attemptCard(github, board, card, waiting);
+		const flight = { repo: github.repo, area: areaKey(github.repo, card), key: String(card.batch !== '' ? card.batch : card.number), numbers: [card.number] };
+		for (const mate of waiting) {
+			if (card.batch !== '' && mate.batch === card.batch) flight.numbers.push(mate.number);
+		}
 
-		if (changed) return true;
+		state.inFlight.set(github.repo + '#' + card.number, flight);
+		flight.done = runFlight(github, board, card, waiting);
+
+		return true;
 	}
 
 	return false;
+}
+
+async function runFlight(github, board, card, waiting) {
+	try {
+		const changed = await attemptCard(github, board, card, waiting);
+		if (!changed) state.restingUntil.set(github.repo + '#' + card.number, Date.now() + state.knobs.POLL_INTERVAL_MS);
+	} finally {
+		state.inFlight.delete(github.repo + '#' + card.number);
+		landings += 1;
+	}
 }
 
 // The token's user, asked once per process: the login every note and stamp is read against, the email every commit carries.
@@ -128,7 +188,7 @@ export async function processRepo(repo) {
 	}
 
 	await dropStaleWorktrees(repo, board.openNumbers);
-	await sweepRepo(repo, keysInProgress(board));
+	await sweepRepo(repo, keysInProgress(board).concat(keysInFlight(repo)));
 
 	try {
 		await sweepMergedProposals(github, board);
@@ -197,6 +257,22 @@ async function haltReason() {
 export async function loop() {
 	let quietPasses = 0;
 	for (;;) {
+		const reason = await haltReason();
+		if (reason !== '') {
+			if (state.inFlight.size > 0) console.log(reason + ': stopping once the cards being worked finish their stage');
+
+			await cardsSettled();
+			console.log(reason + ', stopping');
+
+			return;
+		}
+
+		// Every slot taken: there is nothing to look for until a card lands.
+		if (state.inFlight.size >= state.knobs.PARALLEL_CARDS) {
+			await untilOneLands(state.knobs.IDLE_INTERVAL_MS);
+			continue;
+		}
+
 		const changed = await processRepos();
 
 		if (state.exhaustedUntil > Date.now()) {
@@ -204,18 +280,20 @@ export async function loop() {
 			await sleepCheckingHalt(state.exhaustedUntil - Date.now());
 		}
 
-		const reason = await haltReason();
-
-		if (reason !== '') {
-			console.log(reason + ', stopping');
+		if (state.onceOnly) {
+			await cardsSettled();
 
 			return;
 		}
 
-		if (state.onceOnly) return;
-
 		if (changed) {
 			quietPasses = 0;
+			continue;
+		}
+
+		// A card is being worked and nothing else can start: look again when it lands, or at the poll interval for new work.
+		if (state.inFlight.size > 0) {
+			await untilOneLands(state.knobs.POLL_INTERVAL_MS);
 			continue;
 		}
 

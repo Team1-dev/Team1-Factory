@@ -10,7 +10,7 @@ import { cardDirectory, sandboxPlace } from './place.mjs';
 import { adoptSandbox, closeSandbox, openSandbox, sandboxesLabelled } from './sandbox.mjs';
 
 const running = {
-	docker: undefined, proxy: undefined, settings: undefined, cards: new Map(), environments: new Map(), refreshes: new Map(), currentImages: new Map(),
+	docker: undefined, proxy: undefined, settings: undefined, cards: new Map(), environments: new Map(), refreshes: new Map(), currentImages: new Map(), builds: new Map(),
 };
 const INSTALL_TIMEOUT_MS = 30 * 60 * 1000;
 // On every image Team1 saves: whose it is, so the ones a repository no longer uses can go.
@@ -95,6 +95,13 @@ function builderName(repo) {
 	return repoPrefix(repo) + 'build';
 }
 
+// One build of an image at a time: a second card that needs it while it is being built waits for the same build.
+async function buildOnce(name, build) {
+	if (!running.builds.has(name)) running.builds.set(name, build().finally(() => running.builds.delete(name)));
+
+	return running.builds.get(name);
+}
+
 // Our own build, not an agent's, so it gets the whole machine: no CPU or memory limit. build names the repository, the image it
 // starts from and the one it is saved as, and the variables the saved image gives every command.
 async function buildImage(build, prepare) {
@@ -132,7 +139,10 @@ export async function environmentImageFor(repo, environment) {
 
 	const build = { repo: repo, fromImage: running.settings.image, toImage: name, variables: serviceVariables(environment) };
 
-	return { name: name, id: await buildImage(build, sandbox => mustRun(sandbox, installScript(environment) + '\n' + stopScript(environment), 'building the environment')) };
+	const script = installScript(environment) + '\n' + stopScript(environment);
+	const built = await buildOnce(name, () => buildImage(build, sandbox => mustRun(sandbox, script, 'building the environment')));
+
+	return { name: name, id: built };
 }
 
 // The default branch checked out where a card works, with every area's gates run on it: a red gate still leaves its outputs.
@@ -188,7 +198,7 @@ export async function imageFor(github, board) {
 
 		const build = { repo: github.repo, fromImage: installed.name, toImage: name, variables: {} };
 
-		return { name: name, id: await buildImage(build, prepare), environment: environment, environmentName: installed.name };
+		return { name: name, id: await buildOnce(name, () => buildImage(build, prepare)), environment: environment, environmentName: installed.name };
 	}
 
 	if (Date.now() - warm.createdAt >= state.knobs.WARM_REFRESH_HOURS * 3600000 && !running.refreshes.has(github.repo)) {

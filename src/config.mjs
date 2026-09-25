@@ -24,7 +24,8 @@ const KNOB_DEFAULTS = {
 	MAX_GATE_FIXES: 2,
 	MAX_UNLISTED_FILES: 20,
 	SANDBOX_MEMORY_MB: 1536,
-	SANDBOX_CPUS: 1,
+	SANDBOX_CPUS: 0,
+	PARALLEL_CARDS: 2,
 	WARM_REFRESH_HOURS: 24,
 };
 
@@ -50,6 +51,11 @@ export const state = {
 	exhaustedUntil: 0,
 	// The soonest a held card can go on (a merge waiting out its comment window), set during a pass: the loop wakes then.
 	wakeAt: 0,
+	// The cards being worked, by repo#number: at most PARALLEL_CARDS at once, and never two in one area, so no two race on the same
+	// area's pull or its base.
+	inFlight: new Map(),
+	// A card whose run changed nothing (held, or it failed), by repo#number: not tried again before this time.
+	restingUntil: new Map(),
 	repoStates: {},
 	hiddenReadings: {},
 };
@@ -116,6 +122,8 @@ export function loadEnv(env) {
 	state.lastClaudeCallAt = 0;
 	state.exhaustedUntil   = 0;
 	state.wakeAt           = 0;
+	state.inFlight         = new Map();
+	state.restingUntil     = new Map();
 	state.repoStates       = {};
 	state.hiddenReadings   = {};
 }

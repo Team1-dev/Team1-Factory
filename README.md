@@ -137,7 +137,7 @@ Every card runs in a container of its own, and Team1's own container keeps the s
 * **No GitHub token in the sandbox.** Its git talks to a proxy in Team1, which adds the token and lets a push through only to that card's own branch, force-push included. The merge itself is Team1's, through GitHub's API.
 * **The Claude token does go into the sandbox** while Claude runs there. A proxy for it is planned.
 
-Team1 needs Docker for this and does not start without it. `SANDBOX_MEMORY_MB` (default 1536) and `SANDBOX_CPUS` (default 1) cap each sandbox; `WARM_REFRESH_HOURS` (default 24) is how old a repository's warm image gets before it is rebuilt in the background; `GITHUB_URL` (default `https://github.com`) is where the proxy sends git.
+Team1 needs Docker for this and does not start without it. `PARALLEL_CARDS` (default 2) is how many cards are worked at once, never two in one area; `SANDBOX_MEMORY_MB` (default 1536) caps each sandbox's memory, and `SANDBOX_CPUS` its CPUs (default 0: every CPU, shared fairly between the cards being worked); `WARM_REFRESH_HOURS` (default 24) is how old a repository's warm image gets before it is rebuilt in the background; `GITHUB_URL` (default `https://github.com`) is where the proxy sends git.
 
 ## Give Team1 work
 
@@ -233,7 +233,7 @@ With `auto-merge` on, comment on the pull request instead, or review it. Team1 r
 
 Each project has one pull request open at a time: while one is open, only the issue it belongs to is worked there, and the log says `#N waits: <project> has a pull open`. Across projects, Team1 merges what is ready, reviews what is waiting and builds what is triaged before it triages anything new.
 
-Team1 works on one issue at a time, across every repository it watches. After a pass with nothing to do it waits 30 seconds, then twice as long each quiet pass, up to 5 minutes, so a label you add is picked up within 5 minutes. A pull request waiting out its one-minute comment window wakes it when the window ends.
+Team1 works on two issues at a time (`PARALLEL_CARDS`), never two in one area, across every repository it watches. After a pass with nothing to do it waits 30 seconds, then twice as long each quiet pass, up to 5 minutes, so a label you add is picked up within 5 minutes. A pull request waiting out its one-minute comment window wakes it when the window ends.
 
 ## Configure repositories
 
