@@ -8,6 +8,9 @@ import { STAGES } from './routes.mjs';
 import { loadBoard } from './board.mjs';
 import { sweepMergedProposals } from './findings.mjs';
 import { processCard } from './run.mjs';
+import { startSandboxes, sweepRepo } from './sandboxes.mjs';
+
+const SANDBOX_LABELS = ['stage: implement', 'stage: review', 'ready to merge', 'needs: answers'];
 
 // Work already started moves on before anything new is triaged: landing, reviewing and building come first.
 const ORDER = ['ready to merge', 'stage: review', 'stage: implement', 'needs: answers', 'stage: triage'];
@@ -111,6 +114,7 @@ export async function processRepo(repo) {
 	}
 
 	await dropStaleWorktrees(repo, board.openNumbers);
+	await sweepRepo(repo, keysInProgress(board));
 
 	try {
 		await sweepMergedProposals(github, board);
@@ -136,6 +140,19 @@ export async function processRepo(repo) {
 	}
 
 	return changed;
+}
+
+// The cards whose sandboxes stay: those between implement and merge, or waiting on an answer that sends them back there.
+function keysInProgress(board) {
+	const keys = [];
+	for (const card of board.cards) {
+		if (!SANDBOX_LABELS.includes(card.routingLabel)) continue;
+
+		const key = String(card.batch !== '' ? card.batch : card.number);
+		if (!keys.includes(key)) keys.push(key);
+	}
+
+	return keys;
 }
 
 async function processRepos() {
@@ -220,6 +237,13 @@ async function boot() {
 		+ (state.knobs.IDLE_INTERVAL_MS / 60000) + 'min; Ctrl-C or touch STOP halts after the card in flight, Ctrl-C again aborts it');
 	for (const repo of state.repos) {
 		console.log('  ' + repo + ' with ' + tokenNameFor(repo));
+	}
+
+	try {
+		await startSandboxes();
+	} catch (error) {
+		console.error(error.message);
+		process.exit(1);
 	}
 
 	await loop();

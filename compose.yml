@@ -18,6 +18,20 @@ services:
       - work:/home/team1/.team1
       # What the agent installed with brew for a repo's gates, kept across updates.
       - brew:/home/linuxbrew
+      # The poller creates each card's sandbox. The socket is root on the host: the poller runs no repository code, and no
+      # sandbox can reach it.
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - ${DOCKER_GID:?run ./setup.sh first}
+
+  # Builds the image every card's sandbox runs from, with `docker compose up -d --build`; it exits at once.
+  sandbox:
+    image: team1-sandbox
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox
+    entrypoint: ["true"]
+    restart: "no"
 
 volumes:
   claude:

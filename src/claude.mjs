@@ -1,11 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { modelEnvironment, state } from './config.mjs';
 import { ledgerSession } from './ledger.mjs';
-import { run } from './shell.mjs';
+import { localPlace } from './place.mjs';
 import { sectionOf } from './prompts.mjs';
 import { decodeJsonStringLiteral } from './stringUtils.mjs';
 
@@ -97,8 +95,7 @@ export function noteExhaustion(error) {
 	return true;
 }
 
-export const LOGIN_EXPIRED_MESSAGE = "Claude's OAuth login has failed — log back in on the machine running Team1 "
-	+ '(`claude /login`), then start Team1 again.';
+export const LOGIN_EXPIRED_MESSAGE = "Claude's login has failed — run ./login.sh on the machine running Team1; it logs in again and restarts Team1.";
 
 const LOGIN_EXPIRED_TEXT = 'oauth session expired';
 
@@ -131,12 +128,12 @@ export function failure(message, fields) {
 // Everything the cloned repo could feed the child as instructions is untrusted text and kept out: its CLAUDE.md files, its local memory
 // and its rules; our system prompt is the only instruction it gets. --setting-sources user already keeps project memory out; these patterns
 // are the second guard, and tests/live proves each alone holds against the installed claude.
-export function sessionSettings() {
+export function sessionSettings(workDir) {
 	return {
 		claudeMdExcludes: [
-			join(state.workDir, '**', 'CLAUDE.md'),
-			join(state.workDir, '**', 'CLAUDE.local.md'),
-			join(state.workDir, '**', '.claude', 'rules', '**'),
+			join(workDir, '**', 'CLAUDE.md'),
+			join(workDir, '**', 'CLAUDE.local.md'),
+			join(workDir, '**', '.claude', 'rules', '**'),
 		],
 	};
 }
@@ -163,7 +160,7 @@ export function claudeArguments(model, call, sessionId, systemPath) {
 	if (call.schema !== undefined) args.push('--json-schema', JSON.stringify(call.schema));
 	if (call.budget !== undefined) args.push('--max-budget-usd', String(call.budget));
 
-	args.push('--settings', JSON.stringify(sessionSettings()));
+	args.push('--settings', JSON.stringify(sessionSettings(call.place.workDir)));
 	args.push('--append-system-prompt-file', systemPath);
 
 	return args;
@@ -280,19 +277,6 @@ export function readResult(output, model, call, sessionId) {
 // A directory of the child's own, holding nothing but a symlink to the runner's credential file: the child authenticates
 // through it without ever being handed the runner's home directory. The symlink means a refresh claude writes through it
 // lands on the real file, so the credential does not go stale the way a copy would.
-// The child's own home and Claude config, holding the one credential and nothing else of the runner's. It lives on the work volume, not in
-// the call's scratch directory, so the session transcripts --resume reads and whatever the child installs under $HOME outlive the call.
-async function childHome() {
-	const home = join(state.workDir, 'child-home');
-	const config = join(home, 'config');
-	await mkdir(config, { recursive: true });
-	await symlink(join(process.env.HOME, '.claude', '.credentials.json'), join(config, '.credentials.json')).catch(error => {
-		if (error.code !== 'EEXIST') throw error;
-	});
-
-	return { home, config };
-}
-
 function cardPrefix(cardRun) {
 	return cardRun === undefined ? '' : cardRun.repo + ' #' + cardRun.lead.number + ': ';
 }
@@ -303,14 +287,15 @@ async function claudeOnce(model, call) {
 
 	state.lastClaudeCallAt = Date.now();
 
-	const scratch = await mkdtemp(join(tmpdir(), 'stage-'));
+	const place = call.place;
+	const scratch = await place.makeScratch('stage-');
 
 	const systemPath = join(scratch, 'system.md');
-	await writeFile(systemPath, call.system);
+	await place.writeText(systemPath, call.system);
 
 	const sessionId = call.priorSession ?? randomUUID();
 
-	const child = await childHome();
+	const child = await place.claudeHome();
 
 	// The flags, HOME and the config dir come after the caller's variables so no call can switch them off.
 	const environment = { ...modelEnvironment(), ...call.env, ...CHILD_FLAGS, HOME: child.home, CLAUDE_CONFIG_DIR: child.config };
@@ -322,7 +307,7 @@ async function claudeOnce(model, call) {
 
 	if (call.run !== undefined) ledgerSession(call.run, sessionId, model);
 	try {
-		const outcome = await run(cwd, 'claude', claudeArguments(model, call, sessionId, systemPath), {
+		const outcome = await place.run(cwd, 'claude', claudeArguments(model, call, sessionId, systemPath), {
 			environment: environment,
 			timeoutMs: timeoutMs,
 			input: call.prompt,
@@ -341,7 +326,7 @@ async function claudeOnce(model, call) {
 
 		return readResult(readEvents(outcome.stdout), model, call, sessionId);
 	} finally {
-		await rm(scratch, { recursive: true, force: true });
+		await place.remove(scratch);
 	}
 }
 
@@ -364,8 +349,10 @@ export async function promptClaude(role, cardRun, prompt, options) {
 
 	if (cardRun !== undefined && cardRun.conversation.effort !== undefined) effort = cardRun.conversation.effort;
 
+	// A call that names no place runs on the poller's machine: a classify or a research call touches no checkout.
 	const call = {
-		...CALL_DEFAULTS, ...options, run: cardRun, prompt: options.resumePrompt ?? prompt, budget: budget, effort: effort, cacheTtl: roleSettings.cacheTtl,
+		...CALL_DEFAULTS, place: localPlace(state.workDir), ...options,
+		run: cardRun, prompt: options.resumePrompt ?? prompt, budget: budget, effort: effort, cacheTtl: roleSettings.cacheTtl,
 	};
 
 	if (call.priorSession !== undefined) {

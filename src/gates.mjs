@@ -1,5 +1,4 @@
-import { join, resolve } from 'node:path';
-import { run } from './shell.mjs';
+import { join } from 'node:path';
 import { state, childEnvironment } from './config.mjs';
 import { fenceSafe, redactSecrets } from './stringUtils.mjs';
 
@@ -7,16 +6,16 @@ const GATE_TIMEOUT_MS = 600000;
 
 // A gate is the cloned repo's own command. It gets the allowlisted environment and no login shell, so nothing the operator's profile
 // exports reaches it; what it prints is untrusted text that goes to the model and the card, so secrets and fences are neutralised.
-function gateChild(cwd, command, args) {
-	return run(cwd, command, args, { environment: childEnvironment(), timeoutMs: GATE_TIMEOUT_MS, signal: state.childAbort.signal });
+function gateChild(place, cwd, command, args) {
+	return place.run(cwd, command, args, { environment: childEnvironment(), timeoutMs: GATE_TIMEOUT_MS, signal: state.childAbort.signal });
 }
 
 function gateText(output, keep) {
 	return redactSecrets(fenceSafe(output.trim().slice(-keep)));
 }
 
-export async function install(worktreeRoot, area) {
-	const outcome = await gateChild(worktreeRoot, 'bash', [resolve('scripts/install.sh'), worktreeRoot, area.path]);
+export async function install(place, worktreeRoot, area) {
+	const outcome = await gateChild(place, worktreeRoot, 'bash', [place.installScript, worktreeRoot, area.path]);
 
 	if (outcome.timedOut) return { ran: false, error: 'install timed out after ' + (GATE_TIMEOUT_MS / 60000) + ' minutes' };
 
@@ -31,8 +30,8 @@ function failedInstall(area, error) {
 	return { passed: false, command: 'install', code: 1, output: error, area: area };
 }
 
-async function runGate(directory, command, area) {
-	const outcome = await gateChild(directory, 'bash', ['-c', command]);
+async function runGate(place, directory, command, area) {
+	const outcome = await gateChild(place, directory, 'bash', ['-c', command]);
 
 	let code = outcome.code;
 	// 124 is what the timeout command exits with, so a timed-out gate reads like one.
@@ -104,7 +103,7 @@ async function gateScopes(worktreeRoot, cardRun, chosen) {
 	for (const scope of cardRun.board.scopes) {
 		if (!chosen.includes(scope)) continue;
 
-		const installed = await install(worktreeRoot, scope);
+		const installed = await install(cardRun.place, worktreeRoot, scope);
 
 		if (installed.error !== undefined) return failedInstall(scope, installed.error);
 
@@ -114,7 +113,7 @@ async function gateScopes(worktreeRoot, cardRun, chosen) {
 	let gate = { passed: true, command: '', code: 0, output: '', area: cardRun.area };
 	for (const wave of gateWaves(gated)) {
 		// Every gate of the wave starts before any is awaited, so they run side by side; run() never rejects.
-		const running = wave.map(scope => runGate(join(worktreeRoot, scope.path), scope.gates, scope));
+		const running = wave.map(scope => runGate(cardRun.place, join(worktreeRoot, scope.path), scope.gates, scope));
 		const results = [];
 		for (const pending of running) {
 			results.push(await pending);
@@ -135,11 +134,11 @@ async function gateScopes(worktreeRoot, cardRun, chosen) {
 export async function runOwnGates(worktreeRoot, cardRun, changedFiles) {
 	const area = cardRun.area;
 	if (cardRun.conversation.fullGates && area.fullGates !== undefined) {
-		const installed = await install(worktreeRoot, area);
+		const installed = await install(cardRun.place, worktreeRoot, area);
 
 		if (installed.error !== undefined) return failedInstall(area, installed.error);
 
-		return runGate(worktreeRoot, area.fullGates, area);
+		return runGate(cardRun.place, worktreeRoot, area.fullGates, area);
 	}
 
 	return gateScopes(worktreeRoot, cardRun, cardRun.board.mono ? changedScopes(cardRun.board, area, changedFiles) : [area]);

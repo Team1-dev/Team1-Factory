@@ -10,4 +10,4 @@ Say what you did, what happened, and what an attacker could gain. We fix problem
 
 Team1 runs Claude Code unattended with permission checks off, and it runs commands from the repositories it manages. That is by design, and it is why the README tells you to run it on a server of its own with a dedicated GitHub account. Code running with Team1's permissions on that server is not a vulnerability.
 
-These are: a GitHub token or Claude credential reaching the model or a gate command, text from an untrusted account being followed as instructions, hidden instructions that escape the `attack` label, and anything that lets Team1 merge what its gates, review or approval settings should have stopped.
+These are: a GitHub token reaching a card's sandbox (the Claude token is there while Claude runs, a known limitation until its proxy lands), text from an untrusted account being followed as instructions, hidden instructions that escape the `attack` label, and anything that lets Team1 merge what its gates, review or approval settings should have stopped.

@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { setRedactedAccountName, setRedactedRoots, splitCommaList } from './stringUtils.mjs';
 import { repository } from './git.mjs';
+import { repoDirectory } from './place.mjs';
 
 // Only these reach a child process. The operator's shell holds GITHUB_TOKEN and whatever else; none of it may reach the model or the gates.
 // CLAUDE_* is for the model child alone: a gate command comes from the cloned repo and must never see a claude credential.
@@ -22,6 +23,8 @@ const KNOB_DEFAULTS = {
 	MAX_COST_PER_CARD: 15,
 	MAX_GATE_FIXES: 2,
 	MAX_UNLISTED_FILES: 20,
+	SANDBOX_MEMORY_MB: 1536,
+	SANDBOX_CPUS: 1,
 };
 
 // Settings from the environment, then the process state and the caches, all reset by loadEnv.
@@ -31,6 +34,7 @@ export const state = {
 	trustedLogins: [],
 	knobs: {},
 	workDir: undefined,
+	sandbox: { image: '', socket: '', gitUpstream: '' },
 	ledgerPath: undefined,
 	childEnvironment: {},
 	modelEnvironment: {},
@@ -69,6 +73,11 @@ export function loadEnv(env) {
 
 	state.trustedLogins = splitCommaList(env.TRUSTED_LOGINS);
 	state.workDir = env.WORK_DIR ?? join(homedir(), '.team1', 'work');
+	state.sandbox = {
+		image: 'team1-sandbox',
+		socket: env.DOCKER_SOCKET ?? '/var/run/docker.sock',
+		gitUpstream: env.GITHUB_URL ?? 'https://github.com',
+	};
 	state.ledgerPath = join(state.workDir, 'metrics.jsonl');
 	setRedactedRoots([{ path: resolve(state.workDir), replacement: '<work>' }, { path: homedir(), replacement: '~' }]);
 	setRedactedAccountName(basename(homedir()));
@@ -124,7 +133,7 @@ export function tokenNameFor(repo) {
 }
 
 export function workDirectory(repo) {
-	return join(state.workDir, repo.replace('/', '__'));
+	return repoDirectory(state.workDir, repo);
 }
 
 export function childEnvironment() {
@@ -135,14 +144,16 @@ export function modelEnvironment() {
 	return { ...state.modelEnvironment };
 }
 
-export function repositoryFor(repo, runnerLogin) {
+export function repositoryFor(repo, runnerLogin, place) {
 	const tokenName = tokenNameFor(repo);
 	const environment = childEnvironment();
-	environment.RUNNER_GIT_TOKEN = state.tokens[tokenName];
+	// A sandbox's git reaches GitHub through the git proxy, which adds the token; it must never carry it.
+	if (place.holdsSecrets) environment.RUNNER_GIT_TOKEN = state.tokens[tokenName];
 
 	return repository({
-		store: workDirectory(repo) + '/.repo',
-		url: 'https://github.com/' + repo + '.git',
+		place: place,
+		store: repoDirectory(place.workDir, repo) + '/.repo',
+		url: place.gitRemote(repo),
 		environment: environment,
 		tokenVariable: 'RUNNER_GIT_TOKEN',
 		tokenUser: 'x-access-token',

@@ -158,7 +158,7 @@ async function implementPrompt(run, worktree, installed, priorSession) {
 	}
 
 	const treeFiles = await run.git.listFiles(worktree.cwd);
-	const preread = await inlineFiles(worktree.cwd, filesNamedOnCards(treeFiles, run.batch, run.comments), PREREAD_CHARS);
+	const preread = await inlineFiles(run.place, worktree.cwd, filesNamedOnCards(treeFiles, run.batch, run.comments), PREREAD_CHARS);
 
 	const sentences = [];
 	if (run.area.repoWide) {
@@ -413,7 +413,7 @@ export async function handleImplement(run) {
 	const forceGitignore = await run.git.ensureGitignore(worktree.root, run.area.path);
 	worktree.forceInclude = forceGitignore ? ['.gitignore'] : [];
 
-	const installed = await install(worktree.root, run.area);
+	const installed = await install(run.place, worktree.root, run.area);
 
 	if (installed.error !== undefined) console.log(run.tag + ': install failed: ' + installed.error);
 
@@ -421,6 +421,7 @@ export async function handleImplement(run) {
 	const prompts = await implementPrompt(run, worktree, installed, priorSession);
 	const built = await buildUntilGreen(run, worktree, prompts, {
 		system: systemPrompt(run),
+		place: run.place,
 		cwd: worktree.cwd,
 		tools: ['Bash', 'Read', 'Edit', 'Write', 'Grep', 'Glob'],
 		permissionMode: 'bypassPermissions',

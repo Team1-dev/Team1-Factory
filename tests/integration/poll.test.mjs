@@ -212,7 +212,7 @@ test('an expired claude login halts the loop before any other card in the repo i
 
 	expect(model.calls.length).toBe(1);
 	expect(p.github.writes.some(write => write.number === 6)).toBe(false);
-	expect(state.haltReason).toContain('log back in');
+	expect(state.haltReason).toContain('run ./login.sh');
 });
 
 test('a card a person merged has its proposals read once, then nothing on a second sweep', async () => {

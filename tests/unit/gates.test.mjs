@@ -4,12 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadEnv } from '../../src/config.mjs';
 import { runDependentGates, runGates, runOwnGates } from '../../src/gates.mjs';
+import { localPlace } from '../../src/place.mjs';
 
 // A single-project repository whose one area has this gate command.
 function gated(root, command, changedFiles) {
 	const scope = { name: '', path: '.', gates: command, fullGates: undefined, uses: [], repoWide: false };
 
-	return runGates(root, { area: scope, board: { mono: false, scopes: [scope] }, conversation: { fullGates: false } }, changedFiles);
+	return runGates(root, { area: scope, board: { mono: false, scopes: [scope] }, place: localPlace(tmpdir()), conversation: { fullGates: false } }, changedFiles);
 }
 
 test('a gate command runs in the real shell with the allowlisted environment and never a token', async () => {
@@ -72,7 +73,7 @@ test('in a monorepo the changed area, every area that uses it, and nothing else,
 
 	const api = scope('api', []);
 	const board = { mono: true, scopes: [scope('docs', []), api, scope('web', ['api']), { name: '', path: '.', gates: 'true', uses: [], repoWide: true }] };
-	const gate = await runGates(root, { area: api, board: board, conversation: { fullGates: false } }, ['apps/api/x.js']);
+	const gate = await runGates(root, { area: api, board: board, place: localPlace(tmpdir()), conversation: { fullGates: false } }, ['apps/api/x.js']);
 
 	expect(gate.passed).toBe(true);
 	expect(readFileSync(join(root, 'ran'), 'utf8')).toBe('api ' + join(root, 'apps/api') + '\nweb ' + join(root, 'apps/web') + '\n');
@@ -87,7 +88,7 @@ test('an install that fails is the red gate, its output neutralised; full gates 
 
 	const scope = { name: '', path: '.', gates: 'echo fast', fullGates: 'echo full bar', uses: [], repoWide: false };
 	const board = { mono: false, scopes: [scope] };
-	const failed = await runGates(root, { area: scope, board: board, conversation: { fullGates: false } }, []);
+	const failed = await runGates(root, { area: scope, board: board, place: localPlace(tmpdir()), conversation: { fullGates: false } }, []);
 
 	expect(failed.passed).toBe(false);
 	expect(failed.command).toBe('install');
@@ -95,7 +96,7 @@ test('an install that fails is the red gate, its output neutralised; full gates 
 	expect(failed.output.length).toBeLessThanOrEqual(300);
 	expect(failed.output).not.toContain('```');
 
-	const full = await runGates(mkdtempSync(join(tmpdir(), 'gate-')), { area: scope, board: board, conversation: { fullGates: true } }, []);
+	const full = await runGates(mkdtempSync(join(tmpdir(), 'gate-')), { area: scope, board: board, place: localPlace(tmpdir()), conversation: { fullGates: true } }, []);
 
 	expect(full.passed).toBe(true);
 	expect(full.command).toBe('echo full bar');
@@ -121,7 +122,7 @@ test('gates run in waves: an area starts once what it uses has passed, the areas
 	const base = scope('base', [], 0);
 	const board = { mono: true, scopes: [base, scope('left', ['base'], 0), scope('right', ['base'], 0), scope('top', ['left'], 0)] };
 	const began = Date.now();
-	const gate = await runGates(root, { area: base, board: board, conversation: { fullGates: false } }, ['apps/base/x.cs']);
+	const gate = await runGates(root, { area: base, board: board, place: localPlace(tmpdir()), conversation: { fullGates: false } }, ['apps/base/x.cs']);
 	const lines = readFileSync(log, 'utf8').trim().split('\n');
 
 	expect(gate.passed).toBe(true);
@@ -135,7 +136,7 @@ test('gates run in waves: an area starts once what it uses has passed, the areas
 	writeFileSync(log, '');
 
 	const red = { mono: true, scopes: [base, scope('left', ['base'], 4), scope('right', ['base'], 5), scope('top', ['left'], 0)] };
-	const failed = await runGates(root, { area: base, board: red, conversation: { fullGates: false } }, ['apps/base/x.cs']);
+	const failed = await runGates(root, { area: base, board: red, place: localPlace(tmpdir()), conversation: { fullGates: false } }, ['apps/base/x.cs']);
 
 	expect(failed.passed).toBe(false);
 	expect(failed.area.name).toBe('left');
@@ -157,7 +158,7 @@ test('implement gates only what the card changed; review gates only what uses it
 
 	const lib = scope('lib', []);
 	const board = { mono: true, scopes: [lib, scope('app', ['lib']), scope('docs', [])] };
-	const cardRun = { area: lib, board: board, conversation: { fullGates: false } };
+	const cardRun = { area: lib, board: board, place: localPlace(tmpdir()), conversation: { fullGates: false } };
 
 	expect((await runOwnGates(root, cardRun, ['apps/lib/x.js'])).passed).toBe(true);
 	expect(readFileSync(join(root, 'ran'), 'utf8')).toBe('lib\n');

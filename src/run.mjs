@@ -2,10 +2,12 @@ import { batchFor, collectBlockers } from './board.mjs';
 import { branchOf, readComment } from './cards.mjs';
 import { noteExhaustion, noteLoginExpired } from './claude.mjs';
 import { hiddenInstruction } from './classify.mjs';
-import { repositoryFor, sayOnce, state, workDirectory } from './config.mjs';
+import { repositoryFor, sayOnce, state } from './config.mjs';
 import { readConversation } from './conversation.mjs';
 import { handleImplement } from './implement.mjs';
 import { handleMerge } from './merge.mjs';
+import { localPlace, repoDirectory } from './place.mjs';
+import { placeFor } from './sandboxes.mjs';
 import { apply, divert, failedOutcome, loginExpiredOutcome } from './outcomes.mjs';
 import { ledgerStart } from './ledger.mjs';
 import { fragment } from './prompts.mjs';
@@ -14,6 +16,8 @@ import { STAMP_MARKER } from './trust.mjs';
 import { handleReview } from './review.mjs';
 import { labelOfStage, stageOf } from './routes.mjs';
 import { handleTriage } from './triage.mjs';
+
+const CHECKOUT_STAGES = ['implement', 'review', 'merge'];
 
 // An answered card goes back to the stage that asked.
 async function handleAnswers(run) {
@@ -143,11 +147,15 @@ export async function processCard(github, board, card, waiting) {
 	const batch = batchFor(card, waiting, stage.name);
 	const mates = batch.slice(1);
 	const ownArea = board.mono && card.area !== undefined && card.area.name !== '';
+	const key = card.batch !== '' ? card.batch : card.number;
+	// A stage that touches the checkout runs in the card's sandbox; the rest read only GitHub, with no shell and no files.
+	const place = CHECKOUT_STAGES.includes(stage.name) ? await placeFor(github.repo, key, branchOf(card)) : localPlace(state.workDir);
 	const run = {
 		repo: github.repo,
 		tag: github.repo + ' #' + card.number,
 		github: github,
-		git: repositoryFor(github.repo, board.runnerLogin),
+		place: place,
+		git: repositoryFor(github.repo, board.runnerLogin, place),
 		board: board,
 		area: card.area,
 		stage: stage,
@@ -159,7 +167,7 @@ export async function processCard(github, board, card, waiting) {
 		humanReview: batch.some(member => member.humanReview),
 		lead: card,
 		branch: branchOf(card),
-		batchRoot: workDirectory(github.repo) + '/' + (card.batch !== '' ? card.batch : card.number),
+		batchRoot: repoDirectory(place.workDir, github.repo) + '/' + key,
 		ownArea: ownArea,
 		where: ownArea ? ' ' + fragment('_notes.md', 'in-area', { path: card.area.path }) : '',
 		comments: [],

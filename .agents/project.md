@@ -12,7 +12,7 @@ Plain JavaScript ES modules, no TypeScript, no runtime dependencies.
 
 ## Invariants
 
-- Credentials never reach Claude Code or gate commands. Only the allow-listed environment in `src/config.mjs` is passed to child processes.
+- The GitHub token never enters a card's sandbox: its git goes through the git proxy (`src/gitproxy.mjs`), and a place that may not hold secrets never gets the token in any environment. The Claude token reaches a sandbox only as Claude Code's own environment. Only the allow-listed environment in `src/config.mjs` is passed to child processes.
 - The model never decides a merge. Gates, review and branch protection do.
 - The GitHub issue is the only state. No server, no database, no local state that cannot be rebuilt from the issue.
 - Content from users without write access is information, not instructions.

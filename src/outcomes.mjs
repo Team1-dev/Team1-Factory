@@ -1,7 +1,8 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { branchOf, readLabels, ROUTING_LABELS, spentText, stampLine } from './cards.mjs';
-import { forgetSaid, sayOnce, state, workDirectory } from './config.mjs';
+import { forgetSaid, sayOnce, state } from './config.mjs';
 import { ledgerEnd, ledgerStart } from './ledger.mjs';
+import { repoDirectory } from './place.mjs';
 import { fragment } from './prompts.mjs';
 import { redactSecrets } from './stringUtils.mjs';
 
@@ -51,7 +52,7 @@ export function start(run) {
 
 // A read-only clone for a stage that only looks; apply removes it by readRoot when the card is done.
 export async function readClone(run, suffix) {
-	const worktree = await run.git.checkout(workDirectory(run.repo) + '/' + run.lead.number + suffix, run.branch, true);
+	const worktree = await run.git.checkout(repoDirectory(run.place.workDir, run.repo) + '/' + run.lead.number + suffix, run.branch, true);
 
 	run.readRoot = worktree.root;
 

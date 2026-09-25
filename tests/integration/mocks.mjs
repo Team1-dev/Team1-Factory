@@ -30,6 +30,19 @@ vi.mock('../../src/git.mjs', () => ({ repository: repository }));
 
 vi.mock('../../src/gates.mjs', () => ({ install: install, runGates: runGates, runOwnGates: runOwnGates, runDependentGates: runDependentGates }));
 
+// Real sandboxes are tests/docker's: here a card's place is the poller's own, where the doubles above stand in for git and gates.
+vi.mock('../../src/sandboxes.mjs', async () => {
+	const { localPlace } = await vi.importActual('../../src/place.mjs');
+	const { state } = await vi.importActual('../../src/config.mjs');
+
+	return {
+		startSandboxes: async () => {},
+		stopSandboxes: async () => {},
+		placeFor: async () => localPlace(state.workDir),
+		sweepRepo: async () => {},
+	};
+});
+
 const realGithub = await vi.importActual('../../src/github.mjs');
 
 function githubClient(repo, token, apiBase) {

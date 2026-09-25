@@ -1,12 +1,11 @@
-import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { run, exists } from './shell.mjs';
 
 // The child git answers to the store's config alone: no prompt, no global or system config, so nothing the operator keeps in
 // ~/.gitconfig (a credential helper, a hooks path, rebase options) reaches a clone, a push or a rebase.
 const GIT_ENVIRONMENT = { GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
 
 export function repository(settings) {
+	const place = settings.place;
 	const store = resolve(settings.store);
 	const runOptions = { environment: { ...settings.environment, ...GIT_ENVIRONMENT } };
 	const credentialHelper = '!f() { echo username=' + settings.tokenUser
@@ -14,7 +13,7 @@ export function repository(settings) {
 
 	// A non-zero exit that is an answer, not a failure: the caller reads the code.
 	function tryGit(cwd, args) {
-		return run(cwd, 'git', args, runOptions);
+		return place.run(cwd, 'git', args, runOptions);
 	}
 
 	async function git(cwd, args) {
@@ -31,14 +30,14 @@ export function repository(settings) {
 	}
 
 	async function ensureStore() {
-		const cloned = await exists(join(store, '.git'));
+		const cloned = await place.exists(join(store, '.git'));
 
 		if (cloned) await git(store, ['remote', 'set-url', 'origin', settings.url]);
 
 		if (!cloned) {
 			await git('.', ['-c', 'credential.helper=' + credentialHelper, 'clone', '--no-checkout', settings.url, store]);
-			await mkdir(join(store, '.git', 'info'), { recursive: true });
-			await appendFile(join(store, '.git', 'info', 'exclude'), settings.excludes.join('\n') + '\n');
+			await place.makeDirectory(join(store, '.git', 'info'));
+			await place.appendText(join(store, '.git', 'info', 'exclude'), settings.excludes.join('\n') + '\n');
 		}
 
 		await git(store, ['config', 'credential.helper', credentialHelper]);
@@ -85,9 +84,9 @@ export function repository(settings) {
 	}
 
 	async function removeWorktree(root) {
-		await rm(root, { recursive: true, force: true });
+		await place.remove(root);
 
-		const cloned = await exists(join(store, '.git'));
+		const cloned = await place.exists(join(store, '.git'));
 
 		if (cloned) await git(store, ['worktree', 'prune']);
 	}
@@ -97,15 +96,15 @@ export function repository(settings) {
 	// A generated file a prior pass stopped short of pushing is still untracked on this pass: force it in again rather than
 	// leaving it for `committedChanges` to read as someone else's leftover.
 	async function ensureGitignore(root, areaPath) {
-		let isNodeProject = await exists(join(root, 'package.json'));
-		if (!isNodeProject) isNodeProject = await exists(join(root, areaPath, 'package.json'));
+		let isNodeProject = await place.exists(join(root, 'package.json'));
+		if (!isNodeProject) isNodeProject = await place.exists(join(root, areaPath, 'package.json'));
 
 		if (!isNodeProject) return false;
 
-		const hasGitignore = await exists(join(root, '.gitignore'));
+		const hasGitignore = await place.exists(join(root, '.gitignore'));
 
 		if (!hasGitignore) {
-			await writeFile(join(root, '.gitignore'), 'node_modules\n');
+			await place.writeText(join(root, '.gitignore'), 'node_modules\n');
 
 			return true;
 		}
@@ -216,7 +215,7 @@ export function repository(settings) {
 		const tracked = files.length > 0 ? (await git(root, ['ls-files', '--', ...files])).split('\n') : [];
 		const addable = [];
 		for (const file of files) {
-			if (tracked.includes(file) || await exists(join(root, file))) addable.push(file);
+			if (tracked.includes(file) || await place.exists(join(root, file))) addable.push(file);
 		}
 
 		if (addable.length > 0) await git(root, ['add', '--', ...addable]);

@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { claudeArguments, failure, readResult } from '../../src/claude.mjs';
 import { loadEnv } from '../../src/config.mjs';
+import { localPlace } from '../../src/place.mjs';
 
 test('failure: the two account-limit messages give a lift time a minute past the limit and are never retried', () => {
 	const epoch = failure('Claude AI usage limit reached|1760000000', { retryable: true });
@@ -26,7 +27,7 @@ test('failure: the two account-limit messages give a lift time a minute past the
 test('claudeArguments: a fresh call names its session, a resume resumes it; schema and budget only when given', () => {
 	loadEnv({ WORK_DIR: '/w' });
 
-	const call = { permissionMode: 'acceptEdits', tools: ['Read'], effort: 'low', schema: { type: 'object' }, budget: 0.5 };
+	const call = { permissionMode: 'acceptEdits', tools: ['Read'], effort: 'low', schema: { type: 'object' }, budget: 0.5, place: localPlace('/w') };
 	const fresh = claudeArguments('sonnet', call, 'sid', '/s.md');
 
 	expect(fresh[fresh.indexOf('--session-id') + 1]).toBe('sid');

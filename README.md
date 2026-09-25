@@ -36,7 +36,7 @@ Watch one go from [issue](https://github.com/Team1-dev/Team1-demo/issues/24) to 
 ## Requirements
 
 > [!WARNING]
-> Team1 runs Claude Code unattended with permission checks off. It runs inside a container, and we still recommend a server of its own rather than your own computer.
+> Team1 runs Claude Code unattended with permission checks off. Every card runs in a sandbox container of its own, which holds no GitHub token; we still recommend a server of its own rather than your own computer.
 
 * A Linux VPS. The steps below are for Ubuntu or Debian. Tested with 4 GB RAM and 2 CPUs; Team1 itself needs little, the memory goes to Claude Code and your own tests.
 * Docker. Step 1 installs it
@@ -77,43 +77,25 @@ A classic token with `repo` scope also works.
 
 Keep the token on the Team1 host only.
 
-### 3. Install Team1
+### 3. Set up Team1
 
 ```sh
 git clone https://github.com/Team1-dev/Team1-Factory.git team1
 cd team1
+./setup.sh
 ```
 
-### 4. Configure Team1
+`setup.sh` checks Docker, then asks for your repositories one at a time: paste a GitHub link (or `owner/name`) and the token for it, and it checks at once that the token can write to that repository. It builds Team1 and the sandbox every card runs in, and logs in to Claude with your subscription: it prints a link to open in a browser on any machine, and you paste back the code and then the token it gives you. Everything goes into `.env`, readable by you only, never into an image.
 
-Create `.env`:
+Run it again to add or remove a repository, or to change a token.
+
+### 4. Start it
 
 ```sh
-REPOS=owner/repo,owner/other-repo
-GITHUB_TOKEN=github_pat_...
+./start.sh
 ```
 
-Web consoles often mangle pasted text. After pasting the token, check it with `cat .env`.
-
-Credentials are not passed to Claude Code or gate commands. `.env` is never copied into the image.
-
-### 5. Log in to Claude
-
-```sh
-docker compose run --rm team1 claude
-```
-
-The first run builds the image, which takes a few minutes. Claude Code then prints a login URL. Open it in a browser on any machine, then paste the code it gives you back into the terminal. Once logged in, type `/exit`.
-
-The login is kept in a Docker volume, so you do this once.
-
-### 6. Run it
-
-Start the factory. This also creates Team1's labels in each repository:
-
-```sh
-docker compose up -d
-```
+It starts Team1, creates Team1's labels in each repository, and shows whether it came up.
 
 ## Run Team1
 
@@ -136,10 +118,23 @@ docker compose run --rm team1 node src/poll.mjs --once
 To update Team1:
 
 ```sh
-docker compose stop && git pull && docker compose up -d --build
+docker compose stop && git pull && ./start.sh
 ```
 
-The Claude login, Team1's working files and the tools it installed for your gates are in Docker volumes and survive an update.
+When Claude's login expires, Team1 says so in its log and on the issue it was working on. Run `./login.sh`: it logs in again and restarts Team1.
+
+Team1's working files are in Docker volumes and survive an update. The sandboxes of cards in progress keep running across an update, and Team1 picks them up again.
+
+## Sandboxes
+
+Every card runs in a container of its own, and Team1's own container keeps the secrets:
+
+* **A sandbox per card**, opened when the card first needs a checkout (implement, review or merge) and removed once the card is merged, closed or stopped. Each has a network of its own, so sandboxes cannot reach each other.
+* **Inside, the agent can install anything** (it may `sudo`), because nothing of value is in there.
+* **No GitHub token in the sandbox.** Its git talks to a proxy in Team1, which adds the token and lets a push through only to that card's own branch, force-push included. The merge itself is Team1's, through GitHub's API.
+* **The Claude token does go into the sandbox** while Claude runs there. A proxy for it is planned.
+
+Team1 needs Docker for this and does not start without it. `SANDBOX_MEMORY_MB` (default 1536) and `SANDBOX_CPUS` (default 1) cap each sandbox; `GITHUB_URL` (default `https://github.com`) is where the proxy sends git.
 
 ## Give Team1 work
 

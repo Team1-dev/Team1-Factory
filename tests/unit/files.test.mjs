@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { inlineFiles, parseDiff } from '../../src/files.mjs';
+import { localPlace } from '../../src/place.mjs';
 
 function fileDiff(path, added) {
 	return 'diff --git a/' + path + ' b/' + path + '\n--- a/' + path + '\n+++ b/' + path + '\n@@ -1 +1,2 @@\n x\n+' + added + '\n';
@@ -44,7 +45,7 @@ test('inlineFiles: a symlink is never read, a path escaping the root is never re
 	writeFileSync(join(root, 'src', 'a.mjs'), 'export const a = 1;\n');
 	symlinkSync(join(outside, 'credentials.json'), join(root, 'notes.md'));
 
-	const inlined = await inlineFiles(root, ['notes.md', '../' + basename(outside) + '/credentials.json', 'src/a.mjs'], 30000);
+	const inlined = await inlineFiles(localPlace(tmpdir()), root, ['notes.md', '../' + basename(outside) + '/credentials.json', 'src/a.mjs'], 30000);
 
 	expect(inlined.whole).toEqual(['src/a.mjs']);
 	expect(inlined.text).not.toContain('SECRET-CONTENT');

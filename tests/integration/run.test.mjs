@@ -218,11 +218,11 @@ test('an expired claude login gets one plain note, no error stamp, and halts the
 	const first = await passOver({ issues: [implementCard('x')], comments: { [CARD]: [TRIAGED] } }, CARD);
 
 	expect(callNames(first.writes)).toEqual(['comment']);
-	expect(first.writes[0].body).toContain('log back in');
+	expect(first.writes[0].body).toContain('run `./login.sh`');
 	expect(first.writes[0].body).not.toContain('· error ·');
 	expect(first.writes[0].body.endsWith('\n\n— team1-factory · implement · login-expired · 0 tokens · $0.00 API · total 0 tokens · $0.10 API')).toBe(true);
 	expect(state.haltAsked).toBe(true);
-	expect(state.haltReason).toContain('log back in');
+	expect(state.haltReason).toContain('run ./login.sh');
 
 	setup();
 	model.answers.push(failure('Failed to authenticate: OAuth session expired and could not be refreshed', {}));

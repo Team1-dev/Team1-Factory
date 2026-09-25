@@ -1,4 +1,3 @@
-import { lstat, readFile } from 'node:fs/promises';
 import { basename, matchesGlob, resolve, sep } from 'node:path';
 import { fragment } from './prompts.mjs';
 
@@ -74,31 +73,25 @@ export function compactDiff(diff, filesShownWhole) {
 
 // A path from a diff or a tree is the repo's own naming: it must stay under the root, and a symlink is not a file, or a pull
 // request could point one at the operator's files and have them read into the prompt.
-async function regularFileUnder(root, file) {
+async function regularFileUnder(place, root, file) {
 	const path = resolve(root, file);
 	if (!path.startsWith(resolve(root) + sep)) return undefined;
 
-	try {
-		const fileStat = await lstat(path);
-
-		return fileStat.isFile() ? path : undefined;
-	} catch {
-		return undefined;
-	}
+	return await place.fileKind(path) === 'file' ? path : undefined;
 }
 
-export async function inlineFiles(root, files, totalChars) {
+export async function inlineFiles(place, root, files, totalChars) {
 	let budget = Math.min(totalChars, FILES_CHARS);
 	const shown = [];
 	const whole = [];
 	for (const file of files) {
 		if (budget <= 0) break;
 
-		const path = await regularFileUnder(root, file);
+		const path = await regularFileUnder(place, root, file);
 
 		if (path === undefined) continue;
 
-		const text = await readFile(path, 'utf8');
+		const text = await place.readText(path);
 
 		const limit = Math.min(FILE_CHARS, budget);
 		const body = text.length > limit ? text.slice(0, limit) + '\n' + fragment('_shared.md', 'file-truncated', {}) : text;

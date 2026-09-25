@@ -68,7 +68,7 @@ async function changeUnderReview(run, pull, pullText) {
 
 async function reviewPrompt(run, change) {
 	const diff = change.diff;
-	const inlined = await inlineFiles(change.root, diff.files, diff.inlineBudget);
+	const inlined = await inlineFiles(run.place, change.root, diff.files, diff.inlineBudget);
 
 	const compacted = compactDiff(diff, inlined.whole);
 	let situation = fragment('review.md', 'change-under-review', { number: change.number, branch: run.branch });
@@ -127,6 +127,7 @@ export async function handleReview(run) {
 
 	const reply = await promptClaude(run.role, run, await reviewPrompt(run, change), {
 		system: systemPrompt(run),
+		place: run.place,
 		cwd: change.root,
 		tools: READ_TOOLS,
 		schema: verdictSchema(run.stage.verdicts, { delivery: true }),

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { repository } from '../../src/git.mjs';
+import { localPlace } from '../../src/place.mjs';
 import { run } from '../../src/shell.mjs';
 
 // A bare origin with one commit on main, a home whose global git config would change what our git does if it were read, and a
@@ -34,6 +35,7 @@ async function origin() {
 	await sh(seed, ['push', '-q', 'origin', 'main']);
 
 	const repo = repository({
+		place: localPlace(base),
 		store: join(base, 'store', '.repo'), url: 'file://' + bare, environment: environment, tokenVariable: 'RUNNER_GIT_TOKEN',
 		tokenUser: 'x-access-token', userName: 'runner', userEmail: 'runner@example.test', excludes: ['.agent-out/'],
 	});

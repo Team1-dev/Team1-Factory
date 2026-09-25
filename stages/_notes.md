@@ -21,7 +21,7 @@ After {rounds} rounds of this it goes to a person rather than round again.
 
 {stamp}
 <!-- login-expired -->
-**Claude's OAuth login has failed — you need to log back in on the machine running Team1** (`claude /login`), then start Team1 again. Nothing was wrong with this card and it will carry on from where it was.
+**Claude's login has failed — run `./login.sh` on the machine running Team1.** It logs in again and restarts Team1. Nothing was wrong with this card and it will carry on from where it was.
 
 {stamp}
 <!-- over-budget -->

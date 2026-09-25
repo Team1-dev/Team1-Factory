@@ -96,7 +96,7 @@ export function repository() {
 	};
 }
 
-export async function install(worktreeRoot, area) {
+export async function install(place, worktreeRoot, area) {
 	gates.calls.push({ name: 'install', root: worktreeRoot, area: area.name });
 
 	return gates.given.install;
