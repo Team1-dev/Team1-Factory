@@ -39,6 +39,7 @@ vi.mock('../../src/sandboxes.mjs', async () => {
 		startSandboxes: async () => {},
 		stopSandboxes: async () => {},
 		placeFor: async () => localPlace(state.workDir),
+		environmentFor: async () => ({ tools: {}, services: {} }),
 		sweepRepo: async () => {},
 	};
 });

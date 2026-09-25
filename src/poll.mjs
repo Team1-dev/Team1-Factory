@@ -8,7 +8,7 @@ import { STAGES } from './routes.mjs';
 import { loadBoard } from './board.mjs';
 import { sweepMergedProposals } from './findings.mjs';
 import { processCard } from './run.mjs';
-import { startSandboxes, sweepRepo } from './sandboxes.mjs';
+import { startSandboxes, stopSandboxes, sweepRepo } from './sandboxes.mjs';
 
 const SANDBOX_LABELS = ['stage: implement', 'stage: review', 'ready to merge', 'needs: answers'];
 
@@ -247,6 +247,8 @@ async function boot() {
 	}
 
 	await loop();
+	// The git proxy's server would otherwise keep the process alive after the loop has stopped.
+	await stopSandboxes();
 }
 
 function halt() {

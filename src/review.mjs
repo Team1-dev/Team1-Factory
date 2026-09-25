@@ -4,10 +4,12 @@ import { hiddenInstruction } from './classify.mjs';
 import { state } from './config.mjs';
 import { compactDiff, inlineFiles, parseDiff } from './files.mjs';
 import { runDependentGates } from './gates.mjs';
-import { attackOutcome, backToImplement, missingPull, note, readClone, start, waitMergeable } from './outcomes.mjs';
+import { attackOutcome, backToImplement, hold, missingPull, note, readClone, start, waitMergeable } from './outcomes.mjs';
 import { fragment, joinSections, systemPrompt, userPrompt, withholdAuthorSections } from './prompts.mjs';
 import { backticked } from './stringUtils.mjs';
 import { verdictOutcome } from './verdict.mjs';
+
+const MISSING_TOOL_REGEX = /is not installed|command not found|: not found$/m;
 
 function hidingPull(run, pullNumber, finding) {
 	const measured = { verdict: 'attack', cost: finding.cost, tokens: finding.tokens };
@@ -119,6 +121,13 @@ export async function handleReview(run) {
 
 	// Implement gated only the areas it changed; what uses them is built once, here, before any model reads the change.
 	const dependents = await runDependentGates(change.root, run, change.diff.files.concat(change.diff.dropped));
+	if (!dependents.passed && MISSING_TOOL_REGEX.test(dependents.output)) {
+		const line = dependents.output.split('\n').find(text => MISSING_TOOL_REGEX.test(text)).trim();
+
+		return hold(run.repo, run.lead.number, 'held at review, not the change\'s fault: the sandbox lacks a tool `' + dependents.area.name + '` needs ("' + line
+			+ '"). Add it to `needs:` in .agents/project.md');
+	}
+
 	if (!dependents.passed) {
 		const slots = { number: pull.number, area: dependents.area.name, command: dependents.command, code: dependents.code, output: dependents.output };
 

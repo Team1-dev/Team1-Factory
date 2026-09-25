@@ -11,7 +11,9 @@ RUN useradd --create-home --shell /bin/bash team1 \
 	&& chmod 0440 /etc/sudoers.d/team1
 
 USER team1
-ENV PATH=/home/team1/.local/bin:$PATH
+# Where a repository's .NET and Go go when its environment is built, so every command finds them.
+ENV PATH=/home/team1/.local/bin:/home/team1/.dotnet:/home/team1/.dotnet/tools:/usr/local/go/bin:$PATH \
+	DOTNET_ROOT=/home/team1/.dotnet DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 USER root

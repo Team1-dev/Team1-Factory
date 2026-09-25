@@ -3,9 +3,10 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { branchOf, stampLine } from '../../src/cards.mjs';
+import { repoState } from '../../src/config.mjs';
 import { model, gates, git } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
-import { issue, mine, openPull, stamped } from '../builders.mjs';
+import { REPO, issue, mine, openPull, stamped } from '../builders.mjs';
 
 const CARD = 5;
 const PULL = 50;
@@ -104,6 +105,17 @@ test('what uses the change is built once, before any reading; red, the card goes
 	expect(pass.writes[0].body).toContain('```\napp broke\n```');
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:dependents-red']);
+});
+
+test('a tool missing from the sandbox is never the change\'s fault: the card is held at review, with no note and no model call', async () => {
+	setup();
+	gates.given.dependentGate = { passed: false, command: 'dotnet-gates.sh', code: 1, output: 'building\ndotnet is not installed', area: { name: 'app-api' } };
+
+	const pass = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
+
+	expect(pass.writes).toEqual([]);
+	expect(model.calls).toEqual([]);
+	expect(repoState(REPO).said[CARD]).toContain('the sandbox lacks a tool `app-api` needs ("dotnet is not installed"). Add it to `needs:`');
 });
 
 test('the prompt: the pull, the files, the diff less generated files, added comments, author withheld', async () => {

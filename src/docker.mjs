@@ -73,6 +73,26 @@ export function dockerAt(socketPath) {
 		await call('DELETE', '/containers/' + encodeURIComponent(name) + '?force=true');
 	}
 
+	// An image's id, or undefined when Docker has no image by that name.
+	async function imageId(name) {
+		try {
+			return (await call('GET', '/images/' + encodeURIComponent(name) + '/json')).Id;
+		} catch (error) {
+			if (error.status === 404) return undefined;
+
+			throw error;
+		}
+	}
+
+	async function removeImage(name) {
+		await call('DELETE', '/images/' + encodeURIComponent(name) + '?force=true');
+	}
+
+	async function commit(container, image) {
+		const [repository, tag] = image.split(':');
+		await call('POST', '/commit?container=' + encodeURIComponent(container) + '&repo=' + encodeURIComponent(repository) + '&tag=' + encodeURIComponent(tag));
+	}
+
 	async function inspectNetwork(name) {
 		return call('GET', '/networks/' + encodeURIComponent(name));
 	}
@@ -99,6 +119,9 @@ export function dockerAt(socketPath) {
 		startContainer: startContainer,
 		inspectContainer: inspectContainer,
 		inspectNetwork: inspectNetwork,
+		imageId: imageId,
+		commit: commit,
+		removeImage: removeImage,
 		removeContainer: removeContainer,
 		containersLabelled: containersLabelled,
 		networksLabelled: networksLabelled,

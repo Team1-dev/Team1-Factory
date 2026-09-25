@@ -93,6 +93,7 @@ test('the client pages to a short page, sends the bearer token, reads a 404 file
 const ENDPOINTS = [
 	['user', [], 'GET', '/user', ''],
 	['defaultBranch', [], 'GET', '/repos/acme/app', ''],
+	['tree', ['main'], 'GET', '/repos/acme/app/git/trees/main?recursive=1', ''],
 	['labels', [], 'GET', '/repos/acme/app/labels?per_page=100&page=1', ''],
 	['createLabel', ['x', 'ff0000', 'd'], 'POST', '/repos/acme/app/labels', '{"name":"x","color":"ff0000","description":"d"}'],
 	['updateLabel', ['a b', 'ff0000', 'd'], 'PATCH', '/repos/acme/app/labels/a%20b', '{"color":"ff0000","description":"d"}'],
@@ -131,6 +132,7 @@ function emptyGitHub(request, response) {
 	if (request.method === 'DELETE') return response.end();
 	if (path === '/repos/acme/app') return response.end('{"default_branch":"main"}');
 	if (path.startsWith('/repos/acme/app/contents/')) return response.end('text');
+	if (path.startsWith('/repos/acme/app/git/trees/')) return response.end('{"sha":"abc","tree":[{"path":"a.js","type":"blob"},{"path":"src","type":"tree"}]}');
 
 	return response.end(LISTED_REGEX.test(path) && request.method === 'GET' ? '[]' : '{"number":1}');
 }

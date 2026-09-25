@@ -178,6 +178,17 @@ export function client(repo, token, apiBase) {
 		return requestRaw(base + '/pulls/' + number, 'application/vnd.github.diff');
 	}
 
+	// Every file path on a branch, and the tree's sha, which changes whenever any of them does.
+	async function tree(branch) {
+		const listing = await request('GET', base + '/git/trees/' + encodeURIComponent(branch) + '?recursive=1');
+		const paths = [];
+		for (const entry of listing.tree) {
+			if (entry.type === 'blob') paths.push(entry.path);
+		}
+
+		return { sha: listing.sha, paths: paths };
+	}
+
 	async function file(path) {
 		return requestRaw(base + '/contents/' + encodedPath(path), 'application/vnd.github.raw+json');
 	}
@@ -210,6 +221,7 @@ export function client(repo, token, apiBase) {
 		repo: repo,
 		user: user,
 		defaultBranch: defaultBranch,
+		tree: tree,
 		labels: labels,
 		createLabel: createLabel,
 		updateLabel: updateLabel,

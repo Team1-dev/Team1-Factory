@@ -8,6 +8,8 @@ const SETTING_FIELDS = {
 	'gates-full': { field: 'fullGates', kind: 'text' },
 	'human-approvals': { field: 'humanApprovals', kind: 'number' },
 	'review-ignore': { field: 'reviewIgnores', kind: 'list' },
+	'needs': { field: 'needs', kind: 'list' },
+	'services': { field: 'services', kind: 'list' },
 	'uses': { field: 'uses', kind: 'list' },
 	'auto-merge': { field: 'autoMerge', kind: 'flag' },
 };
@@ -26,7 +28,10 @@ function trimPath(path) {
 
 // A scalar the file does not set stays undefined, so newScope falls back from the area's file to the root's with ??.
 export function parseSettings(text) {
-	const settings = { gates: undefined, fullGates: undefined, humanApprovals: undefined, autoMerge: undefined, reviewIgnores: [], uses: [], projects: [] };
+	const settings = {
+		gates: undefined, fullGates: undefined, humanApprovals: undefined, autoMerge: undefined, reviewIgnores: [], uses: [], projects: [], needs: [], services: [],
+	};
+
 	if (text === undefined) return settings;
 
 	let inProjects = false;
@@ -73,7 +78,7 @@ function union(first, second) {
 }
 
 function newScope(declared, texts, root, mono) {
-	const own = parseSettings(texts.project);
+	const own = texts.settings;
 
 	const queues = {};
 	for (const stage of STAGES) {
@@ -101,12 +106,18 @@ function newScope(declared, texts, root, mono) {
 async function readScopes(github, board) {
 	const root = parseSettings(board.projectText);
 	board.mono = root.projects.length > 0;
+	board.needs = root.needs;
+	board.services = root.services;
 	for (const declared of root.projects.concat([ROOT_AREA])) {
-		const texts = { project: undefined, style: undefined };
+		const texts = { project: undefined, style: undefined, settings: undefined };
 		if (declared.path !== '.') {
 			texts.project = await github.file(declared.path + '/.agents/project.md');
 			texts.style   = await github.file(declared.path + '/.agents/style.md');
 		}
+
+		texts.settings = parseSettings(texts.project);
+		board.needs = union(board.needs, texts.settings.needs);
+		board.services = union(board.services, texts.settings.services);
 
 		board.scopes.push(newScope(declared, texts, root, board.mono));
 		if (declared.name !== '') board.areaNames.push(declared.name);
@@ -181,6 +192,8 @@ export async function loadBoard(github, runnerLogin) {
 		areaNames: [],
 		projectNames: [],
 		mono: false,
+		needs: [],
+		services: [],
 		runnerLogin: runnerLogin,
 		openNumbers: [],
 		fingerprint: '',

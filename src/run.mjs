@@ -7,7 +7,7 @@ import { readConversation } from './conversation.mjs';
 import { handleImplement } from './implement.mjs';
 import { handleMerge } from './merge.mjs';
 import { localPlace, repoDirectory } from './place.mjs';
-import { placeFor } from './sandboxes.mjs';
+import { environmentFor, placeFor } from './sandboxes.mjs';
 import { apply, divert, failedOutcome, loginExpiredOutcome } from './outcomes.mjs';
 import { ledgerStart } from './ledger.mjs';
 import { fragment } from './prompts.mjs';
@@ -149,7 +149,9 @@ export async function processCard(github, board, card, waiting) {
 	const ownArea = board.mono && card.area !== undefined && card.area.name !== '';
 	const key = card.batch !== '' ? card.batch : card.number;
 	// A stage that touches the checkout runs in the card's sandbox; the rest read only GitHub, with no shell and no files.
-	const place = CHECKOUT_STAGES.includes(stage.name) ? await placeFor(github.repo, key, branchOf(card)) : localPlace(state.workDir);
+	const place = CHECKOUT_STAGES.includes(stage.name)
+		? await placeFor(github.repo, key, branchOf(card), await environmentFor(github, board))
+		: localPlace(state.workDir);
 	const run = {
 		repo: github.repo,
 		tag: github.repo + ' #' + card.number,

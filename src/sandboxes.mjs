@@ -3,11 +3,13 @@ import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { state, tokenNameFor } from './config.mjs';
 import { dockerAt } from './docker.mjs';
+import { detectTools, environmentImage, environmentOf, installScript, startScript } from './environment.mjs';
 import { GIT_PROXY_PORT, gitProxy } from './gitproxy.mjs';
 import { sandboxPlace } from './place.mjs';
 import { adoptSandbox, closeSandbox, openSandbox, sandboxesLabelled } from './sandbox.mjs';
 
-const running = { docker: undefined, proxy: undefined, settings: undefined, cards: new Map() };
+const running = { docker: undefined, proxy: undefined, settings: undefined, cards: new Map(), environments: new Map() };
+const INSTALL_TIMEOUT_MS = 30 * 60 * 1000;
 
 export async function startSandboxes() {
 	if (state.modelEnvironment.CLAUDE_CODE_OAUTH_TOKEN === undefined) {
@@ -52,15 +54,60 @@ async function proxyHost(name) {
 	return network.IPAM.Config[0].Gateway;
 }
 
+// What a repository needs, from its default branch's files and its project.md, worked out again only when those files change.
+export async function environmentFor(github, board) {
+	const tree = await github.tree(board.defaultBranch);
+	const known = running.environments.get(github.repo);
+	if (known !== undefined && known.sha === tree.sha) return known.environment;
+
+	const detected = await detectTools(tree.paths, path => github.file(path));
+	const environment = environmentOf(detected, board.needs, board.services);
+	running.environments.set(github.repo, { sha: tree.sha, environment: environment });
+	console.log(github.repo + ': environment ' + JSON.stringify(environment));
+
+	return environment;
+}
+
+async function mustRun(sandbox, script, what) {
+	const outcome = await sandbox.run('/home/team1', 'bash', ['-c', script], { environment: {}, timeoutMs: INSTALL_TIMEOUT_MS });
+	if (outcome.code !== 0) throw new Error(what + ' failed in ' + sandbox.name + ': ' + outcome.output.trim().slice(-800));
+}
+
+// A fresh sandbox from the environment's image; the first time, one from the base image that installs the environment and is then
+// saved as that image.
+async function openWithEnvironment(name, environment) {
+	const baseId = await running.docker.imageId(running.settings.image);
+	if (baseId === undefined) throw new Error('no ' + running.settings.image + ' image: run ./setup.sh or ./start.sh, which build it');
+
+	const image = environmentImage(baseId, environment);
+	if (await running.docker.imageId(image) !== undefined) return openSandbox(running.docker, name, { ...running.settings, image: image });
+
+	const sandbox = await openSandbox(running.docker, name, running.settings);
+	console.log(name + ': building the environment ' + image);
+	try {
+		await mustRun(sandbox, installScript(environment), 'building the environment');
+	} catch (error) {
+		await closeSandbox(running.docker, name, running.settings);
+
+		throw error;
+	}
+
+	await running.docker.commit(name, image);
+	console.log(name + ': environment saved as ' + image);
+
+	return sandbox;
+}
+
 // The card's place in its sandbox, opened on first use and kept until the card is done. A fresh proxy key each time the poller starts:
 // the store's remote is set again from the place on every checkout.
-export async function placeFor(repo, key, branch) {
+export async function placeFor(repo, key, branch, environment) {
 	const name = repoPrefix(repo) + key;
 	let card = running.cards.get(name);
 	if (card === undefined) {
 		let sandbox = await adoptSandbox(running.docker, name, running.settings);
 		if (sandbox === undefined) {
-			sandbox = await openSandbox(running.docker, name, running.settings);
+			sandbox = await openWithEnvironment(name, environment);
+			await mustRun(sandbox, startScript(environment), 'starting services');
 			console.log(repo + ' #' + key + ': sandbox ' + name + ' opened');
 		}
 
