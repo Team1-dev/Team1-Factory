@@ -34,13 +34,14 @@ function keysInFlight(repo) {
 	return keys;
 }
 
-// How many cards have finished their stage since the poller started: a wait ends when it moves.
-let landings = 0;
+// GitHub's issue list can lag a card's new labels by a few seconds, so a pass just after a card lands may see nothing to start.
+const LIST_LAG_MS = 15000;
+const LOOK_AGAIN_SOON_MS = 5000;
 
 // Until a card being worked finishes its stage, at most ms, or a halt.
 async function untilOneLands(ms) {
-	const before = landings;
-	for (let waited = 0; waited < ms && landings === before; waited += 1000) {
+	const before = state.landings;
+	for (let waited = 0; waited < ms && state.landings === before; waited += 1000) {
 		if (state.haltAsked || await exists('STOP')) return;
 
 		await sleep(1000);
@@ -165,7 +166,8 @@ async function runFlight(card, run) {
 		if (!changed) state.restingUntil.set(run.repo + '#' + card.number, Date.now() + state.knobs.POLL_INTERVAL_MS);
 	} finally {
 		state.inFlight.delete(run.repo + '#' + card.number);
-		landings += 1;
+		state.landings += 1;
+		state.landedAt = Date.now();
 	}
 }
 
@@ -326,6 +328,7 @@ export async function loop() {
 		let wait = Math.min(state.knobs.POLL_INTERVAL_MS * (2 ** (quietPasses - 1)), state.knobs.IDLE_INTERVAL_MS);
 		// A held merge wakes the loop the moment it can go, however long the quiet has lasted.
 		if (state.wakeAt > 0) wait = Math.min(wait, Math.max(state.wakeAt - Date.now(), 1000));
+		if (Date.now() - state.landedAt < LIST_LAG_MS) wait = Math.min(wait, LOOK_AGAIN_SOON_MS);
 		console.log('nothing to start; looking again in ' + (wait < 120000 ? Math.round(wait / 1000) + 's' : Math.round(wait / 60000) + ' minutes'));
 
 		await sleepCheckingHalt(wait);

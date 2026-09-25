@@ -93,6 +93,10 @@ needs, a query it adds that scans too much, a race it opens — is `reject-local
 more round on this card costs far less than a card of its own later. `advance` only when you found
 nothing concrete in the change.
 
+**What an earlier review on this card asked for stands.** The author built it because it was asked
+for; undo it only for a concrete failure it causes, and then say which earlier instruction you are
+reversing and why. A decision a person wrote on the card is the design: hold the change to it.
+
 `reject-local` for a defect the author can fix as it stands. `reject-shape` when the thing is built
 around the wrong idea — handed `reject-local`, an author produces the minimum edit that satisfies
 your wording, not a rethink. **A second copy is always `reject-shape`**, naming the first copy.

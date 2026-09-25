@@ -54,6 +54,9 @@ export const state = {
 	// The cards being worked, by repo#number: at most PARALLEL_CARDS at once, and never two in one area, so no two race on the same
 	// area's pull or its base.
 	inFlight: new Map(),
+	// How many cards have finished their stage since the poller started, and when the last did: a wait ends when it moves.
+	landings: 0,
+	landedAt: 0,
 	// A card whose run changed nothing (held, or it failed), by repo#number: not tried again before this time.
 	restingUntil: new Map(),
 	repoStates: {},
@@ -123,6 +126,8 @@ export function loadEnv(env) {
 	state.exhaustedUntil   = 0;
 	state.wakeAt           = 0;
 	state.inFlight         = new Map();
+	state.landings         = 0;
+	state.landedAt         = 0;
 	state.restingUntil     = new Map();
 	state.repoStates       = {};
 	state.hiddenReadings   = {};
