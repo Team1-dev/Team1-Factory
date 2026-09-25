@@ -5,6 +5,7 @@ export const git = { given: {}, calls: [] };
 export const gates = { given: {}, calls: [], sequence: [] };
 export const shell = { given: [], calls: [] };
 export const timers = { waits: [], onWait: undefined };
+export const sandboxes = { calls: [] };
 // A GitHub client the poll loop gets from the test when one is given; else the real one.
 export const githubMock = { client: undefined };
 

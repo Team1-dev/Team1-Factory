@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { dockerAt } from '../../src/docker.mjs';
-import { closeSandbox, openSandbox, sweepSandboxes } from '../../src/sandbox.mjs';
+import { closeSandbox, openSandbox, sandboxesLabelled } from '../../src/sandbox.mjs';
 
 const docker = dockerAt(process.env.DOCKER_SOCKET ?? '/var/run/docker.sock');
 const SETTINGS = { image: 'team1-sandbox', memoryBytes: 1024 * 1024 * 1024, cpus: 1, pollerContainer: '' };
@@ -51,7 +51,7 @@ test('two cards\' sandboxes cannot reach each other', async () => {
 	expect(probe.stdout).not.toContain('exit 0');
 });
 
-test('closing a sandbox removes its container and its network; the sweep removes leftovers and keeps the rest', async () => {
+test('closing a sandbox removes its container and its network; a half-made one, a network alone, is listed and closed too', async () => {
 	const closed = sandboxName();
 	await openSandbox(docker, closed, SETTINGS);
 	await closeSandbox(docker, closed, SETTINGS);
@@ -59,12 +59,12 @@ test('closing a sandbox removes its container and its network; the sweep removes
 	expect(await gone(closed)).toBe(true);
 	expect((await docker.networksLabelled('team1.sandbox=' + closed)).length).toBe(0);
 
-	const kept = sandboxName();
-	const leftover = sandboxName();
-	await openSandbox(docker, kept, SETTINGS);
-	await openSandbox(docker, leftover, SETTINGS);
-	await sweepSandboxes(docker, opened.filter(name => name !== leftover), SETTINGS);
+	const halfMade = sandboxName();
+	await docker.createNetwork(halfMade, { 'team1.sandbox': halfMade });
 
-	expect(await gone(leftover)).toBe(true);
-	expect(await gone(kept)).toBe(false);
+	expect(await sandboxesLabelled(docker)).toContain(halfMade);
+
+	await closeSandbox(docker, halfMade, SETTINGS);
+
+	expect(await sandboxesLabelled(docker)).not.toContain(halfMade);
 });

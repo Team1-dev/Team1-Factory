@@ -51,8 +51,9 @@ export async function openSandbox(docker, name, settings) {
 	return sandbox;
 }
 
-// A card's sandbox still running from before the poller restarted, or undefined; a stopped one is closed so a fresh one opens.
-export async function adoptSandbox(docker, name, settings) {
+// A card's sandbox still running from before the poller restarted, when it runs the current environment's image; any other is closed
+// so a fresh one opens from that image.
+export async function adoptSandbox(docker, name, settings, imageId) {
 	let inspected;
 	try {
 		inspected = await docker.inspectContainer(name);
@@ -62,7 +63,7 @@ export async function adoptSandbox(docker, name, settings) {
 		throw error;
 	}
 
-	if (!inspected.State.Running) {
+	if (!inspected.State.Running || inspected.Image !== imageId) {
 		await closeSandbox(docker, name, settings);
 
 		return undefined;
@@ -115,10 +116,4 @@ export async function sandboxesLabelled(docker) {
 	}
 
 	return names;
-}
-
-export async function sweepSandboxes(docker, keep, settings) {
-	for (const name of await sandboxesLabelled(docker)) {
-		if (!keep.includes(name)) await closeSandbox(docker, name, settings);
-	}
 }

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { failure } from '../../src/claude.mjs';
 import { state } from '../../src/config.mjs';
-import { git, model } from '../doubles.mjs';
+import { git, model, sandboxes } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { issue, mine, person, stamped, stranger } from '../builders.mjs';
 
@@ -38,7 +38,17 @@ test('a card is blocked by the open cards its body, a person or a stamp names as
 		expect(pass.changed, blocked.body).toBe(false);
 		expect(pass.writes, blocked.body).toEqual([]);
 		expect(model.calls, blocked.body).toEqual([]);
+		expect(sandboxes.calls, blocked.body).toEqual([]);
 	}
+});
+
+test('a card that goes ahead gets its sandbox for implement, named by its own key and branch', async () => {
+	setup();
+	model.answers.push(implementAnswer());
+
+	await passOver({ issues: [implementCard('x')], comments: { [CARD]: [TRIAGED] } }, CARD);
+
+	expect(sandboxes.calls).toEqual([{ repo: 'acme/app', key: CARD, branch: 'card/5-card-5' }]);
 });
 
 test('a closed card, prose, a stranger\'s word or a far-off number is not a blocker', async () => {

@@ -2,6 +2,8 @@ import { repoState } from './config.mjs';
 
 const API = 'https://api.github.com';
 const PAGE_SIZE = 100;
+// A GitHub call that stalls would otherwise hold the whole factory: nothing else runs while one is awaited.
+const REQUEST_TIMEOUT_MS = 60000;
 
 // A path from the repository's own config goes into the URL one encoded segment at a time.
 function encodedPath(path) {
@@ -9,7 +11,7 @@ function encodedPath(path) {
 }
 
 // apiBase is for tests that stand a server in for GitHub.
-export function client(repo, token, apiBase) {
+export function client(repo, token, apiBase, timeoutMs = REQUEST_TIMEOUT_MS) {
 	const api = apiBase ?? API;
 	const owner = repo.slice(0, repo.indexOf('/'));
 	const base = api + '/repos/' + repo;
@@ -21,7 +23,7 @@ export function client(repo, token, apiBase) {
 	};
 
 	async function request(method, url, body) {
-		const response = await fetch(url, { method: method, headers: headers, body: JSON.stringify(body) });
+		const response = await fetch(url, { method: method, headers: headers, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
 
 		if (!response.ok) {
 			const text = await response.text();
@@ -35,7 +37,7 @@ export function client(repo, token, apiBase) {
 	}
 
 	async function requestRaw(url, accept) {
-		const response = await fetch(url, { headers: { Accept: accept, Authorization: authorization } });
+		const response = await fetch(url, { headers: { Accept: accept, Authorization: authorization }, signal: AbortSignal.timeout(timeoutMs) });
 
 		if (response.status === 404) return undefined;
 		if (!response.ok) throw new Error('GET ' + url + ' ' + response.status);
@@ -99,7 +101,7 @@ export function client(repo, token, apiBase) {
 		const cached = cache[url];
 		const conditionalHeaders = cached === undefined ? headers : { ...headers, 'If-None-Match': cached.etag };
 
-		const response = await fetch(url + '?per_page=' + PAGE_SIZE + '&page=1', { headers: conditionalHeaders });
+		const response = await fetch(url + '?per_page=' + PAGE_SIZE + '&page=1', { headers: conditionalHeaders, signal: AbortSignal.timeout(timeoutMs) });
 
 		if (response.status === 304) return cached.items;
 		if (!response.ok) throw new Error('GET ' + url + ' ' + response.status);

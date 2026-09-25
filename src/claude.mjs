@@ -326,7 +326,8 @@ async function claudeOnce(model, call) {
 
 		return readResult(readEvents(outcome.stdout), model, call, sessionId);
 	} finally {
-		await place.remove(scratch);
+		// A sandbox that died mid-call cannot remove its scratch; that must not replace the reason the call failed.
+		await place.remove(scratch).catch(error => console.log(cardPrefix(call.run) + 'scratch not removed: ' + error.message));
 	}
 }
 

@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { githubMock, install, model, repository, runDependentGates, runGates, runOwnGates, shell, timers } from '../doubles.mjs';
+import { githubMock, install, model, repository, runDependentGates, runGates, runOwnGates, sandboxes, shell, timers } from '../doubles.mjs';
 
 // The setup file of every integration test: the model, git, the gates, the shell, the clock and the GitHub client are all replaced.
 
@@ -38,7 +38,11 @@ vi.mock('../../src/sandboxes.mjs', async () => {
 	return {
 		startSandboxes: async () => {},
 		stopSandboxes: async () => {},
-		placeFor: async () => localPlace(state.workDir),
+		placeFor: async (repo, key, branch) => {
+			sandboxes.calls.push({ repo: repo, key: key, branch: branch });
+
+			return localPlace(state.workDir);
+		},
 		environmentFor: async () => ({ tools: {}, services: {} }),
 		sweepRepo: async () => {},
 	};

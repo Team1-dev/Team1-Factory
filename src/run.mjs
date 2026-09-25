@@ -109,6 +109,15 @@ function held(run) {
 	return undefined;
 }
 
+// Where the card works, and so where its repository and worktrees are.
+function workIn(run, place) {
+	run.place = place;
+	run.git = repositoryFor(run.repo, run.board.runnerLogin, place);
+	run.batchRoot = repoDirectory(place.workDir, run.repo) + '/' + run.key;
+}
+
+// A stage that touches the checkout gets the card's sandbox, opened only once the card is known to go ahead: not hidden, blocked or
+// held. The others read only GitHub, with no shell and no files, on the poller.
 async function cardOutcome(run) {
 	const hidden = await screened(run);
 
@@ -119,6 +128,8 @@ async function cardOutcome(run) {
 	if (holding !== undefined) return holding.outcome;
 
 	try {
+		if (CHECKOUT_STAGES.includes(run.stage.name)) await workIn(run, await placeFor(run.repo, run.key, run.branch, await environmentFor(run.github, run.board)));
+
 		return await HANDLERS[run.stage.name](run);
 	} catch (error) {
 		if (noteLoginExpired(error)) return loginExpiredOutcome(run, { verdict: 'login-expired', cost: error.cost ?? 0, tokens: error.tokens ?? 0 });
@@ -148,10 +159,7 @@ export async function processCard(github, board, card, waiting) {
 	const mates = batch.slice(1);
 	const ownArea = board.mono && card.area !== undefined && card.area.name !== '';
 	const key = card.batch !== '' ? card.batch : card.number;
-	// A stage that touches the checkout runs in the card's sandbox; the rest read only GitHub, with no shell and no files.
-	const place = CHECKOUT_STAGES.includes(stage.name)
-		? await placeFor(github.repo, key, branchOf(card), await environmentFor(github, board))
-		: localPlace(state.workDir);
+	const place = localPlace(state.workDir);
 	const run = {
 		repo: github.repo,
 		tag: github.repo + ' #' + card.number,
@@ -168,6 +176,7 @@ export async function processCard(github, board, card, waiting) {
 		allTrusted: batch.every(member => member.trusted),
 		humanReview: batch.some(member => member.humanReview),
 		lead: card,
+		key: key,
 		branch: branchOf(card),
 		batchRoot: repoDirectory(place.workDir, github.repo) + '/' + key,
 		ownArea: ownArea,

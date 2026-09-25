@@ -6,7 +6,7 @@ import { state, loadEnv } from '../src/config.mjs';
 import { readBoardLabels } from '../src/cards.mjs';
 import { loadBoard } from '../src/board.mjs';
 import { processCard } from '../src/run.mjs';
-import { model, git, gates, shell, timers, githubMock } from './doubles.mjs';
+import { gates, git, githubMock, model, sandboxes, shell, timers } from './doubles.mjs';
 import { REPO, RUNNER, openPull } from './builders.mjs';
 
 const EMPTY_GIVEN = {
@@ -36,6 +36,7 @@ export function setup() {
 	model.calls       = [];
 	git.calls         = [];
 	gates.calls       = [];
+	sandboxes.calls   = [];
 	gates.sequence    = [];
 	shell.given       = [];
 	shell.calls       = [];

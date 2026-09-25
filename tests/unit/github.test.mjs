@@ -211,3 +211,19 @@ test('every function of the client sends the method, path and body GitHub expect
 	expect(ENDPOINTS.map(endpoint => endpoint[0]).sort()).toEqual(Object.keys(api).filter(key => key !== 'repo').sort());
 	github.close();
 });
+
+test('a GitHub call that never answers fails after the timeout instead of holding the factory', async () => {
+	const github = await listen(() => {});
+	const api = client('acme/app', 'tok', github.base, 300);
+	const began = Date.now();
+
+	const failure = await api.issues('open').catch(error => error);
+
+	expect(failure).toBeInstanceOf(Error);
+	expect(Date.now() - began).toBeLessThan(5000);
+	for (const call of [api.defaultBranch(), api.file('README.md'), api.comment(5, 'hi')]) {
+		await expect(call).rejects.toThrow();
+	}
+
+	github.close();
+});

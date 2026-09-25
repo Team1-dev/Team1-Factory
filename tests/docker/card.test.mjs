@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadEnv, repositoryFor, state } from '../../src/config.mjs';
 import { dockerAt } from '../../src/docker.mjs';
+import { environmentImage, environmentOf } from '../../src/environment.mjs';
 import { placeFor, startSandboxes, stopSandboxes, sweepRepo } from '../../src/sandboxes.mjs';
 import { run } from '../../src/shell.mjs';
 import { gitHost } from '../githost.mjs';
@@ -11,6 +12,7 @@ import { gitHost } from '../githost.mjs';
 const FAKE_GITHUB_TOKEN = 'ghp_FAKEtokenThatMustNeverReachASandbox0001';
 const REPO = 'acme/app';
 const BRANCH = 'card/5-x';
+const PLAIN = environmentOf({}, [], []);
 const GIT = {
 	PATH: process.env.PATH, HOME: tmpdir(), GIT_CONFIG_GLOBAL: '/dev/null',
 	GIT_AUTHOR_NAME: 's', GIT_AUTHOR_EMAIL: 's@example.test', GIT_COMMITTER_NAME: 's', GIT_COMMITTER_EMAIL: 's@example.test',
@@ -54,10 +56,13 @@ afterAll(async () => {
 	await sweepRepo(REPO, []);
 	await stopSandboxes();
 	host.server.close();
+
+	const docker = dockerAt(state.sandbox.socket);
+	await docker.removeImage(environmentImage(await docker.imageId('team1-sandbox'), PLAIN)).catch(() => {});
 });
 
 test('a card is checked out, committed and pushed from its own sandbox through the proxy; upstream alone sees the token', async () => {
-	const place = await placeFor(REPO, '5', BRANCH);
+	const place = await placeFor(REPO, '5', BRANCH, PLAIN);
 	const git = repositoryFor(REPO, 'runner', place);
 
 	const worktree = await git.checkout(place.workDir + '/acme__app/5', BRANCH, false);
@@ -83,7 +88,7 @@ test('a card is checked out, committed and pushed from its own sandbox through t
 const SEARCH = '{ grep -l --binary-files=text "$1" /proc/[0-9]*/environ; sudo grep -rl --binary-files=text "$1" /home /tmp /runner /etc; } 2>/dev/null | wc -l';
 
 test('the fake GitHub token is nowhere in the sandbox, by a search that does find a marker put in a process environment there', async () => {
-	const place = await placeFor(REPO, '5', BRANCH);
+	const place = await placeFor(REPO, '5', BRANCH, PLAIN);
 	const options = { environment: {}, timeoutMs: 120000 };
 
 	const token = await place.run('/', 'bash', ['-c', SEARCH, 'search', FAKE_GITHUB_TOKEN], options);
@@ -94,7 +99,7 @@ test('the fake GitHub token is nowhere in the sandbox, by a search that does fin
 });
 
 test('a card no longer in progress has its sandbox closed by the sweep', async () => {
-	await placeFor(REPO, '6', 'card/6-y');
+	await placeFor(REPO, '6', 'card/6-y', PLAIN);
 
 	const docker = dockerAt(state.sandbox.socket);
 

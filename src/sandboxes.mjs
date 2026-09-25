@@ -75,15 +75,21 @@ async function mustRun(sandbox, script, what) {
 
 // A fresh sandbox from the environment's image; the first time, one from the base image that installs the environment and is then
 // saved as that image.
-async function openWithEnvironment(name, environment) {
+// The environment's image: its name, and its id once it has been built.
+async function imageOf(environment) {
 	const baseId = await running.docker.imageId(running.settings.image);
 	if (baseId === undefined) throw new Error('no ' + running.settings.image + ' image: run ./setup.sh or ./start.sh, which build it');
 
-	const image = environmentImage(baseId, environment);
-	if (await running.docker.imageId(image) !== undefined) return openSandbox(running.docker, name, { ...running.settings, image: image });
+	const name = environmentImage(baseId, environment);
+
+	return { name: name, id: await running.docker.imageId(name) };
+}
+
+async function openWithEnvironment(name, environment, image) {
+	if (image.id !== undefined) return openSandbox(running.docker, name, { ...running.settings, image: image.name });
 
 	const sandbox = await openSandbox(running.docker, name, running.settings);
-	console.log(name + ': building the environment ' + image);
+	console.log(name + ': building the environment ' + image.name);
 	try {
 		await mustRun(sandbox, installScript(environment), 'building the environment');
 	} catch (error) {
@@ -92,10 +98,21 @@ async function openWithEnvironment(name, environment) {
 		throw error;
 	}
 
-	await running.docker.commit(name, image);
-	console.log(name + ': environment saved as ' + image);
+	await running.docker.commit(name, image.name);
+	console.log(name + ': environment saved as ' + image.name);
 
 	return sandbox;
+}
+
+// A card's sandbox can be removed under it (by hand, or by Docker); its cached place would then point at nothing.
+async function stillRunning(name) {
+	try {
+		return (await running.docker.inspectContainer(name)).State.Running;
+	} catch (error) {
+		if (error.status === 404) return false;
+
+		throw error;
+	}
 }
 
 // The card's place in its sandbox, opened on first use and kept until the card is done. A fresh proxy key each time the poller starts:
@@ -103,10 +120,18 @@ async function openWithEnvironment(name, environment) {
 export async function placeFor(repo, key, branch, environment) {
 	const name = repoPrefix(repo) + key;
 	let card = running.cards.get(name);
+	if (card !== undefined && !await stillRunning(name)) {
+		running.proxy.forget(card.proxyKey);
+		running.cards.delete(name);
+		card = undefined;
+		console.log(repo + ' #' + key + ': sandbox ' + name + ' was gone; opening a fresh one');
+	}
+
 	if (card === undefined) {
-		let sandbox = await adoptSandbox(running.docker, name, running.settings);
+		const image = await imageOf(environment);
+		let sandbox = await adoptSandbox(running.docker, name, running.settings, image.id);
 		if (sandbox === undefined) {
-			sandbox = await openWithEnvironment(name, environment);
+			sandbox = await openWithEnvironment(name, environment, image);
 			await mustRun(sandbox, startScript(environment), 'starting services');
 			console.log(repo + ' #' + key + ': sandbox ' + name + ' opened');
 		}
