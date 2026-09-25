@@ -7,10 +7,10 @@ function boot(env) {
 }
 
 test('the process refuses to boot on a knob that is not a number, and on no repos, before touching GitHub', () => {
-	const knob = boot({ REPOS: 'acme/app', WIP_CAP: 'four' });
+	const knob = boot({ REPOS: 'acme/app', MAX_ROUNDS: 'four' });
 
 	expect(knob.status).toBe(1);
-	expect(knob.stderr.trim()).toBe('WIP_CAP is not a number: four');
+	expect(knob.stderr.trim()).toBe('MAX_ROUNDS is not a number: four');
 
 	const none = boot({});
 

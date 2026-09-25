@@ -15,8 +15,7 @@ const MODEL_ENVIRONMENT_PREFIX = 'CLAUDE_';
 
 const KNOB_DEFAULTS = {
 	POLL_INTERVAL_MS: 30000,
-	IDLE_INTERVAL_MS: 3600000,
-	WIP_CAP: 4,
+	IDLE_INTERVAL_MS: 300000,
 	MERGE_DELAY_MS: 60000,
 	MAX_ROUNDS: 2,
 	MAX_ROUNDS_EVER: 4,
@@ -44,6 +43,8 @@ export const state = {
 	sessions: undefined,
 	lastClaudeCallAt: 0,
 	exhaustedUntil: 0,
+	// The soonest a held card can go on (a merge waiting out its comment window), set during a pass: the loop wakes then.
+	wakeAt: 0,
 	repoStates: {},
 	hiddenReadings: {},
 };
@@ -104,6 +105,7 @@ export function loadEnv(env) {
 	state.sessions         = undefined;
 	state.lastClaudeCallAt = 0;
 	state.exhaustedUntil   = 0;
+	state.wakeAt           = 0;
 	state.repoStates       = {};
 	state.hiddenReadings   = {};
 }

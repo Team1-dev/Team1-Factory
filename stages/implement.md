@@ -41,7 +41,7 @@ from the issue text.
 **Deliver everything the card asks for, in this one change.** Files in other projects are yours
 when the card asks for them. Never leave part of the ask for a follow-up card and call the rest
 `advance`: `cards` is only for what the card did not ask for. A card too big for one change is
-`reject-shape`, naming the split — never a partial build.
+`split` — never a partial build.
 
 1. **Work to your own plan.** Where the code contradicts it, do the right thing and record what
    the plan got wrong. This is the most valuable thing you will write.
@@ -73,8 +73,20 @@ beside the code, a line in the README or `project.md`, the commit that introduce
 then `git log`). If somebody chose this, do not fix it: return `questions`, quoting the evidence —
 a feature wearing a bug report is a person's decision. No evidence either way is not a blocker.
 
-**If the card cannot be built as asked** — not harder than it looked, but wrong — return
-`reject-shape` with what you learned. Do not quietly diverge.
+**If the card is the wrong shape** — not harder than it looked, but wrong — fix the shape yourself,
+before you write any code. Do not quietly diverge, and never stop at describing a better shape:
+- **It belongs to another project** — the files it needs are all another project's: return `reroute`
+  with that project's name in `project`. It moves there and comes straight back to implement.
+- **It is too big for one change, or needs work in several projects**: return `split`, with one
+  `cards` entry per part — its `title`, a `body` that says what to build and where, and its
+  `project`. Leave out what is already done, and say so in your section. Team1 opens each as a card
+  of its own; this card waits for them and closes once they have landed. No parts left means the
+  card is already done: return `advance` with nothing changed.
+- **A value it needs is defined nowhere** — a product choice, not a fact: return `questions`. The
+  person who opened the card can answer on it; ask so that one reply settles it.
+
+**A card that comes back after its parts were split out and landed:** check that what it asked for
+is now there, change nothing, and return `advance` — Team1 closes it.
 
 ## Write
 

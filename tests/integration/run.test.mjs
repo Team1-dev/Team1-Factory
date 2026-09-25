@@ -94,6 +94,7 @@ test('stalled: the stage ran maxRounds times since a person last spoke', async (
 
 	expect(callNames(pass.writes)).toEqual(['comment', 'setLabels']);
 	expect(pass.writes[0].body).toContain('This card has been through **implement** 2 times without settling.');
+	expect(pass.writes[0].body).toContain('It needs a decision: reply here with it, and it goes round again.\n\nWhat stopped it last time:\n\n> ## implement');
 	expect(pass.writes[0].body.endsWith('\n\n— team1-factory · implement · stalled · 0 tokens · $0.00 API · total 0 tokens · $3.10 API')).toBe(true);
 	expect(pass.writes[1].labels).toEqual(['tier: contained', 'needs: answers']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:stalled']);

@@ -29,11 +29,11 @@ This card has used **${spent} API**, over the ${budget} API budget. Work has sto
 
 {stamp}
 <!-- too-big -->
-**{stage}** has now run {rounds} times on this card, across every answer it has been given. More answers are not what it is short of: a card that cannot get through one stage in four attempts is too big, and wants splitting into cards that can. Reply here to send it round again anyway.
+**{stage}** has now run {rounds} times on this card, across every answer it has been given. More answers are not what it is short of: a card that cannot get through one stage in four attempts is too big, and wants splitting into cards that can. Reply here to send it round again anyway.{blocking}
 
 {stamp}
 <!-- stalled -->
-This card has been through **{stage}** {rounds} times without settling. Going round again would run the same stage on the same inputs. It needs a decision.
+This card has been through **{stage}** {rounds} times without settling. Going round again would run the same stage on the same inputs. It needs a decision: reply here with it, and it goes round again.{blocking}
 
 {stamp}
 <!-- died -->
@@ -96,6 +96,26 @@ Back to implement with these answers.
 {stamp}
 <!-- research-empty -->
 The research found nothing that answers these.
+<!-- rerouted -->
+{section}
+
+This card belongs to `{project}`, so it moves there and goes on to implement.
+
+{stamp}
+<!-- reroute-unknown -->
+{section}
+
+Implement named `{project}` as this card's project, which is not one of this repository's. Back to triage to place it.
+
+{stamp}
+<!-- split -->
+{section}
+
+Split into cards of their own: {cards}. This card waits for them and closes once they have all landed.
+
+blocked-by: {cards}
+
+{stamp}
 <!-- no-change -->
 {section}
 

@@ -1,7 +1,7 @@
 import { readdir, rm } from 'node:fs/promises';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { state, loadEnv, tokenNameFor, repoState, sayOnce, forgetSaid, workDirectory } from './config.mjs';
+import { state, loadEnv, tokenNameFor, repoState, sayOnce, workDirectory } from './config.mjs';
 import { client } from './github.mjs';
 import { exists } from './shell.mjs';
 import { STAGES } from './routes.mjs';
@@ -9,9 +9,9 @@ import { loadBoard } from './board.mjs';
 import { sweepMergedProposals } from './findings.mjs';
 import { processCard } from './run.mjs';
 
-// Landing and reviewing what is already open comes before any other stage.
-const FIRST_STAGES = ['ready to merge', 'stage: review'];
-const PASS_ORDER = STAGES.filter(stage => FIRST_STAGES.includes(stage.label)).concat(STAGES.filter(stage => !FIRST_STAGES.includes(stage.label)));
+// Work already started moves on before anything new is triaged: landing, reviewing and building come first.
+const ORDER = ['ready to merge', 'stage: review', 'stage: implement', 'needs: answers', 'stage: triage'];
+const PASS_ORDER = ORDER.map(label => STAGES.find(stage => stage.label === label));
 
 async function sleepCheckingHalt(ms) {
 	for (let waited = 0; waited < ms; waited += 1000) {
@@ -28,9 +28,7 @@ function stopAsked() {
 	return state.exhaustedUntil > Date.now();
 }
 
-function skipsCard(repo, card, stage, capped) {
-	if (capped && !card.started) return true;
-
+function skipsCard(repo, card, stage) {
 	if (stage.name === 'implement' && !card.hasPull && card.area.hasPull) {
 		sayOnce(repo, card.number, '#' + card.number + ' waits: ' + card.area.projectName + ' has a pull open');
 
@@ -60,7 +58,7 @@ async function processStage(github, board, stage, scope) {
 	const waiting = scope.queues[stage.label];
 	for (const card of waiting) {
 		if (stopAsked()) return false;
-		if (stage.startsWork && skipsCard(github.repo, card, stage, scope.capped)) continue;
+		if (stage.startsWork && skipsCard(github.repo, card, stage)) continue;
 
 		const changed = await attemptCard(github, board, card, waiting);
 
@@ -129,14 +127,6 @@ export async function processRepo(repo) {
 			+ board.projectNames.join(', ') + ' — invisible until a person fixes it');
 	}
 
-	for (const scope of board.scopes) {
-		if (scope.capped) {
-			sayOnce(repo, 'wip', 'wip ' + scope.active + '/' + state.knobs.WIP_CAP + ' — no new cards started');
-		} else {
-			forgetSaid(repo, 'wip');
-		}
-	}
-
 	// One stage at a time across every area, so what is open lands before new work starts; the first change ends the pass and
 	// the next one reads a fresh board.
 	for (const stage of PASS_ORDER) {
@@ -149,6 +139,8 @@ export async function processRepo(repo) {
 }
 
 async function processRepos() {
+	state.wakeAt = 0;
+
 	let changed = false;
 	for (const repo of state.repos) {
 		try {
@@ -200,7 +192,9 @@ export async function loop() {
 
 		quietPasses += 1;
 
-		const wait = Math.min(state.knobs.POLL_INTERVAL_MS * (2 ** (quietPasses - 1)), state.knobs.IDLE_INTERVAL_MS);
+		let wait = Math.min(state.knobs.POLL_INTERVAL_MS * (2 ** (quietPasses - 1)), state.knobs.IDLE_INTERVAL_MS);
+		// A held merge wakes the loop the moment it can go, however long the quiet has lasted.
+		if (state.wakeAt > 0) wait = Math.min(wait, Math.max(state.wakeAt - Date.now(), 1000));
 		if (wait > 4 * state.knobs.POLL_INTERVAL_MS) console.log('quiet — next look in ' + Math.round(wait / 60000) + ' minutes');
 
 		await sleepCheckingHalt(wait);

@@ -70,6 +70,13 @@ export function readConversation(card, comments, stageName) {
 			events      = [];
 		}
 
+		// The card's own author answering on it sends it on like a person would: what they write was already the card. It stays
+		// their report, never trusted text, so it never overrides a model or asks for full gates.
+		if (comment.kind === 'other' && comment.login === card.login && card.login !== '') {
+			conversation.personSpokeLast = true;
+			events = [];
+		}
+
 		if (stamp === undefined) continue;
 
 		const restart = hasStamp(stamp, 'merge', ['objection']);

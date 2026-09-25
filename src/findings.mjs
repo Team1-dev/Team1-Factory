@@ -47,8 +47,9 @@ async function proposalsCard(run, title) {
 
 const FINDINGS_CARD_LIMIT = 10;
 
-// A findings card being worked opens what it does not do here as cards of their own, straight to triage in their project.
-async function openCards(run, findings) {
+// Cards of their own for what this card does not do itself, straight to triage in their project, each saying where it came from;
+// the numbers opened, as `#n`.
+export async function openCards(run, findings) {
 	const opened = [];
 	for (const finding of findings.slice(0, FINDINGS_CARD_LIMIT)) {
 		if (typeof finding.title !== 'string' || finding.title.trim() === '') continue;
@@ -62,9 +63,7 @@ async function openCards(run, findings) {
 		opened.push('#' + issue.number);
 	}
 
-	if (opened.length === 0) return '';
-
-	return fragment('_notes.md', 'opened-cards', { cards: opened.join(', ') });
+	return opened;
 }
 
 // What a stage found worth doing separately, posted as one comment per origin (implement, review) on this
@@ -75,7 +74,9 @@ export async function fileFindings(run, findings, limit, originNote) {
 
 	if (run.lead.labels.includes('findings')) {
 		try {
-			return await openCards(run, findings);
+			const opened = await openCards(run, findings);
+
+			return opened.length === 0 ? '' : fragment('_notes.md', 'opened-cards', { cards: opened.join(', ') });
 		} catch (error) {
 			console.log(run.tag + ': cards not opened: ' + error.message);
 

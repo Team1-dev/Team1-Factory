@@ -5,7 +5,7 @@ import { state } from './config.mjs';
 import { filesNamedOnCards, inlineFiles } from './files.mjs';
 import { install, runOwnGates } from './gates.mjs';
 import { newestSession } from './ledger.mjs';
-import { fileFindings } from './findings.mjs';
+import { fileFindings, openCards } from './findings.mjs';
 import { researchOutcome } from './research.mjs';
 import { alreadyDone, batchOutcome, hold, spentTotal, note, start, unreadableOutcome } from './outcomes.mjs';
 import { cardHeading, fragment, joinSections, resumeSince, RULE, systemPrompt, userPrompt } from './prompts.mjs';
@@ -38,6 +38,41 @@ function needsReview(run, changedFiles) {
 	return run.lead.reviewed;
 }
 
+// The card belongs to another project: it moves there and goes straight on to implement. A project the board does not have
+// goes to triage, which knows the list.
+function rerouteOutcome(run, section, project, measured) {
+	measured.verdict = 'reroute';
+	if (!run.board.areaNames.includes(project) || project === run.area.name) {
+		return batchOutcome(run.batch, note(run, 'reroute-unknown', { section: section, project: project ?? '' }, measured), 'stage: triage', measured);
+	}
+
+	for (const card of run.batch) {
+		card.labels = card.labels.filter(label => !label.startsWith('project: ')).concat(['project: ' + project]);
+	}
+
+	return batchOutcome(run.batch, note(run, 'rerouted', { section: section, project: project }, measured), 'stage: implement', measured);
+}
+
+// The card is bigger than one change, or spans projects: its parts become cards of their own, and it waits on them. When they
+// have all landed it comes back to implement, which finds nothing left and closes it. No parts left is a card already done.
+async function splitOutcome(run, section, parts, measured) {
+	measured.verdict = 'split';
+
+	const opened = await openCards(run, parts);
+	if (opened.length === 0) {
+		const doneOutcome = batchOutcome(run.batch, note(run, 'no-change', { section: section, filed: '' }, measured), '', measured);
+		for (const entry of doneOutcome.cards) {
+			entry.close = 'completed';
+		}
+
+		return doneOutcome;
+	}
+
+	const cards = opened.join(', ');
+
+	return batchOutcome(run.batch, note(run, 'split', { section: section, cards: cards }, measured), 'stage: implement', measured);
+}
+
 async function settleUnpushed(run, worktree, attempt) {
 	const reply = attempt.reply;
 	const outcome = reply.output.verdict;
@@ -47,6 +82,9 @@ async function settleUnpushed(run, worktree, attempt) {
 	if (outcome === 'questions' && research.length > 0 && run.conversation.newest.research === undefined) {
 		return researchOutcome(run, section, research, measured);
 	}
+
+	if (outcome === 'reroute') return rerouteOutcome(run, section, reply.output.project, measured);
+	if (outcome === 'split') return splitOutcome(run, section, reply.output.cards ?? [], measured);
 
 	if (outcome !== 'advance' && !attempt.changes.unpushed) {
 		const previous = run.conversation.newest.implement;
@@ -388,7 +426,7 @@ export async function handleImplement(run) {
 		permissionMode: 'bypassPermissions',
 		timeoutMs: IMPLEMENT_TIMEOUT_MS,
 		env: { CLAUDE_PROJECT_DIR: worktree.cwd },
-		schema: verdictSchema(run.stage.verdicts, { research: true }),
+		schema: verdictSchema(run.stage.verdicts, { research: true, reroute: true }),
 		priorSession: priorSession,
 		resumePrompt: prompts.resumePrompt,
 		cutOn: PLAN_CUT,

@@ -51,20 +51,6 @@ test('worktrees of cards no longer open are dropped; the store and the open card
 	expect(['.repo', '5-fine', '7-gone', '8-batch'].filter(name => existsSync(join(work, name)))).toEqual(['.repo', '5-fine']);
 });
 
-test('at the WIP cap no unstarted card is worked and the cap is said once; a started card still is', async () => {
-	const capped = pass({ issues: [issue(5, ['stage: triage'], 'fine'), issue(6, ['stage: triage'], 'also')] }, { WIP_CAP: '0' });
-
-	expect(await capped.run()).toBe(false);
-	expect(model.calls.length).toBe(0);
-	expect(repoState(REPO).said.wip).toBe('wip 0/0 — no new cards started');
-
-	const started = pass({ issues: [issue(5, ['stage: review', 'tier: contained'], 'built')] }, { WIP_CAP: '0' });
-
-	await started.run();
-
-	expect(started.github.writes.length).toBeGreaterThan(0);
-});
-
 test('one card per scope per pass, and a card wearing an unknown project is said to be invisible', async () => {
 	const p = pass({
 		issues: [issue(5, ['stage: triage', 'project: web'], 'a'), issue(6, ['stage: triage', 'project: web'], 'b'), issue(7, ['stage: triage', 'project: gone'], 'c')],
@@ -96,6 +82,25 @@ test('a card waiting in review in one area is worked before a card in triage in 
 	expect(cardWrites).toEqual([6]);
 });
 
+test('a card waiting for implement in one area is worked before a card waiting for triage in another', async () => {
+	const p = pass({
+		issues: [issue(5, ['stage: triage', 'project: web'], 'new'), issue(6, ['stage: implement', 'tier: contained', 'project: api'], 'triaged')],
+		files: { '.agents/project.md': 'projects:\n  web: apps/web\n  api: apps/api\n' },
+	});
+
+	// The implement card was never triaged, so implement sends it back without a model call — the pass is implement's, not
+	// a triage of the other card.
+	expect(await p.run()).toBe(true);
+
+	const cardWrites = [];
+	for (const write of p.github.writes) {
+		if (write.number !== undefined) cardWrites.push(write.number);
+	}
+
+	expect(cardWrites).toEqual([6]);
+	expect(model.calls).toEqual([]);
+});
+
 test('an area with a pull open starts no other card\'s implement until it lands, and says so once', async () => {
 	const waiting = issue(5, ['failed', 'tier: contained', 'project: web'], 'has a pull');
 	const p = pass({
@@ -107,6 +112,34 @@ test('an area with a pull open starts no other card\'s implement until it lands,
 	expect(await p.run()).toBe(false);
 	expect(model.calls.length).toBe(0);
 	expect(repoState(REPO).said[6]).toBe('#6 waits: web has a pull open');
+});
+
+test('a merge held for its comment window wakes the loop when the window ends, not after the quiet backoff', async () => {
+	const held = pass({ issues: [] });
+	const listIssues = held.github.issues;
+	let passes = 0;
+	// Each pass stands in for a merge held two seconds more.
+	held.github.issues = () => {
+		passes += 1;
+		state.wakeAt = Date.now() + 2000;
+
+		return listIssues();
+	};
+
+	timers.onWait = () => {
+		if (passes === 4) state.haltAsked = true;
+	};
+
+	await loop();
+
+	// Four passes a couple of seconds apart, where the backoff alone would have slept 30, 60 and 120 seconds between them.
+	let slept = 0;
+	for (const ms of timers.waits) {
+		slept += ms;
+	}
+
+	expect(passes).toBe(4);
+	expect(slept).toBeLessThanOrEqual(8000);
 });
 
 test('the loop: one pass with --once; a quiet pass backs off by the poll interval; a halt or the STOP file stops it; an account limit is slept out', async () => {

@@ -177,13 +177,6 @@ test('a verdict other than advance with nothing pushed posts the section and rou
 	expect(gates.calls).toEqual([{ name: 'install', root: ROOT, area: '' }]);
 
 	setup();
-	answered('reject-shape', {}, 0.5);
-
-	const rejected = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
-
-	expect(rejected.writes[1].labels).toEqual(['tier: contained', 'stage: triage']);
-
-	setup();
 	answered('park', {}, 0.5);
 
 	const parked = await passOver({ issues: [implementCard([], 'x')], comments: { [CARD]: [triaged()] } }, CARD);
@@ -244,6 +237,53 @@ test('advance with nothing pushed and no pull is no-change and closes the card a
 	expect(pass.writes[1].labels).toEqual(['tier: contained']);
 	expect(pass.writes[2]).toEqual({ name: 'close', number: CARD, reason: 'completed' });
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:no-change']);
+});
+
+test('a card that belongs to another project moves there and goes straight on to implement; an unknown project goes to triage', async () => {
+	setup();
+	answered('reroute', { project: 'app' }, 0.5);
+
+	const moved = await passOver({ issues: [implementCard(['project: lib'], 'x')], comments: { [CARD]: [triaged()] }, files: MONO }, CARD);
+	const moveLabels = moved.writes.find(write => write.name === 'setLabels');
+
+	expect(moveLabels.labels).toEqual(['tier: contained', 'project: app', 'stage: implement']);
+	expect(moved.writes.find(write => write.name === 'comment').body).toContain('This card belongs to `app`, so it moves there and goes on to implement.');
+
+	setup();
+	answered('reroute', { project: 'nowhere' }, 0.5);
+
+	const unknown = await passOver({ issues: [implementCard(['project: lib'], 'x')], comments: { [CARD]: [triaged()] }, files: MONO }, CARD);
+
+	expect(unknown.writes.find(write => write.name === 'setLabels').labels).toEqual(['tier: contained', 'project: lib', 'stage: triage']);
+});
+
+test('a card too big for one change is split into cards of their own in their projects, and waits on them', async () => {
+	setup();
+	answered('split', {
+		cards: [{ title: 'Add the follows table', body: 'In the API.', project: 'lib' }, { title: 'Add the Copy button', body: 'In the app.', project: 'app' }],
+	}, 0.5);
+
+	const pass = await passOver({ issues: [implementCard(['project: lib'], 'x')], comments: { [CARD]: [triaged()] }, files: MONO }, CARD);
+	const opened = pass.writes.filter(write => write.name === 'createIssue');
+
+	expect(opened.map(write => [write.title, write.labels])).toEqual([
+		['Add the follows table', ['stage: triage', 'project: lib']],
+		['Add the Copy button', ['stage: triage', 'project: app']],
+	]);
+
+	const noted = pass.writes.find(write => write.name === 'comment' && write.number === CARD).body;
+
+	expect(noted).toMatch(/Split into cards of their own: #\d+, #\d+\. This card waits for them/);
+	expect(noted).toMatch(/\nblocked-by: #\d+, #\d+\n/);
+	expect(pass.writes.find(write => write.name === 'setLabels').labels).toEqual(['tier: contained', 'project: lib', 'stage: implement']);
+	expect(pass.writes.some(write => write.name === 'close')).toBe(false);
+
+	setup();
+	answered('split', { cards: [] }, 0.5);
+
+	const done = await passOver({ issues: [implementCard(['project: lib'], 'x')], comments: { [CARD]: [triaged()] }, files: MONO }, CARD);
+
+	expect(done.writes.at(-1)).toEqual({ name: 'close', number: CARD, reason: 'completed' });
 });
 
 test('questions the web can answer are looked up by a session with only the web tools, and the card goes back to implement', async () => {

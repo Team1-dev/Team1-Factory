@@ -93,8 +93,6 @@ function newScope(declared, texts, root, mono) {
 		reviewIgnores: union(root.reviewIgnores, own.reviewIgnores),
 		uses: union(root.uses, own.uses),
 		repoWide: mono && declared.name === '',
-		active: 0,
-		capped: false,
 		hasPull: false,
 		queues: queues,
 	};
@@ -154,12 +152,10 @@ function placeCards(board, pullBranches) {
 
 		if (card.hasPull) card.area.hasPull = true;
 
-		if (card.started && !card.terminal) card.area.active += 1;
 		if (card.area.queues[card.routingLabel] !== undefined) card.area.queues[card.routingLabel].push(card);
 	}
 
 	for (const scope of board.scopes) {
-		scope.capped = scope.active >= state.knobs.WIP_CAP;
 		for (const stage of STAGES) {
 			scope.queues[stage.label].sort(byRank);
 		}

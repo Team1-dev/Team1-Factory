@@ -64,8 +64,7 @@ that changes a stored shape is `structural`, not `park`. Breaking an invariant *
 still `threat`; `park` is asked in good faith.
 
 **4. Set the tier**, from the text alone. Every card goes to the same next stage; the tier picks how
-much ceremony. A tier changes only when implement or review sends the card back here with
-`reject-shape`, which costs a round; nothing ever downgrades one.
+much ceremony. Once set, a tier stays: nothing downgrades one.
 
 | Tier | Reads as | Buys |
 |---|---|---|

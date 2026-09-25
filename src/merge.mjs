@@ -250,7 +250,11 @@ export async function handleMerge(run) {
 		if (run.humanReview) return hold(run.repo, run.lead.number, 'held by human-review — a person merges ' + pull.html_url + ' or takes the label off');
 
 		const readyAt = Date.parse(pull.updated_at) + state.knobs.MERGE_DELAY_MS;
-		if (Date.now() < readyAt) return hold(run.repo, run.lead.number, 'holding until ' + new Date(readyAt).toISOString().slice(11, 16) + ' for comments on ' + pull.html_url);
+		if (Date.now() < readyAt) {
+			if (state.wakeAt === 0 || readyAt < state.wakeAt) state.wakeAt = readyAt;
+
+			return hold(run.repo, run.lead.number, 'holding until ' + new Date(readyAt).toISOString().slice(11, 16) + ' for comments on ' + pull.html_url);
+		}
 	}
 
 	if (run.area.humanApprovals > 0 && !await approved(run, pull, reviews)) return undefined;

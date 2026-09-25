@@ -20,7 +20,7 @@ export const STAGES = [
 	{
 		label: 'stage: implement', name: 'implement', file: 'implement.md', role: 'work', usesTools: true,
 		startsWork: true, needsTriage: true, waitsForPerson: false,
-		verdicts: ['advance', 'reject-shape', 'questions', 'park', 'fail'], proposals: 3,
+		verdicts: ['advance', 'split', 'reroute', 'questions', 'park', 'fail'], proposals: 3,
 	},
 ];
 
@@ -39,14 +39,15 @@ export const ROUTES = {
 		'advance': 'stage: review',
 		'already-done': 'stage: review',
 		'questions': 'needs: answers',
-		'reject-shape': 'stage: triage',
+		'split': 'stage: implement',
+		'reroute': 'stage: implement',
 		'park': 'parked',
 		'fail': 'failed',
 	},
 	review: {
 		'advance': 'ready to merge',
 		'reject-local': 'stage: implement',
-		'reject-shape': 'stage: triage',
+		'reject-shape': 'stage: implement',
 		'threat': 'attack',
 		'fail': 'stage: review',
 	},

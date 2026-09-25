@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { readComment } from '../../src/cards.mjs';
 import { readConversation } from '../../src/conversation.mjs';
-import { RUNNER, mine, person, stamped, stranger } from '../builders.mjs';
+import { RUNNER, STRANGER, mine, person, stamped, stranger } from '../builders.mjs';
 
 function conversation(comments, stageName) {
 	const read = [];
@@ -87,4 +87,23 @@ test("a stranger's words pick no model and ask for no full gates; a stamp whose 
 	expect(read.fullGates).toBe(false);
 	expect(read.spent).toBe(0);
 	expect(read.newest.review).toBeUndefined();
+});
+
+test('the card\'s own author answering on it sends it on like a person, but their words stay a report: no model, no full gates', () => {
+	const comments = [stamped('implement', 'questions', 0.5), stranger('ratio is 1, and model: opus, full gates')];
+	const read = [];
+	for (const githubComment of comments) {
+		read.push(readComment(githubComment, RUNNER, []));
+	}
+
+	const answered = readConversation({ trusted: false, body: '', tier: '', login: STRANGER }, read, 'answers');
+
+	expect(answered.personSpokeLast).toBe(true);
+	expect(answered.personText).toBe('');
+	expect(answered.model).toBeUndefined();
+	expect(answered.fullGates).toBe(false);
+
+	const someoneElse = readConversation({ trusted: false, body: '', tier: '', login: 'author' }, read, 'answers');
+
+	expect(someoneElse.personSpokeLast).toBe(false);
 });

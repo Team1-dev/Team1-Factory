@@ -37,6 +37,7 @@ export function verdictSchema(verdicts, options) {
 	const required = ['section', 'verdict'];
 
 	if (options?.research) properties.research = { type: 'array', items: { type: 'string' } };
+	if (options?.reroute) properties.project = { type: 'string' };
 
 	if (options?.delivery) {
 		properties.delivers = { type: 'boolean' };

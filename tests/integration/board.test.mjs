@@ -73,8 +73,6 @@ test('placeCards: queues rank high before medium before unlabelled before low, t
 	expect(root.queues['stage: implement'][0].number).toBe(5);
 	expect(board.unassignedCards[0].number).toBe(6);
 	expect(board.cards[7].area).toBe(root);
-	// Five started cards; the one waiting for triage and the parked one are not work in progress.
-	expect(web.active).toBe(5);
 });
 
 const MONO_ROOT = { '.agents/project.md': 'auto-merge: true\nprojects:\n  web: apps/web\n\n  api: apps/api\n', 'apps/web/.agents/project.md': 'gates: npm test\n' };

@@ -15,14 +15,14 @@ test('loadEnv: comma lists, every token, numeric knobs over the defaults', () =>
 		GITHUB_TOKEN_acme_web_ui: ENV.GITHUB_TOKEN_acme_web_ui,
 		MAX_ROUNDS: ENV.MAX_ROUNDS,
 		TRUSTED_LOGINS: 'friend, ally',
-		WIP_CAP: '2',
+		MERGE_DELAY_MS: '2000',
 	});
 
 	expect(state.repos).toEqual(['acme/app', 'acme/web-ui']);
 	expect(state.trustedLogins).toEqual(['friend', 'ally']);
 	expect(state.tokens).toEqual({ GITHUB_TOKEN: 'shared', GITHUB_TOKEN_acme_web_ui: 'own' });
 	expect(state.knobs.MAX_ROUNDS).toBe(3);
-	expect(state.knobs.WIP_CAP).toBe(2);
+	expect(state.knobs.MERGE_DELAY_MS).toBe(2000);
 	expect(state.knobs.MAX_COST_PER_CARD).toBe(15);
 });
 
@@ -69,7 +69,7 @@ test('loadEnv: a relative WORK_DIR is registered resolved, the way a git failure
 });
 
 test('loadEnv: a knob that is not a number and a malformed repo are refused at boot', () => {
-	expect(() => loadEnv({ WIP_CAP: 'four' })).toThrow('WIP_CAP is not a number: four');
+	expect(() => loadEnv({ MAX_ROUNDS: 'four' })).toThrow('MAX_ROUNDS is not a number: four');
 	expect(() => loadEnv({ REPOS: 'acme/app, acme' })).toThrow('REPOS entry is not owner/name: acme');
 
 	loadEnv({ REPOS: 'acme/app, my-org.x/re.po_1' });

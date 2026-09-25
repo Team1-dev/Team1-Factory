@@ -217,6 +217,8 @@ Team1 stops and waits for a person at these labels:
 
 Team1 closes an issue itself, with a comment saying why, when triage finds it a duplicate or already done, or when implement finds nothing needs changing. Reopen it and add `stage: triage` if that was wrong.
 
+An issue that is the wrong shape is never left waiting on you. Implement moves one that belongs to another project to that project, and splits one that is too big, or spans projects, into issues of their own that go straight to triage; the original waits for them and closes once they have all landed. When Team1 needs a decision only a person can make, it asks on the issue, and the person who opened it can answer there.
+
 A stage that errors stays on its label and is tried again. After 2 errors, or 2 rounds that settle nothing, the issue moves to `needs: answers`. After 4 rounds in total, Team1 says the issue is too big and asks you to split it.
 
 > [!CAUTION]
@@ -230,15 +232,9 @@ With `auto-merge` on, comment on the pull request instead, or review it. Team1 r
 
 ### Why is a new issue not starting?
 
-Each project has one pull request open at a time: while one is open, only the issue it belongs to is worked there, and the log says `#N waits: <project> has a pull open`. Across projects, Team1 merges what is ready and reviews what is waiting before it starts anything new.
+Each project has one pull request open at a time: while one is open, only the issue it belongs to is worked there, and the log says `#N waits: <project> has a pull open`. Across projects, Team1 merges what is ready, reviews what is waiting and builds what is triaged before it triages anything new.
 
-Each project also has a work-in-progress cap: once 4 issues are in progress, Team1 starts no new ones until one finishes, and the log says `wip 4/4 — no new cards started`. An issue is in progress from `stage: implement` until it closes or stops at `failed`, `parked`, `duplicate` or `attack`, so issues waiting on you at `ready to merge` or `needs: answers` count.
-
-To carry on, clear what is waiting: merge or close the `ready to merge` issues and answer the `needs: answers` ones. To raise the cap, set it in `.env` and run `docker compose up -d` again:
-
-```sh
-WIP_CAP=8
-```
+Team1 works on one issue at a time, across every repository it watches. After a pass with nothing to do it waits 30 seconds, then twice as long each quiet pass, up to 5 minutes, so a label you add is picked up within 5 minutes. A pull request waiting out its one-minute comment window wakes it when the window ends.
 
 ## Configure repositories
 

@@ -9,6 +9,8 @@ import { handleMerge } from './merge.mjs';
 import { apply, divert, failedOutcome, loginExpiredOutcome } from './outcomes.mjs';
 import { ledgerStart } from './ledger.mjs';
 import { fragment } from './prompts.mjs';
+import { blockquote } from './stringUtils.mjs';
+import { STAMP_MARKER } from './trust.mjs';
 import { handleReview } from './review.mjs';
 import { labelOfStage, stageOf } from './routes.mjs';
 import { handleTriage } from './triage.mjs';
@@ -93,8 +95,9 @@ function held(run) {
 
 	if (stage.waitsForPerson) return undefined;
 
-	const rounds = { stage: stage.name, rounds: state.knobs.MAX_ROUNDS };
-	const ever = { stage: stage.name, rounds: state.knobs.MAX_ROUNDS_EVER };
+	const blocking = lastSection(conversation, stage.name);
+	const rounds = { stage: stage.name, rounds: state.knobs.MAX_ROUNDS, blocking: blocking };
+	const ever = { stage: stage.name, rounds: state.knobs.MAX_ROUNDS_EVER, blocking: blocking };
 	if (conversation.roundsEver >= state.knobs.MAX_ROUNDS_EVER) return decided(divert(run, 'too-big', ever, { verdict: 'too-big', cost: 0, tokens: 0 }));
 	if (conversation.rounds >= state.knobs.MAX_ROUNDS) return decided(divert(run, 'stalled', rounds, { verdict: 'stalled', cost: 0, tokens: 0 }));
 	if (conversation.errors >= state.knobs.MAX_ROUNDS) return decided(divert(run, 'died', rounds, { verdict: 'died', cost: 0, tokens: 0 }));
@@ -122,6 +125,17 @@ async function cardOutcome(run) {
 
 		return failedOutcome(run, error.message, measured, noteExhaustion(error) || error.aborted);
 	}
+}
+
+// What the stage said last time it ran on this card, without its stamp, quoted: the reason a card that keeps going round is stuck.
+function lastSection(conversation, stageName) {
+	const comment = conversation.newest[stageName];
+	if (comment === undefined) return '';
+
+	// A quoted blocked-by line would block the card again, so it is left out with the stamp.
+	const lines = comment.body.split('\n').filter(line => !line.startsWith(STAMP_MARKER) && !line.includes('blocked-by:'));
+
+	return '\n\nWhat stopped it last time:\n\n' + blockquote(lines.join('\n').trim(), 1500);
 }
 
 export async function processCard(github, board, card, waiting) {

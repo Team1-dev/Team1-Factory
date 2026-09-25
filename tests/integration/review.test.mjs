@@ -286,7 +286,7 @@ test('a where is read generously: backticks, a leading ./, a trailing :line, a s
 	}
 });
 
-test('reject-local goes back to implement, reject-shape to triage, no verdict is fail and stays', async () => {
+test('reject-local and reject-shape both go straight back to implement, no verdict is fail and stays', async () => {
 	setup();
 	answered('reject-local', {}, 0.4);
 
@@ -300,7 +300,7 @@ test('reject-local goes back to implement, reject-shape to triage, no verdict is
 
 	const shape = await passOver(underReview(openPull(PULL, BRANCH)), CARD);
 
-	expect(shape.writes[1].labels).toEqual(['tier: contained', 'stage: triage']);
+	expect(shape.writes[1].labels).toEqual(['tier: contained', 'stage: implement']);
 
 	setup();
 	answered(undefined, {}, 0.4);
