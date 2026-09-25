@@ -1,4 +1,6 @@
 const ASKING_VERDICTS = ['questions', 'stalled', 'died', 'over-budget', 'too-big'];
+// A review that sends the card back with a finding gives the other stages something new to work on, so their rounds count afresh.
+const REVIEW_FINDINGS = ['reject-local', 'reject-shape', 'dependents-red'];
 const BOOKKEEPING_VERDICTS = ['stalled', 'died', 'too-big', 'over-budget', 'already-done', 'no-pull', 'comment-noted', 'login-expired'];
 
 // A stamp of the stage being run is a round, an error, or bookkeeping that counts as neither.
@@ -79,7 +81,8 @@ export function readConversation(card, comments, stageName) {
 
 		if (stamp === undefined) continue;
 
-		const restart = hasStamp(stamp, 'merge', ['objection']);
+		let restart = hasStamp(stamp, 'merge', ['objection']);
+		if (stageName !== 'review' && hasStamp(stamp, 'review', REVIEW_FINDINGS)) restart = true;
 		if (restart) events = [];
 
 		const previous = conversation.newest[stamp.stage];

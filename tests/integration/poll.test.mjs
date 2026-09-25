@@ -101,6 +101,27 @@ test('a card waiting for implement in one area is worked before a card waiting f
 	expect(model.calls).toEqual([]);
 });
 
+test('a card holding an open pull request that is back at triage is triaged before new work in any area', async () => {
+	const holder = issue(5, ['stage: triage', 'tier: contained', 'project: web'], 'has a pull');
+	const p = pass({
+		issues: [holder, issue(6, ['stage: implement', 'tier: contained', 'project: api'], 'new work')],
+		files: { '.agents/project.md': 'projects:\n  web: apps/web\n  api: apps/api\n' },
+		pulls: { [branchOf(readCard(holder, 'runner', []))]: { number: 50 } },
+	});
+
+	model.answers.push(triageAnswer(5));
+
+	expect(await p.run()).toBe(true);
+
+	const cardWrites = [];
+	for (const write of p.github.writes) {
+		if (write.number !== undefined) cardWrites.push(write.number);
+	}
+
+	expect(cardWrites.every(number => number === 5)).toBe(true);
+	expect(model.calls[0].role).toBe('classify');
+});
+
 test('an area with a pull open starts no other card\'s implement until it lands, and says so once', async () => {
 	const waiting = issue(5, ['failed', 'tier: contained', 'project: web'], 'has a pull');
 	const p = pass({

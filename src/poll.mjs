@@ -13,8 +13,20 @@ import { startSandboxes, stopSandboxes, sweepRepo } from './sandboxes.mjs';
 const SANDBOX_LABELS = ['stage: implement', 'stage: review', 'ready to merge', 'needs: answers'];
 
 // Work already started moves on before anything new is triaged: landing, reviewing and building come first.
-const ORDER = ['ready to merge', 'stage: review', 'stage: implement', 'needs: answers', 'stage: triage'];
-const PASS_ORDER = ORDER.map(label => STAGES.find(stage => stage.label === label));
+function stageLabelled(label) {
+	return STAGES.find(stage => stage.label === label);
+}
+
+// Each step is a stage and the cards it takes. A card holding an open pull request holds its whole project, so when it has gone back
+// to triage it is triaged before any new work, not after it.
+const PASS = [
+	{ stage: stageLabelled('ready to merge'), takes: () => true },
+	{ stage: stageLabelled('stage: review'), takes: () => true },
+	{ stage: stageLabelled('stage: triage'), takes: card => card.hasPull },
+	{ stage: stageLabelled('stage: implement'), takes: () => true },
+	{ stage: stageLabelled('needs: answers'), takes: () => true },
+	{ stage: stageLabelled('stage: triage'), takes: () => true },
+];
 
 async function sleepCheckingHalt(ms) {
 	for (let waited = 0; waited < ms; waited += 1000) {
@@ -57,10 +69,12 @@ async function attemptCard(github, board, card, waiting) {
 	}
 }
 
-async function processStage(github, board, stage, scope) {
+async function processStep(github, board, step, scope) {
+	const stage = step.stage;
 	const waiting = scope.queues[stage.label];
 	for (const card of waiting) {
 		if (stopAsked()) return false;
+		if (!step.takes(card)) continue;
 		if (stage.startsWork && skipsCard(github.repo, card, stage)) continue;
 
 		const changed = await attemptCard(github, board, card, waiting);
@@ -133,9 +147,9 @@ export async function processRepo(repo) {
 
 	// One stage at a time across every area, so what is open lands before new work starts; the first change ends the pass and
 	// the next one reads a fresh board.
-	for (const stage of PASS_ORDER) {
+	for (const step of PASS) {
 		for (const scope of board.scopes) {
-			if (await processStage(github, board, stage, scope)) return true;
+			if (await processStep(github, board, step, scope)) return true;
 		}
 	}
 

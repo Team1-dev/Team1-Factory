@@ -91,13 +91,29 @@ test('over budget diverts to needs: answers with the spend and the budget', asyn
 	expect(model.calls).toEqual([]);
 });
 
-test('stalled: the stage ran maxRounds times since a person last spoke', async () => {
+test('a review finding between implement rounds is new work, so the rounds before it do not stall the card', async () => {
 	setup();
+	model.answers.push(implementAnswer());
 
 	const rounds = [
 		TRIAGED,
 		stamped('implement', 'advance', 1), stamped('review', 'reject-local', 0.5),
 		stamped('implement', 'advance', 1), stamped('review', 'reject-local', 0.5),
+	];
+
+	await passOver({ issues: [implementCard('x')], comments: { [CARD]: rounds } }, CARD);
+
+	expect(model.calls.length).toBe(1);
+	expect(ledgerVerdicts()).not.toContain('end:stalled');
+});
+
+test('stalled: the stage ran maxRounds times since a person last spoke, with nothing new between the rounds', async () => {
+	setup();
+
+	const rounds = [
+		TRIAGED,
+		stamped('implement', 'fail', 1), stamped('review', 'stale', 0.5),
+		stamped('implement', 'fail', 1), stamped('review', 'stale', 0.5),
 	];
 
 	const pass = await passOver({ issues: [implementCard('x')], comments: { [CARD]: rounds } }, CARD);
