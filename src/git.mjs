@@ -144,6 +144,10 @@ export function repository(settings) {
 		// to lose. A push that failed after its commit is pushed again next pass, not held for a person.
 		if (target === previousRemoteSha && (await tryGit(root, ['merge-base', '--is-ancestor', target, 'HEAD'])).code === 0) return false;
 
+		// Rewritten by a catch-up rebase, the push of it then failing: every commit on the unmoved remote is in HEAD as the same
+		// change, so a force-push loses nothing.
+		if (target === previousRemoteSha && !(await git(root, ['cherry', 'HEAD', target])).split('\n').some(line => line.startsWith('+'))) return false;
+
 		if (head !== previousRemoteSha) return true;
 
 		await git(root, ['reset', '--hard', from.start]);

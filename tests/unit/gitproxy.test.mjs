@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -112,3 +113,17 @@ test('an unknown key, or a known key asking for another repository, is refused b
 	expect(otherRepo.code).not.toBe(0);
 	expect(authorizations.length).toBe(before);
 });
+
+test('a push too big to arrive in one piece reaches upstream whole: the proxy reads its commands without dropping the rest', async () => {
+	const work = join(mkdtempSync(join(tmpdir(), 'sandbox-')), 'app');
+	await git(tmpdir(), ['clone', '-q', proxyAddress + '/card5key/acme/app.git', work]);
+	await git(work, ['checkout', '-q', '-B', BRANCH]);
+	writeFileSync(join(work, 'large.bin'), randomBytes(8 * 1024 * 1024));
+	await git(work, ['add', '-A']);
+	await git(work, ['commit', '-qm', 'large']);
+
+	const pushed = await git(work, ['push', '-q', '--force', 'origin', BRANCH]);
+
+	expect(pushed.code, pushed.output).toBe(0);
+	expect(await upstreamRef(BRANCH)).toBe((await git(work, ['rev-parse', 'HEAD'])).stdout.trim());
+}, 60000);

@@ -25,9 +25,10 @@ function parseCommands(buffer) {
 	return undefined;
 }
 
+// Leaving a plain for-await destroys the stream, and the rest of the pack with it; this one leaves it to be piped on.
 async function readCommands(incoming) {
 	let buffer = Buffer.alloc(0);
-	for await (const chunk of incoming) {
+	for await (const chunk of incoming.iterator({ destroyOnReturn: false })) {
 		buffer = Buffer.concat([buffer, chunk]);
 
 		const parsed = parseCommands(buffer);

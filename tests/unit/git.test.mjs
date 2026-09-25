@@ -256,6 +256,30 @@ test('a pushed branch rebased for a merge whose gates then fail is put back on i
 	expect(await o.sh(root, ['rev-parse', 'HEAD'])).toBe(pushed);
 }, 30000);
 
+test('a branch caught up with a moved base whose push then failed is pushed again next round, not held: the remote holds nothing it lacks', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '12-card');
+	await o.repo.checkout(root, 'card/12-x', false);
+	writeFileSync(join(root, 'feature.txt'), 'feature\n');
+	await o.repo.commitAndPush(root, 'card/12-x', 'feature', ['feature.txt']);
+
+	writeFileSync(join(o.seed, 'other.txt'), 'other\n');
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'add', '-A']);
+	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'commit', '-qm', 'other']);
+	await o.sh(o.seed, ['push', '-q', 'origin', 'main']);
+
+	expect(await o.repo.catchUp(root, 'main')).toEqual({ moved: true, conflicts: [] });
+	writeFileSync(join(root, 'more.txt'), 'more\n');
+	await o.sh(root, ['add', '-A']);
+	await o.sh(root, ['-c', 'user.name=r', '-c', 'user.email=r@x', 'commit', '-qm', 'more']);
+
+	const head = await o.sh(root, ['rev-parse', 'HEAD']);
+	const again = await o.repo.checkout(root, 'card/12-x', false);
+
+	expect(again.diverged).toBeUndefined();
+	expect(await o.sh(root, ['rev-parse', 'HEAD'])).toBe(head);
+}, 30000);
+
 test('diff reads the branch against its base straight from the clone, with no size limit and no download', async () => {
 	const o = await origin();
 	const root = join(o.base, 'work', '5-card');
