@@ -167,7 +167,7 @@ export function repositoryFor(repo, runnerLogin, place) {
 export function repoState(repo) {
 	if (state.repoStates[repo] === undefined) {
 		state.repoStates[repo] = {
-			fingerprint: undefined, said: {}, labelsBootstrapped: false, projectLabelSet: '', defaultBranch: undefined,
+			fingerprint: undefined, said: {}, labelsBootstrapped: false, projectLabelSet: '', defaultBranch: undefined, justOpened: new Map(),
 		};
 	}
 

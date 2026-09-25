@@ -105,8 +105,12 @@ export function client(repo, token, apiBase, timeoutMs = REQUEST_TIMEOUT_MS) {
 		return request('GET', base + '/issues?state=closed&per_page=' + count);
 	}
 
+	// GitHub's issue list can take a while to show an issue just opened; the board counts these as open meanwhile.
 	async function createIssue(title, body, labelNames) {
-		return request('POST', base + '/issues', { title: title, body: body, labels: labelNames });
+		const issue = await request('POST', base + '/issues', { title: title, body: body, labels: labelNames });
+		repoState(repo).justOpened.set(issue.number, Date.now());
+
+		return issue;
 	}
 
 	// A repeat call sends back the etag from the last one: unchanged since, GitHub answers 304 without spending against the rate

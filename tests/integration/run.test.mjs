@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { failure } from '../../src/claude.mjs';
-import { state } from '../../src/config.mjs';
+import { repoState, state } from '../../src/config.mjs';
 import { git, model, sandboxes } from '../doubles.mjs';
 import { callNames, ledgerLines, ledgerVerdicts, modelAnswer, passOver, setup } from '../fake.mjs';
 import { issue, mine, person, stamped, stranger } from '../builders.mjs';
@@ -40,6 +40,24 @@ test('a card is blocked by the open cards its body, a person or a stamp names as
 		expect(model.calls, blocked.body).toEqual([]);
 		expect(sandboxes.calls, blocked.body).toEqual([]);
 	}
+});
+
+test('a card Team1 opened moments ago blocks though GitHub\'s list does not show it yet; long after, a number missing from the list does not', async () => {
+	setup();
+	repoState('acme/app').justOpened.set(8, Date.now());
+
+	const early = await passOver({ issues: [implementCard('x')], comments: { [CARD]: [TRIAGED, mine('blocked-by: #8\n\n— team1-factory · implement · split · $0.10')] } }, CARD);
+
+	expect(early.changed).toBe(false);
+	expect(model.calls).toEqual([]);
+
+	setup();
+	model.answers.push(implementAnswer());
+	repoState('acme/app').justOpened.set(8, Date.now() - (3 * 60 * 1000));
+
+	const later = await passOver({ issues: [implementCard('x')], comments: { [CARD]: [TRIAGED, mine('blocked-by: #8\n\n— team1-factory · implement · split · $0.10')] } }, CARD);
+
+	expect(later.changed).toBe(true);
 });
 
 test('cards that wait on each other in a ring: the card whose blocked-by line closed the ring, the newest, goes ahead; the others wait', async () => {

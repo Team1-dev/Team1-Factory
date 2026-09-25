@@ -3,6 +3,8 @@ import { repoState, state } from './config.mjs';
 import { STAGES } from './routes.mjs';
 import { splitCommaList } from './stringUtils.mjs';
 
+const JUST_OPENED_MS = 2 * 60 * 1000;
+
 const SETTING_FIELDS = {
 	'gates': { field: 'gates', kind: 'text' },
 	'gates-full': { field: 'fullGates', kind: 'text' },
@@ -210,6 +212,12 @@ export async function loadBoard(github, runnerLogin) {
 		board.cards.push(card);
 		board.openNumbers.push(card.number);
 		versions.push(card.number + ':' + card.updatedAt);
+	}
+
+	// A card Team1 opened moments ago may be missing from the list yet: a blocked-by naming it must still hold.
+	for (const [number, openedAt] of perRepo.justOpened) {
+		if (Date.now() - openedAt > JUST_OPENED_MS) perRepo.justOpened.delete(number);
+		else if (!board.openNumbers.includes(number)) board.openNumbers.push(number);
 	}
 
 	versions.sort();

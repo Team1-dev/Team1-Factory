@@ -49,8 +49,11 @@ export function dockerAt(socketPath) {
 		await call('DELETE', '/networks/' + encodeURIComponent(name));
 	}
 
+	// Joined only to reach what is on the network, never as the way out: left at the default priority, a card's network could become
+	// the container's default route (Docker breaks ties by network name), carrying its GitHub traffic, and every connection open
+	// through it would die when the card's network goes.
 	async function connectNetwork(network, container) {
-		await call('POST', '/networks/' + encodeURIComponent(network) + '/connect', { Container: container });
+		await call('POST', '/networks/' + encodeURIComponent(network) + '/connect', { Container: container, EndpointConfig: { GwPriority: -1 } });
 	}
 
 	async function disconnectNetwork(network, container) {

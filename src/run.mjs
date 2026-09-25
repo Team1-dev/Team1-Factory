@@ -93,13 +93,17 @@ function blockerLines(openNumbers, card, comments) {
 async function ringBack(run, leadLines) {
 	const read = new Map([[run.lead.number, leadLines]]);
 	async function linesOf(number) {
+		const card = run.board.cards.find(open => open.number === number);
+		// Opened moments ago and not listed yet: it has waited on nothing so far.
+		if (card === undefined) return [];
+
 		if (!read.has(number)) {
 			const comments = [];
 			for (const githubComment of await run.github.comments(number)) {
 				comments.push(readComment(githubComment, run.board.runnerLogin, state.trustedLogins));
 			}
 
-			read.set(number, blockerLines(run.board.openNumbers, run.board.cards.find(card => card.number === number), comments));
+			read.set(number, blockerLines(run.board.openNumbers, card, comments));
 		}
 
 		return read.get(number);

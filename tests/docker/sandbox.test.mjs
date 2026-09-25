@@ -76,3 +76,19 @@ test('every command gets the sandbox\'s package stores, whatever HOME it runs wi
 
 	expect(stores.stdout.trim()).toBe('/home/team1/.local/share/pnpm/store /home/team1/.nuget/packages /home/team1/.dotnet');
 });
+
+test('a container that joins a card\'s network to reach it keeps its own default route', async () => {
+	// Named so the card's network sorts first, as a card's `team1-owner-repo-n` does before compose's `team1_default`.
+	const name = sandboxName().replace('team1-test-', 'team1-test-a');
+	const joinerName = sandboxName().replace('team1-test-', 'team1-test-z');
+	opened.push(name, joinerName);
+	await openSandbox(docker, name, SETTINGS, '');
+
+	const joiner = await openSandbox(docker, joinerName, SETTINGS, '');
+	const routeOf = async () => (await joiner.run('/', 'bash', ['-c', 'awk \'$2 == "00000000" { print $1, $3 }\' /proc/net/route'], RUN)).stdout;
+	const before = await routeOf();
+
+	await docker.connectNetwork(name, joiner.name);
+
+	expect(await routeOf()).toBe(before);
+});

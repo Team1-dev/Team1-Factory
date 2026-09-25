@@ -116,3 +116,10 @@ test('a reroute starts the count afresh in the project the card moved to; every 
 	expect(moved.rounds).toBe(0);
 	expect(moved.roundsEver).toBe(2);
 });
+
+test('a split hands the card\'s parts to cards of their own: when they land, what is left of it starts the count afresh', () => {
+	const back = conversation([stamped('implement', 'split', 0.4), stamped('implement', 'split', 0.4)], 'implement');
+
+	expect(back.rounds).toBe(0);
+	expect(back.roundsEver).toBe(2);
+});
