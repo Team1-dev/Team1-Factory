@@ -88,12 +88,26 @@ test('two cards are worked at once, in different areas; a third in an area alrea
 
 	expect(model.calls.length).toBe(2);
 	await processRepo(REPO);
-	expect(model.calls.length).toBe(2);
+	expect(model.calls.some(call => call.run?.lead.number === 7)).toBe(false);
 
 	answerFive(triageAnswer(5));
 	await cardsSettled();
 
 	expect(p.github.writes.some(write => write.name === 'setLabels' && write.number === 5)).toBe(true);
+});
+
+test('a card held back takes no slot: the pass goes on to a card that can go', async () => {
+	const p = pass({
+		issues: [issue(5, ['needs: answers', 'project: web'], 'a'), issue(6, ['stage: triage', 'project: api'], 'b')],
+		comments: { 5: [stamped('triage', 'questions', 0.1)] },
+		files: { '.agents/project.md': 'projects:\n  web: apps/web\n  api: apps/api\n' },
+	});
+
+	model.answers.push(triageAnswer(6));
+
+	expect(await p.run()).toBe(true);
+	expect(p.github.writes.some(write => write.name === 'setLabels' && write.number === 6)).toBe(true);
+	expect(p.github.writes.some(write => write.number === 5)).toBe(false);
 });
 
 test('a card waiting in review in one area is worked before a card in triage in another, and that change ends the pass', async () => {
@@ -346,9 +360,8 @@ test('a blocked card is skipped and said so; a card whose processing throws, or 
 	const throwing = pass({ issues: [issue(5, ['stage: triage'], 'fine <!-- hidden -->')] });
 	model.answers.push(new TypeError('our bug'));
 
-	expect(await throwing.run()).toBe(true);
-	expect(throwing.github.writes).toEqual([]);
 	expect(await throwing.run()).toBe(false);
+	expect(throwing.github.writes).toEqual([]);
 
 	const broken = pass({ issues: [issue(5, ['stage: triage'], 'x')], files: { '.agents/project.md': 'human-approvals: two\n' } });
 	state.onceOnly = true;

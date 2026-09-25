@@ -7,7 +7,7 @@ import { exists } from './shell.mjs';
 import { STAGES } from './routes.mjs';
 import { loadBoard } from './board.mjs';
 import { sweepMergedProposals } from './findings.mjs';
-import { processCard } from './run.mjs';
+import { processCard, readyCard, workCard } from './run.mjs';
 import { startSandboxes, stopSandboxes, sweepRepo } from './sandboxes.mjs';
 
 const SANDBOX_LABELS = ['stage: implement', 'stage: review', 'ready to merge', 'needs: answers'];
@@ -126,8 +126,16 @@ async function processStep(github, board, step, scope) {
 			if (card.batch !== '' && mate.batch === card.batch) flight.numbers.push(mate.number);
 		}
 
+		// The checks run here, in the pass: a card held back takes no slot, and the pass goes on to the next.
+		const ready = await readied(github, board, card, waiting);
+		if (ready.run === undefined) {
+			if (ready.changed) return true;
+
+			continue;
+		}
+
 		state.inFlight.set(github.repo + '#' + card.number, flight);
-		flight.done = runFlight(github, board, card, waiting);
+		flight.done = runFlight(card, ready.run);
 
 		return true;
 	}
@@ -135,12 +143,28 @@ async function processStep(github, board, step, scope) {
 	return false;
 }
 
-async function runFlight(github, board, card, waiting) {
+async function readied(github, board, card, waiting) {
 	try {
-		const changed = await attemptCard(github, board, card, waiting);
-		if (!changed) state.restingUntil.set(github.repo + '#' + card.number, Date.now() + state.knobs.POLL_INTERVAL_MS);
+		return await readyCard(github, board, card, waiting);
+	} catch (error) {
+		console.log(github.repo + ' #' + card.number + ' failed: ' + error.message);
+
+		return { run: undefined, changed: false };
+	}
+}
+
+async function runFlight(card, run) {
+	try {
+		let changed = false;
+		try {
+			changed = await workCard(run);
+		} catch (error) {
+			console.log(run.tag + ' failed: ' + error.message);
+		}
+
+		if (!changed) state.restingUntil.set(run.repo + '#' + card.number, Date.now() + state.knobs.POLL_INTERVAL_MS);
 	} finally {
-		state.inFlight.delete(github.repo + '#' + card.number);
+		state.inFlight.delete(run.repo + '#' + card.number);
 		landings += 1;
 	}
 }

@@ -193,15 +193,8 @@ function workIn(run, place) {
 
 // A stage that touches the checkout gets the card's sandbox, opened only once the card is known to go ahead: not hidden, blocked or
 // held. The others read only GitHub, with no shell and no files, on the poller.
-async function cardOutcome(run) {
-	const hidden = await screened(run);
-
-	if (hidden !== undefined) return hidden.outcome;
-
-	const holding = await held(run);
-
-	if (holding !== undefined) return holding.outcome;
-
+// The stage itself, for a card that has passed its checks.
+async function stageOutcome(run) {
 	const batched = run.mates.length > 0 ? ' +' + run.mates.length + ' batched' : '';
 	console.log(run.tag + ' "' + run.lead.title + '" → ' + run.stage.label + batched);
 	try {
@@ -219,6 +212,15 @@ async function cardOutcome(run) {
 	}
 }
 
+// Whether an outcome changed anything, applying it when there is one.
+async function applied(run, outcome) {
+	if (outcome === undefined) return false;
+
+	await apply(run, outcome);
+
+	return true;
+}
+
 // What the stage said last time it ran on this card, without its stamp, quoted: the reason a card that keeps going round is stuck.
 function lastSection(conversation, stageName) {
 	const comment = conversation.newest[stageName];
@@ -230,7 +232,7 @@ function lastSection(conversation, stageName) {
 	return '\n\nWhat stopped it last time:\n\n' + blockquote(lines.join('\n').trim(), 1500);
 }
 
-export async function processCard(github, board, card, waiting) {
+function newRun(github, board, card, waiting) {
 	const stage = stageOf(card);
 	const batch = batchFor(card, waiting, stage.name);
 	const mates = batch.slice(1);
@@ -265,11 +267,33 @@ export async function processCard(github, board, card, waiting) {
 		readRoot: undefined,
 	};
 
-	const outcome = await cardOutcome(run);
+	return run;
+}
 
-	if (outcome === undefined) return false;
+// The checks before a card's stage, quick enough to run in the pass: hidden instructions, and the holds. What they decide is applied
+// here, and the card is done with; a card that goes ahead comes back as its run, to be worked.
+export async function readyCard(github, board, card, waiting) {
+	const run = newRun(github, board, card, waiting);
+	const hidden = await screened(run);
 
-	await apply(run, outcome);
+	if (hidden !== undefined) return { run: undefined, changed: await applied(run, hidden.outcome) };
 
-	return true;
+	const holding = await held(run);
+
+	if (holding !== undefined) return { run: undefined, changed: await applied(run, holding.outcome) };
+
+	return { run: run, changed: false };
+}
+
+// A card's stage, from its sandbox to what it changed on the card: whether it changed anything.
+export async function workCard(run) {
+	return applied(run, await stageOutcome(run));
+}
+
+export async function processCard(github, board, card, waiting) {
+	const ready = await readyCard(github, board, card, waiting);
+
+	if (ready.run === undefined) return ready.changed;
+
+	return workCard(ready.run);
 }
