@@ -148,6 +148,13 @@ export function fakeGithub(given) {
 		return given.issues;
 	}
 
+	// given.current is a card as GitHub has it now, ahead of the list the board was read from.
+	async function issue(number) {
+		if (given.current !== undefined && given.current[number] !== undefined) return given.current[number];
+
+		return given.issues.find(open => open.number === number) ?? given.closedIssues.find(closed => closed.number === number);
+	}
+
 	async function closedIssues() {
 		if (given.closedError !== undefined) throw new Error(given.closedError);
 
@@ -289,6 +296,7 @@ export function fakeGithub(given) {
 		updateLabel: updateLabel,
 		issues: issues,
 		closedIssues: closedIssues,
+		issue: issue,
 		createIssue: createIssue,
 		comments: comments,
 		comment: comment,

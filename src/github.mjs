@@ -101,16 +101,20 @@ export function client(repo, token, apiBase, timeoutMs = REQUEST_TIMEOUT_MS) {
 		return requestAll(base + '/issues?state=' + state);
 	}
 
+	async function issue(number) {
+		return request('GET', base + '/issues/' + number);
+	}
+
 	async function closedIssues(count) {
 		return request('GET', base + '/issues?state=closed&per_page=' + count);
 	}
 
 	// GitHub's issue list can take a while to show an issue just opened; the board counts these as open meanwhile.
 	async function createIssue(title, body, labelNames) {
-		const issue = await request('POST', base + '/issues', { title: title, body: body, labels: labelNames });
-		repoState(repo).justOpened.set(issue.number, Date.now());
+		const opened = await request('POST', base + '/issues', { title: title, body: body, labels: labelNames });
+		repoState(repo).justOpened.set(opened.number, Date.now());
 
-		return issue;
+		return opened;
 	}
 
 	// A repeat call sends back the etag from the last one: unchanged since, GitHub answers 304 without spending against the rate
@@ -267,6 +271,7 @@ export function client(repo, token, apiBase, timeoutMs = REQUEST_TIMEOUT_MS) {
 		updateLabel: updateLabel,
 		issues: issues,
 		closedIssues: closedIssues,
+		issue: issue,
 		createIssue: createIssue,
 		comments: comments,
 		comment: comment,

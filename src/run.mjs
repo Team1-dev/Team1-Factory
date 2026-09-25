@@ -1,5 +1,5 @@
 import { batchFor, collectBlockers } from './board.mjs';
-import { branchOf, readComment } from './cards.mjs';
+import { branchOf, readCard, readComment } from './cards.mjs';
 import { noteExhaustion, noteLoginExpired } from './claude.mjs';
 import { hiddenInstruction } from './classify.mjs';
 import { repositoryFor, sayOnce, state } from './config.mjs';
@@ -273,6 +273,11 @@ function newRun(github, board, card, waiting) {
 // The checks before a card's stage, quick enough to run in the pass: hidden instructions, and the holds. What they decide is applied
 // here, and the card is done with; a card that goes ahead comes back as its run, to be worked.
 export async function readyCard(github, board, card, waiting) {
+	// GitHub's issue list can lag a card's labels by seconds: just after a stage moved it on, the board may still show the stage it
+	// left, and would run that stage again. The card as it is now decides.
+	const now = readCard(await github.issue(card.number), board.runnerLogin, state.trustedLogins);
+	if (now.routingLabel !== card.routingLabel) return { run: undefined, changed: false };
+
 	const run = newRun(github, board, card, waiting);
 	const hidden = await screened(run);
 

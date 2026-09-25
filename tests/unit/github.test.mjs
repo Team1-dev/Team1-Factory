@@ -100,6 +100,7 @@ const ENDPOINTS = [
 	['updateLabel', ['a b', 'ff0000', 'd'], 'PATCH', '/repos/acme/app/labels/a%20b', '{"color":"ff0000","description":"d"}'],
 	['issues', ['open'], 'GET', '/repos/acme/app/issues?state=open&per_page=100&page=1', ''],
 	['closedIssues', [40], 'GET', '/repos/acme/app/issues?state=closed&per_page=40', ''],
+	['issue', [5], 'GET', '/repos/acme/app/issues/5', ''],
 	['createIssue', ['t', 'b', ['proposed']], 'POST', '/repos/acme/app/issues', '{"title":"t","body":"b","labels":["proposed"]}'],
 	['comments', [5], 'GET', '/repos/acme/app/issues/5/comments?per_page=100&page=1', ''],
 	['comment', [5, 'hi'], 'POST', '/repos/acme/app/issues/5/comments', '{"body":"hi"}'],

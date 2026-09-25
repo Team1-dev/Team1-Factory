@@ -86,6 +86,19 @@ test('cards that wait on each other in a ring: the card whose blocked-by line cl
 	expect(model.calls).toEqual([]);
 });
 
+test('a card the list still shows in the stage it just left is not run again: the card as it is now decides', async () => {
+	setup();
+
+	const pass = await passOver({
+		issues: [implementCard('x')], comments: { [CARD]: [TRIAGED] },
+		current: { [CARD]: issue(CARD, ['stage: review', 'tier: contained'], 'x') },
+	}, CARD);
+
+	expect(pass.changed).toBe(false);
+	expect(model.calls).toEqual([]);
+	expect(sandboxes.calls).toEqual([]);
+});
+
 test('a card that goes ahead gets its sandbox for implement, named by its own key and branch', async () => {
 	setup();
 	model.answers.push(implementAnswer());
