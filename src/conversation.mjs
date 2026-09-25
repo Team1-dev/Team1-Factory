@@ -86,6 +86,8 @@ export function readConversation(card, comments, stageName) {
 		// comes next starts afresh.
 		if (stamp.verdict === 'reroute' || stamp.verdict === 'split') restart = true;
 		if (stageName !== 'review' && hasStamp(stamp, 'review', REVIEW_FINDINGS)) restart = true;
+		// And new work pushed after a review gives the next review something new: only a review of the same work twice is a repeat.
+		if (stageName === 'review' && hasStamp(stamp, 'implement', ['advance'])) restart = true;
 		if (restart) events = [];
 
 		const previous = conversation.newest[stamp.stage];

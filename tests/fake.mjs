@@ -48,7 +48,7 @@ export function setup() {
 		gate: { passed: true, command: 'npm test', code: 0, output: '' },
 	};
 	git.given = {
-		rebase: { moved: false, conflict: false },
+		rebase: { moved: false, conflict: false, baseFiles: [] },
 		changes: { unpushed: false, changed: [], round: [], untracked: [] },
 		wroteGitignore: false,
 		tree: [],

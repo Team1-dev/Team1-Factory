@@ -28,7 +28,10 @@ vi.mock('../../src/shell.mjs', async importOriginal => ({ ...await importOrigina
 
 vi.mock('../../src/git.mjs', () => ({ repository: repository }));
 
-vi.mock('../../src/gates.mjs', () => ({ install: install, runGates: runGates, runOwnGates: runOwnGates, runDependentGates: runDependentGates }));
+// Which gates a moved base reaches is decided, not run: the real rule.
+vi.mock('../../src/gates.mjs', async importOriginal => ({
+	baseMoveReaches: (await importOriginal()).baseMoveReaches, install: install, runGates: runGates, runOwnGates: runOwnGates, runDependentGates: runDependentGates,
+}));
 
 // Real sandboxes are tests/docker's: here a card's place is the poller's own, where the doubles above stand in for git and gates.
 vi.mock('../../src/sandboxes.mjs', async () => {

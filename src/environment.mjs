@@ -139,6 +139,21 @@ export function startScript(environment) {
 	return steps.join('\n');
 }
 
+// Before an image is saved: a service saved running starts in every sandbox as if it had crashed, and Postgres recovers first,
+// which took 38s.
+export function stopScript(environment) {
+	const steps = ['set -eu'];
+	for (const name of Object.keys(environment.services)) {
+		if (name === 'postgres' || name === 'postgresql') {
+			steps.push('for cluster in $(ls /etc/postgresql); do sudo pg_ctlcluster "$cluster" main status >/dev/null && sudo pg_ctlcluster "$cluster" main stop -m fast || true; done');
+		}
+
+		if (name === 'redis') steps.push('redis-cli shutdown >/dev/null 2>&1 || true');
+	}
+
+	return steps.join('\n');
+}
+
 // What every command in the sandbox is told about its services: the standard variables their clients read, so a repo's tests find
 // the database without knowing Team1. Postgres answers on its socket to team1, the role the start script makes.
 export function serviceVariables(environment) {
@@ -154,7 +169,8 @@ export function serviceVariables(environment) {
 // Named by the base image's layers, the exact install script and the service variables, so a change to any of them, how a tool is
 // installed included, builds a new one, and a restart that changed nothing does not.
 export function environmentImage(baseLayers, environment) {
-	const hash = createHash('sha256').update(baseLayers + installScript(environment) + JSON.stringify(serviceVariables(environment))).digest('hex').slice(0, 16);
+	const recipe = installScript(environment) + stopScript(environment) + JSON.stringify(serviceVariables(environment));
+	const hash = createHash('sha256').update(baseLayers + recipe).digest('hex').slice(0, 16);
 
 	return 'team1-env:' + hash;
 }

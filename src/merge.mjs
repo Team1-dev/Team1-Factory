@@ -2,7 +2,7 @@ import { findLabel, readComment } from './cards.mjs';
 import { classifyComment } from './classify.mjs';
 import { state } from './config.mjs';
 import { closeCoveredProposals } from './findings.mjs';
-import { runGates } from './gates.mjs';
+import { baseMoveReaches, runGates } from './gates.mjs';
 import { ledgerEnd } from './ledger.mjs';
 import { backToImplement, batchOutcome, hold, landed, missingPull, note, start, waitMergeable } from './outcomes.mjs';
 import { fragment } from './prompts.mjs';
@@ -182,7 +182,10 @@ async function landPull(run, pull) {
 	let pushedSha;
 	if (rebase.moved) {
 		const changes = await run.git.changes(worktree.root, run.branch, base);
-		const gate = await runGates(worktree.root, run, changes.changed.concat(changes.untracked));
+		const files = changes.changed.concat(changes.untracked);
+		let gate = { passed: true };
+		if (baseMoveReaches(run, files, rebase.baseFiles)) gate = await runGates(worktree.root, run, files);
+		else console.log(run.tag + ': ' + base + ' moved only in areas this card neither changes nor builds on; its gates stand');
 
 		if (!gate.passed) {
 			// The rebase is never pushed, so the worktree goes back to the pull's pushed head: left on the rebased commits, the

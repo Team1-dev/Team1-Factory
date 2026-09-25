@@ -62,7 +62,11 @@ test('the next card\'s sandbox starts from the saved environment, ready', async 
 }, 120000);
 
 test('a service is installed and started, lets team1 in, and every command finds it through the standard variables', async () => {
-	const place = await placeFor(REPO, '3', 'card/3-z', await imageWith(WITH_POSTGRES));
+	const image = await imageWith(WITH_POSTGRES);
+	const began = Date.now();
+	const place = await placeFor(REPO, '3', 'card/3-z', image);
+
+	expect(Date.now() - began, 'a service saved stopped starts without recovering').toBeLessThan(15000);
 
 	const postgres = await place.run('/home/team1', 'psql', ['-d', 'postgres', '-tAc', 'select 1'], RUN);
 	const byVariablesScript = 'echo "$PGHOST $PGUSER"; psql -h "$PGHOST" -U "$PGUSER" -d postgres -tAc "select 1"';

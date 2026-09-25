@@ -125,14 +125,14 @@ test('a read-only checkout is detached at the default branch; a rebase onto a mo
 
 	const sha = await o.sh(root, ['rev-parse', 'HEAD']);
 
-	expect(await o.repo.rebaseOnto(root, 'main', sha)).toEqual({ moved: false, conflict: false });
+	expect(await o.repo.rebaseOnto(root, 'main', sha)).toEqual({ moved: false, conflict: false, baseFiles: [] });
 
 	writeFileSync(join(o.seed, 'other.txt'), 'other\n');
 	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'add', '-A']);
 	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'commit', '-qm', 'other']);
 	await o.sh(o.seed, ['push', '-q', 'origin', 'main']);
 
-	expect(await o.repo.rebaseOnto(root, 'main', sha)).toEqual({ moved: true, conflict: false });
+	expect(await o.repo.rebaseOnto(root, 'main', sha)).toMatchObject({ moved: true, conflict: false });
 	expect(existsSync(join(root, 'other.txt'))).toBe(true);
 
 	writeFileSync(join(o.seed, 'README.md'), 'theirs\n');
@@ -143,7 +143,7 @@ test('a read-only checkout is detached at the default branch; a rebase onto a mo
 
 	const ours = await o.sh(root, ['rev-parse', 'HEAD']);
 
-	expect(await o.repo.rebaseOnto(root, 'main', ours)).toEqual({ moved: true, conflict: true });
+	expect(await o.repo.rebaseOnto(root, 'main', ours)).toMatchObject({ moved: true, conflict: true });
 	expect(await o.sh(root, ['rev-parse', 'HEAD'])).toBe(ours);
 	expect(await o.sh(root, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('card/5-x');
 	expect(await o.sh(root, ['status', '--porcelain'])).toBe('');
@@ -248,7 +248,7 @@ test('a pushed branch rebased for a merge whose gates then fail is put back on i
 	await o.sh(o.seed, ['-c', 'user.name=Seed', '-c', 'user.email=seed@example.test', 'commit', '-qm', 'other']);
 	await o.sh(o.seed, ['push', '-q', 'origin', 'main']);
 
-	expect(await o.repo.rebaseOnto(root, 'main', pushed)).toEqual({ moved: true, conflict: false });
+	expect(await o.repo.rebaseOnto(root, 'main', pushed)).toMatchObject({ moved: true, conflict: false });
 	await o.repo.resetTo(root, pushed);
 
 	const again = await o.repo.checkout(root, 'card/11-x', false);
@@ -414,4 +414,23 @@ test('a merge of the base the session made and resolved but could not commit is 
 	expect(changes.changed.sort()).toEqual(['README.md', 'card.txt']);
 	expect(await o.sh(root, ['status', '--porcelain'])).toBe('M card.txt');
 	expect(await o.sh(root, ['merge-base', '--is-ancestor', 'origin/main', 'HEAD'])).toBe('');
+}, 30000);
+
+test('undoing what the branch itself added is a change: a file the branch added and then removed is committed as removed', async () => {
+	const o = await origin();
+	const root = join(o.base, 'work', '10-card');
+	await o.repo.checkout(root, 'card/10-x', false);
+	writeFileSync(join(root, 'added.txt'), 'second copy\n');
+	writeFileSync(join(root, 'README.md'), 'changed\n');
+	await o.sh(root, ['add', '-A']);
+	await o.sh(root, ['-c', 'user.name=r', '-c', 'user.email=r@x', 'commit', '-qm', 'first round']);
+	await o.repo.commitAndPush(root, 'card/10-x', 'first round', []);
+
+	rmSync(join(root, 'added.txt'));
+	writeFileSync(join(root, 'README.md'), 'seed\n');
+
+	const changes = await o.repo.changes(root, 'card/10-x', 'main');
+
+	expect(changes.changed.sort()).toEqual(['README.md', 'added.txt']);
+	expect(changes.round.sort()).toEqual(['README.md', 'added.txt']);
 }, 30000);

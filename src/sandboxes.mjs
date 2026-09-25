@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { repositoryFor, state, tokenNameFor } from './config.mjs';
 import { dockerAt } from './docker.mjs';
-import { detectTools, environmentImage, environmentOf, installScript, serviceVariables, startScript } from './environment.mjs';
+import { detectTools, environmentImage, environmentOf, installScript, serviceVariables, startScript, stopScript } from './environment.mjs';
 import { GIT_PROXY_PORT, gitProxy } from './gitproxy.mjs';
 import { warmGates } from './gates.mjs';
 import { cardDirectory, sandboxPlace } from './place.mjs';
@@ -132,7 +132,7 @@ export async function environmentImageFor(repo, environment) {
 
 	const build = { repo: repo, fromImage: running.settings.image, toImage: name, variables: serviceVariables(environment) };
 
-	return { name: name, id: await buildImage(build, sandbox => mustRun(sandbox, installScript(environment), 'building the environment')) };
+	return { name: name, id: await buildImage(build, sandbox => mustRun(sandbox, installScript(environment) + '\n' + stopScript(environment), 'building the environment')) };
 }
 
 // The default branch checked out where a card works, with every area's gates run on it: a red gate still leaves its outputs.
@@ -149,11 +149,14 @@ async function warmCheckout(sandbox, repo, board, environment) {
 
 		for (const red of await warmGates(place, board, root)) {
 			const area = red.area.name === '' ? 'the root' : red.area.name;
-			console.log(repo + ': warm build: ' + area + ' exited ' + red.code + ' (' + red.command + '); its outputs are kept as they are');
+			const tail = red.output.trim().split('\n').slice(-6).join('\n    ');
+			console.log(repo + ': warm build: ' + area + ' exited ' + red.code + ' (' + red.command + '); its outputs are kept as they are:\n    ' + tail);
 		}
 	} finally {
 		running.proxy.forget(proxyKey);
 	}
+
+	await mustRun(sandbox, stopScript(environment), 'stopping services');
 }
 
 // A day-old warm image is rebuilt while cards go on opening from the one they have; each moves to the new one at its next stage.

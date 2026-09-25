@@ -10,6 +10,12 @@ const CARD = 5;
 const PULL = 50;
 const BRANCH = branchOf({ number: CARD, title: 'Card ' + CARD, batch: '' });
 const AUTO_MERGE = { '.agents/project.md': '```yaml\nauto-merge: true\n```\n' };
+// Two areas that share nothing: a change to one cannot turn the other's gates red.
+const TWO_AREAS = {
+	'.agents/project.md': '```yaml\nauto-merge: true\nprojects:\n  lib: packages/lib\n  docs: packages/docs\n```\n',
+	'packages/lib/.agents/project.md': '```yaml\ngates: npm test\nauto-merge: true\n```\n',
+	'packages/docs/.agents/project.md': '```yaml\ngates: npm run check\n```\n',
+};
 const ONE_APPROVAL = { '.agents/project.md': '```yaml\nauto-merge: true\nhuman-approvals: 1\n```\n' };
 
 function readyCard(labelNames) {
@@ -198,7 +204,7 @@ test('human approvals: the status is written and the merge waits for enough appr
 
 test('a rebase conflict sends the card back to implement', async () => {
 	setup();
-	git.given.rebase = { moved: true, conflict: true };
+	git.given.rebase = { moved: true, conflict: true, baseFiles: ['README.md'] };
 
 	const pass = await passOver(withPull(openPull(PULL, BRANCH)), CARD);
 
@@ -383,7 +389,7 @@ test("an approval counts only from a person: not the runner's own, not a bot's, 
 
 test('the base moved and the rebased branch fails its gates: back to implement with the base-moved note, nothing pushed', async () => {
 	setup();
-	git.given.rebase = { moved: true, conflict: false };
+	git.given.rebase = { moved: true, conflict: false, baseFiles: ['README.md'] };
 	gates.given.gate = { passed: false, command: 'npm test', code: 1, output: '2 failing' };
 
 	const pass = await passOver(withPull(openPull(PULL, BRANCH)), CARD);
@@ -400,7 +406,7 @@ test('the base moved and the rebased branch fails its gates: back to implement w
 
 test('the base moved and the gates hold: force pushed, the pull waited on until it carries the pushed sha, then merged', async () => {
 	setup();
-	git.given.rebase = { moved: true, conflict: false };
+	git.given.rebase = { moved: true, conflict: false, baseFiles: ['README.md'] };
 
 	// GitHub shows the force-pushed commit on the pull after the third look.
 	const pull = openPull(PULL, BRANCH);
@@ -415,6 +421,24 @@ test('the base moved and the gates hold: force pushed, the pull waited on until 
 	expect(timers.waits).toEqual([2000, 2000, 2000]);
 	expect(callNames(pass.writes)).toEqual(['mergePull', 'comment', 'setLabels', 'deleteBranch']);
 	expect(ledgerVerdicts()).toEqual(['start:undefined', 'end:merged']);
+});
+
+test('the base moved only in an area the card neither changes nor builds on: rebased and force pushed, its gates not run again', async () => {
+	setup();
+	git.given.rebase = { moved: true, conflict: false, baseFiles: ['packages/docs/guide.md'] };
+	git.given.changes = { unpushed: true, changed: ['packages/lib/index.js'], round: [], untracked: [] };
+
+	const pull = openPull(PULL, BRANCH);
+	pull.head.sha = 'abc1234def';
+
+	const given = withPull(pull);
+	given.issues = [readyCard(['project: lib'])];
+	given.files = TWO_AREAS;
+
+	await passOver(given, CARD);
+
+	expect(callNames(git.calls)).toContain('forcePush');
+	expect(gates.calls).toEqual([]);
 });
 
 test('a comment the classifier cannot read holds the merge; two unanswered comments are read newest first', async () => {

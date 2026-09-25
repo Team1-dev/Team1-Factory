@@ -215,8 +215,14 @@ export function repository(settings) {
 			unpushed = head !== pushedSha;
 		}
 
-		const changedOutput = await git(root, ['diff', '--name-only', mergeBase]);
-		const changed = changedOutput === '' ? [] : changedOutput.split('\n');
+		// Uncommitted work counts too: undoing what the branch itself added leaves nothing different from the base.
+		const changed = [];
+		for (const output of [await git(root, ['diff', '--name-only', mergeBase]), await git(root, ['diff', '--name-only', 'HEAD'])]) {
+			for (const file of output === '' ? [] : output.split('\n')) {
+				if (!changed.includes(file)) changed.push(file);
+			}
+		}
+
 		const roundOutput = await git(root, ['diff', '--name-only', pushedSha]);
 		const round = roundOutput === '' ? [] : roundOutput.split('\n').filter(file => changed.includes(file));
 		const untrackedOutput = await git(root, ['ls-files', '--others', '--exclude-standard']);
@@ -249,16 +255,20 @@ export function repository(settings) {
 
 		const ancestry = await tryGit(root, ['merge-base', '--is-ancestor', 'origin/' + base, 'HEAD']);
 
-		if (ancestry.code === 0) return { moved: false, conflict: false };
+		if (ancestry.code === 0) return { moved: false, conflict: false, baseFiles: [] };
 
+		// What the base gained since the branch was cut: the merge reruns the gates only when these can change them.
+		const cut = await git(root, ['merge-base', 'HEAD', 'origin/' + base]);
+		const gained = await git(root, ['diff', '--name-only', cut, 'origin/' + base]);
+		const baseFiles = gained === '' ? [] : gained.split('\n');
 		const rebase = await tryGit(root, ['rebase', 'origin/' + base]);
 
-		if (rebase.code === 0) return { moved: true, conflict: false };
+		if (rebase.code === 0) return { moved: true, conflict: false, baseFiles: baseFiles };
 
 		await tryGit(root, ['rebase', '--abort']);
 		await git(root, ['reset', '--hard', headSha]);
 
-		return { moved: true, conflict: true };
+		return { moved: true, conflict: true, baseFiles: baseFiles };
 	}
 
 	// A card's own worktree brought onto the base before a stage works in it, so the card, its gates and the scripts they run all

@@ -188,6 +188,27 @@ export async function warmGates(place, board, worktreeRoot) {
 	return red;
 }
 
+// Whether what the base gained can change this card's gates: a file in an area they run or build on, or outside every area (the
+// repository's own tooling). Anything else leaves them as they were.
+export function baseMoveReaches(cardRun, changedFiles, baseFiles) {
+	if (!cardRun.board.mono) return baseFiles.length > 0;
+
+	const reached = changedScopes(cardRun.board, cardRun.area, changedFiles).concat(dependentsOf(cardRun, changedFiles));
+	for (let before = 0; before !== reached.length;) {
+		before = reached.length;
+		for (const scope of cardRun.board.scopes) {
+			if (!reached.includes(scope) && reached.some(user => user.uses.includes(scope.name))) reached.push(scope);
+		}
+	}
+
+	for (const file of baseFiles) {
+		const owners = cardRun.board.scopes.filter(scope => scope.name !== '' && file.startsWith(scope.path + '/'));
+		if (owners.length === 0 || owners.some(owner => reached.includes(owner))) return true;
+	}
+
+	return false;
+}
+
 // Both, for a change rebased onto a base that moved. The full bar already covers the repository.
 export async function runGates(worktreeRoot, cardRun, changedFiles) {
 	const own = await runOwnGates(worktreeRoot, cardRun, changedFiles);

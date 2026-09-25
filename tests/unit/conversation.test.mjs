@@ -123,3 +123,17 @@ test('a split hands the card\'s parts to cards of their own: when they land, wha
 	expect(back.rounds).toBe(0);
 	expect(back.roundsEver).toBe(2);
 });
+
+test('a review of new work is not a repeat: implement pushing after a rejection starts the review count afresh, the ceiling still counts', () => {
+	const fixed = conversation([
+		stamped('implement', 'advance', 1), stamped('review', 'reject-local', 0.2), stamped('implement', 'advance', 0.3),
+		stamped('review', 'reject-local', 0.2), stamped('implement', 'advance', 0.3),
+	], 'review');
+
+	expect(fixed.rounds).toBe(0);
+	expect(fixed.roundsEver).toBe(2);
+
+	const repeated = conversation([stamped('implement', 'advance', 1), stamped('review', 'reject-local', 0.2), stamped('review', 'reject-local', 0.2)], 'review');
+
+	expect(repeated.rounds).toBe(2);
+});
