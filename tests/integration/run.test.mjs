@@ -99,6 +99,26 @@ test('a card the list still shows in the stage it just left is not run again: th
 	expect(sandboxes.calls).toEqual([]);
 });
 
+test('a card whose split parts have all landed is closed as done by Team1, with no session to split it again; one with a part open waits', async () => {
+	setup();
+
+	const split = mine('## Plan\n\nsplit\n\nblocked-by: #8, #9\n\n— team1-factory · implement · split · $0.10');
+
+	const done = await passOver({ issues: [implementCard('x')], comments: { [CARD]: [TRIAGED, split] } }, CARD);
+
+	expect(done.changed).toBe(true);
+	expect(model.calls).toEqual([]);
+	expect(done.writes.find(write => write.name === 'close')).toMatchObject({ number: CARD, reason: 'completed' });
+	expect(done.writes.find(write => write.name === 'comment').body).toContain('Its parts have all landed (#8, #9)');
+
+	setup();
+
+	const waiting = await passOver({ issues: [implementCard('x'), otherCard(9)], comments: { [CARD]: [TRIAGED, split] } }, CARD);
+
+	expect(waiting.changed).toBe(false);
+	expect(waiting.writes).toEqual([]);
+});
+
 test('a card that goes ahead gets its sandbox for implement, named by its own key and branch', async () => {
 	setup();
 	model.answers.push(implementAnswer());

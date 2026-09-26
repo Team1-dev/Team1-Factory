@@ -8,7 +8,7 @@ import { handleImplement } from './implement.mjs';
 import { handleMerge } from './merge.mjs';
 import { cardDirectory, localPlace } from './place.mjs';
 import { imageFor, placeFor } from './sandboxes.mjs';
-import { apply, divert, failedOutcome, loginExpiredOutcome } from './outcomes.mjs';
+import { apply, batchOutcome, divert, failedOutcome, loginExpiredOutcome, note } from './outcomes.mjs';
 import { ledgerStart } from './ledger.mjs';
 import { fragment } from './prompts.mjs';
 import { blockquote } from './stringUtils.mjs';
@@ -212,6 +212,28 @@ async function stageOutcome(run) {
 	}
 }
 
+// A card split into parts, all of which have landed, is done: nothing is left of it. Team1 closes it itself, with no session to
+// resume that would only repeat the split it remembers.
+function partsLanded(run) {
+	const newest = run.conversation.newest.implement;
+	if (run.stage.name !== 'implement' || newest === undefined || newest.stamp.verdict !== 'split') return undefined;
+
+	const parts = [];
+	for (const line of newest.body.matchAll(/blocked-by:([^\n]*)/gi)) {
+		for (const number of line[1].matchAll(/\d+/g)) parts.push('#' + number[0]);
+	}
+
+	if (parts.length === 0) return undefined;
+
+	const measured = { verdict: 'parts-landed', cost: 0, tokens: 0 };
+	const outcome = batchOutcome(run.batch, note(run, 'parts-landed', { parts: parts.join(', ') }, measured), '', measured);
+	for (const entry of outcome.cards) {
+		entry.close = 'completed';
+	}
+
+	return outcome;
+}
+
 // Whether an outcome changed anything, applying it when there is one.
 async function applied(run, outcome) {
 	if (outcome === undefined) return false;
@@ -286,6 +308,10 @@ export async function readyCard(github, board, card, waiting) {
 	const holding = await held(run);
 
 	if (holding !== undefined) return { run: undefined, changed: await applied(run, holding.outcome) };
+
+	const landed = partsLanded(run);
+
+	if (landed !== undefined) return { run: undefined, changed: await applied(run, landed) };
 
 	return { run: run, changed: false };
 }

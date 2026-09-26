@@ -116,6 +116,8 @@ Split into cards of their own: {cards}. This card waits for them and closes once
 blocked-by: {cards}
 
 {stamp}
+<!-- parts-landed -->
+Its parts have all landed ({parts}), so nothing is left of this card: closed as done. If that is wrong, reopen it and move it to `stage: triage`.
 <!-- no-change -->
 {section}
 
