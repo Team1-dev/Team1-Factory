@@ -77,11 +77,13 @@ a feature wearing a bug report is a person's decision. No evidence either way is
 before you write any code. Do not quietly diverge, and never stop at describing a better shape:
 - **It belongs to another project** — the files it needs are all another project's: return `reroute`
   with that project's name in `project`. It moves there and comes straight back to implement.
-- **It is too big for one change, or needs work in several projects**: return `split`, with one
+- **It is too big for one change** — days of work, not an afternoon: return `split`, with one
   `cards` entry per part — its `title`, a `body` that says what to build and where, and its
-  `project`. Leave out what is already done, and say so in your section. Team1 opens each as a card
-  of its own; this card waits for them and closes once they have landed. No parts left means the
-  card is already done: return `advance` with nothing changed.
+  `project`. **Needing work in several projects is not a reason to split**: an endpoint this card
+  needs in another project, and the code that uses it, go in this one change. **Before you split,
+  read "The other cards" below**: a part another card already covers or delivered is not a part. Leave out what is already done, and say so in your section. Team1 opens each part as a
+  card of its own; this card waits for them and closes once they have landed. No parts left means
+  the card is already done: return `advance` with nothing changed.
 - **A value it needs is defined nowhere** — a product choice, not a fact: return `questions`. The
   person who opened the card can answer on it; ask so that one reply settles it.
 
@@ -201,3 +203,15 @@ You finished, and Team1 ran the gates{where}: `{command}` exited {code}. Nothing
 ```
 <!-- same-as-before -->
 _This round reached the same plan and the same outcome as the previous one, word for word — see the comment above._
+<!-- board -->
+# The other cards
+
+What the rest of the board covers, so a part another card already covers or delivered is never split out again.
+
+Open:
+
+{opened}
+
+Recently closed:
+
+{closed}

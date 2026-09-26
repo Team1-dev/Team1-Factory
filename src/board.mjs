@@ -163,7 +163,8 @@ function placeCards(board, pullBranches) {
 			continue;
 		}
 
-		if (card.hasPull) card.area.hasPull = true;
+		// A pull holds its area only while its card is moving: one waiting on an answer, parked or failed lets the next card start.
+		if (card.hasPull && card.routingLabel !== 'needs: answers' && !card.terminal) card.area.hasPull = true;
 
 		if (card.area.queues[card.routingLabel] !== undefined) card.area.queues[card.routingLabel].push(card);
 	}

@@ -50,8 +50,8 @@ function indexLine(number, title, labelNames) {
 	return line;
 }
 
-// The batch's cards, the rest of the board and what was recently closed, the projects in a monorepo, and the conversation for a lone card.
-async function triagePrompt(run) {
+// The rest of the board and what was recently closed, one line a card, for a stage that must know what other cards cover.
+export async function boardIndex(run) {
 	const opened = [];
 	for (const card of run.board.cards) {
 		if (!run.batch.includes(card) && !card.labels.includes('findings')) opened.push(indexLine(card.number, card.title, card.labels));
@@ -66,12 +66,18 @@ async function triagePrompt(run) {
 		console.log(run.tag + ': closed issues unavailable: ' + error.message);
 	}
 
+	return { opened: orNone(opened), closed: orNone(closed) };
+}
+
+// The batch's cards, the rest of the board and what was recently closed, the projects in a monorepo, and the conversation for a lone card.
+async function triagePrompt(run) {
+
 	const parts = [fragment('triage.md', 'cards-to-triage', {})];
 	for (const card of run.batch) {
 		parts.push(cardHeading(card) + '\n\n' + card.body.slice(0, 4000));
 	}
 
-	parts.push(fragment('triage.md', 'board', { opened: orNone(opened), closed: orNone(closed) }));
+	parts.push(fragment('triage.md', 'board', await boardIndex(run)));
 	if (run.board.mono) parts.push(fragment('triage.md', 'projects', { project: run.area.projectName, projects: run.board.projectNames.join(', ') }));
 	if (run.mates.length === 0) parts.push(conversationPrompt(run.comments, false));
 

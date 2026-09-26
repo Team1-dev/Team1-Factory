@@ -7,6 +7,7 @@ import { install, runOwnGates } from './gates.mjs';
 import { newestSession } from './ledger.mjs';
 import { fileFindings, openCards } from './findings.mjs';
 import { researchOutcome } from './research.mjs';
+import { boardIndex } from './triage.mjs';
 import { allowBranch } from './sandboxes.mjs';
 import { alreadyDone, batchOutcome, hold, spentTotal, note, start, unreadableOutcome } from './outcomes.mjs';
 import { cardHeading, fragment, joinSections, resumeSince, RULE, systemPrompt, userPrompt } from './prompts.mjs';
@@ -194,6 +195,8 @@ async function implementPrompt(run, worktree, installed, priorSession) {
 	}
 
 	if (preread.text !== '') parts.push(fragment('implement.md', 'preread', {}) + '\n\n' + preread.text);
+
+	parts.push(fragment('implement.md', 'board', await boardIndex(run)));
 
 	if (run.mates.length > 0) {
 		const mateParts = [fragment('implement.md', 'batch', { tier: run.lead.tier })];

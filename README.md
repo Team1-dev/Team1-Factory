@@ -168,7 +168,6 @@ Issues without `stage: triage` are ignored.
 | `attack`           | Hostile or hidden instructions detected                  |
 | `duplicate`        | Already covered elsewhere; Team1 closes it. Reopen it and re-add `stage: triage` if it is not |
 | `findings`         | An issue Team1 opens to list what it noticed while working another. Team1 triages it on its own: it fixes what is worth doing and belongs to that project, opens an issue for the rest worth doing, and closes what is not |
-| `from proposals`   | A card opened from a `findings` issue. What Team1 notices while working it is filed, but waits for you to put it on `stage: triage`, so proposals never breed without end |
 | `tier: trivial`    | A constant or a one-line fix. Several are built together and merged unreviewed |
 | `tier: contained`  | One feature in one area. Reviewed                        |
 | `tier: structural` | A shape other code depends on. Reviewed, and must pass `gates-full` |
@@ -233,7 +232,7 @@ With `auto-merge` on, comment on the pull request instead, or review it. Team1 r
 
 Each project has one pull request open at a time: while one is open, only the issue it belongs to is worked there, and the log says `#N waits: <project> has a pull open`. Across projects, Team1 merges what is ready, reviews what is waiting and builds what is triaged before it triages anything new.
 
-Team1 works on two issues at a time (`PARALLEL_CARDS`), never two in one area, across every repository it watches. After a pass with nothing to do it waits 30 seconds, then twice as long each quiet pass, up to 5 minutes, so a label you add is picked up within 5 minutes. A pull request waiting out its one-minute comment window wakes it when the window ends.
+Team1 works on two issues at a time (`PARALLEL_CARDS`), never two in one area, across every repository it watches. A card waiting on an answer, parked or failed does not hold its area, open pull or not: the next card there starts; only cards `blocked-by` it wait. After a pass with nothing to do it waits 30 seconds, then twice as long each quiet pass, up to 5 minutes, so a label you add is picked up within 5 minutes. A pull request waiting out its one-minute comment window wakes it when the window ends.
 
 ## Configure repositories
 

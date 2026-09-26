@@ -83,10 +83,14 @@ test('the prompt: where you are, the file list, the card and the conversation; t
 	gates.given.install = { ran: true, ms: 12 };
 
 	await passOver({
-		issues: [implementCard([], 'add a --quiet flag')],
+		issues: [implementCard([], 'add a --quiet flag'), issue(8, ['stage: triage'], 'another card')],
 		comments: { [CARD]: [triaged(), person('keep it small')] },
+		closedIssues: [{ ...issue(7, [], 'done already'), title: 'Add a --verbose flag' }],
 	}, CARD);
 
+	expect(model.calls[0].prompt).toContain('# The other cards');
+	expect(model.calls[0].prompt).toContain('- #8 Card 8 (stage: triage)');
+	expect(model.calls[0].prompt).toContain('- #7 Add a --verbose flag');
 	expect(callNames(git.calls)).toEqual(['checkout', 'catchUp', 'ensureGitignore', 'listFiles', 'changes']);
 	expect(git.calls[0]).toEqual({ name: 'checkout', root: ROOT, branch: BRANCH, readOnly: false });
 	expect(git.calls[1]).toEqual({ name: 'catchUp', root: ROOT, base: 'main' });
@@ -328,8 +332,8 @@ test('a findings card opens what it does not fix here as cards of their own in t
 	const opened = pass.writes.filter(write => write.name === 'createIssue');
 
 	expect(opened.map(write => [write.title, write.labels])).toEqual([
-		['Rate limit the nonce route', ['stage: triage', 'from proposals', 'project: lib']],
-		['Sign the ownership message', ['stage: triage', 'from proposals', 'project: app']],
+		['Rate limit the nonce route', ['stage: triage', 'project: lib']],
+		['Sign the ownership message', ['stage: triage', 'project: app']],
 	]);
 	expect(opened[0].body).toBe('No limit on it.\n\nSplit out of #5.');
 

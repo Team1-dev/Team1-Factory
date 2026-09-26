@@ -169,9 +169,9 @@ test('a card holding an open pull request that is back at triage is triaged befo
 });
 
 test('an area with a pull open starts no other card\'s implement until it lands, and says so once', async () => {
-	const waiting = issue(5, ['failed', 'tier: contained', 'project: web'], 'has a pull');
+	const waiting = issue(5, ['stage: review', 'tier: contained', 'project: web'], 'has a pull\nblocked-by: #7');
 	const p = pass({
-		issues: [waiting, issue(6, ['stage: implement', 'tier: contained', 'project: web'], 'next')],
+		issues: [waiting, issue(6, ['stage: implement', 'tier: contained', 'project: web'], 'next'), issue(7, ['failed'], 'elsewhere')],
 		files: { '.agents/project.md': 'projects:\n  web: apps/web\n' },
 		pulls: { [branchOf(readCard(waiting, 'runner', []))]: { number: 50 } },
 	});
@@ -179,6 +179,23 @@ test('an area with a pull open starts no other card\'s implement until it lands,
 	expect(await p.run()).toBe(false);
 	expect(model.calls.length).toBe(0);
 	expect(repoState(REPO).said[6]).toBe('#6 waits: web has a pull open');
+});
+
+test('a card waiting on an answer, or failed, does not hold its area with its pull: the next card there starts', async () => {
+	for (const stuck of ['needs: answers', 'failed']) {
+		const holder = issue(5, [stuck, 'tier: contained', 'project: web'], 'has a pull');
+		const p = pass({
+			issues: [holder, issue(6, ['stage: implement', 'tier: contained', 'project: web'], 'next')],
+			comments: { 6: [stamped('triage', 'advance', 0.1)] },
+			files: { '.agents/project.md': 'projects:\n  web: apps/web\n' },
+			pulls: { [branchOf(readCard(holder, 'runner', []))]: { number: 50 } },
+		});
+
+		await p.run();
+
+		expect(repoState(REPO).said[6], stuck).toBeUndefined();
+		expect(model.calls.some(call => call.run?.lead.number === 6), stuck).toBe(true);
+	}
 });
 
 test('a merge held for its comment window wakes the loop when the window ends, not after the quiet backoff', async () => {

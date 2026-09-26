@@ -372,18 +372,6 @@ test('findings are posted to the card\'s proposals issue as one comment, a blank
 		+ '\n\n— team1-factory · review · advance · 0 tokens · $0.40 API · total 0 tokens · $1.50 API · sonnet');
 });
 
-test('a card that was itself a proposal files its findings for a person, not straight to triage: one generation only', async () => {
-	setup();
-	answered('advance', { cards: [{ title: 'Help text is stale', body: 'Lists --verbose.' }] }, 0.4);
-
-	const given = underReview(openPull(PULL, BRANCH));
-	given.issues = [reviewCard(['from proposals'])];
-
-	const pass = await passOver(given, CARD);
-
-	expect(pass.writes[0].labels).toEqual(['findings']);
-});
-
 test('a missing section is said so and the verdict stands', async () => {
 	setup();
 
