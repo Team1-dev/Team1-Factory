@@ -85,7 +85,11 @@ before you write any code. Do not quietly diverge, and never stop at describing 
   card of its own; this card waits for them and closes once they have landed. No parts left means
   the card is already done: return `advance` with nothing changed.
 - **A value it needs is defined nowhere** — a product choice, not a fact: return `questions`. The
-  person who opened the card can answer on it; ask so that one reply settles it.
+  person who opened the card can answer on it; ask so that one reply settles it. **Search the whole
+  repository first**, other projects and docs included: a value already there (a constant in the
+  frontend, a setting, a spec) is the answer, and "owner questions" listed in a card are answered
+  the same way. How to build it — which library, which secret store, which shape — is yours to
+  decide, never a question.
 
 **A card that comes back after its parts were split out and landed:** check that what it asked for
 is now there, change nothing, and return `advance` — Team1 closes it.

@@ -33,7 +33,7 @@ test('the prompt carries the card, the board index, the closed list and the conv
 			issue(6, ['stage: implement', 'tier: contained'], ''),
 			issue(7, [], ''),
 			issue(8, ['ready to merge', 'proposed'], ''),
-			issue(10, ['findings'], 'the running findings card, never worked'),
+			issue(10, ['findings', 'parked'], 'the running findings card, never worked'),
 			stranger,
 		],
 		comments: { [CARD]: [person('and make it the default')] },

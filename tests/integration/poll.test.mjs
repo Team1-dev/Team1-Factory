@@ -135,6 +135,14 @@ test('a blocked card is read once, not again while it and its blockers are uncha
 	expect(reads).toBe(2);
 });
 
+test('a proposals issue that never got a stage is triaged like any other', async () => {
+	const p = pass({ issues: [issue(5, ['findings'], 'proposals')] });
+	model.answers.push(triageAnswer(5));
+
+	expect(await p.run()).toBe(true);
+	expect(model.calls[0].role).toBe('classify');
+});
+
 test('a card waiting in review in one area is worked before a card in triage in another, and that change ends the pass', async () => {
 	const p = pass({
 		issues: [issue(5, ['stage: triage', 'project: web'], 'new'), issue(6, ['stage: review', 'tier: contained', 'project: api'], 'built')],
@@ -325,7 +333,7 @@ test('an expired claude login halts the loop before any other card in the repo i
 });
 
 test('a card a person merged has its proposals read once, then nothing on a second sweep', async () => {
-	const proposalsIssue = issue(900, ['findings'], 'proposals');
+	const proposalsIssue = issue(900, ['findings', 'parked'], 'proposals');
 	proposalsIssue.title = 'Proposals from #5: Card 5';
 
 	const origin = fragment('_notes.md', 'proposal-origin-implement', { number: 5 });
@@ -372,7 +380,7 @@ test('a card with no proposals issue, or merged by Team1 itself, is left to the 
 
 	expect(noProposals.github.writes).toEqual([]);
 
-	const proposalsIssue = issue(900, ['findings'], 'proposals');
+	const proposalsIssue = issue(900, ['findings', 'parked'], 'proposals');
 	proposalsIssue.title = 'Proposals from #6: Card 6';
 
 	const autoMergedCard = issue(6, [], 'built by Team1');

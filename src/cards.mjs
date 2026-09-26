@@ -82,6 +82,9 @@ export function readLabels(card) {
 		if (label === 'human-review') card.humanReview = true;
 	}
 
+	// Every proposals issue is worked: one that never got a stage (opened before that was so) waits for triage like any other.
+	if (card.routingLabel === '' && card.labels.includes('findings')) card.routingLabel = 'stage: triage';
+
 	card.rank     = PRIORITY_ORDER.indexOf(card.priority);
 	card.terminal = TERMINAL_LABELS.includes(card.routingLabel);
 	card.trivial  = card.tier === 'trivial';
