@@ -159,6 +159,7 @@ async function held(run) {
 		const blockers = await blockersOf(run);
 		if (blockers.length > 0) {
 			sayOnce(run.repo, run.lead.number, '#' + run.lead.number + ' blocked by #' + blockers.join(', #'));
+			state.blockedCards.set(run.repo + '#' + run.lead.number, { updatedAt: run.lead.updatedAt, blockers: blockers });
 
 			return decided(undefined);
 		}

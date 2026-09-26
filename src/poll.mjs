@@ -112,6 +112,17 @@ async function attemptCard(github, board, card, waiting) {
 	}
 }
 
+// Blocked when last read, and nothing since that could free it: the card is unchanged and every blocker still open.
+function stillBlocked(repo, board, card) {
+	const blocked = state.blockedCards.get(repo + '#' + card.number);
+	if (blocked === undefined) return false;
+	if (blocked.updatedAt === card.updatedAt && blocked.blockers.every(number => board.openNumbers.includes(number))) return true;
+
+	state.blockedCards.delete(repo + '#' + card.number);
+
+	return false;
+}
+
 // A card that goes ahead is started and left to run: the pass ends, and the next one, on a fresh board, can start another card in
 // another area while it works.
 async function processStep(github, board, step, scope) {
@@ -120,6 +131,7 @@ async function processStep(github, board, step, scope) {
 	for (const card of waiting) {
 		if (stopAsked() || state.inFlight.size >= state.knobs.PARALLEL_CARDS) return false;
 		if (!step.takes(card) || isInFlight(github.repo, card) || state.restingUntil.get(github.repo + '#' + card.number) > Date.now()) continue;
+		if (stillBlocked(github.repo, board, card)) continue;
 		if (stage.startsWork && skipsCard(github.repo, card, stage)) continue;
 
 		const flight = { repo: github.repo, area: areaKey(github.repo, card), key: String(card.batch !== '' ? card.batch : card.number), numbers: [card.number] };

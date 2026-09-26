@@ -110,6 +110,31 @@ test('a card held back takes no slot: the pass goes on to a card that can go', a
 	expect(p.github.writes.some(write => write.number === 5)).toBe(false);
 });
 
+test('a blocked card is read once, not again while it and its blockers are unchanged; its blocker closing reads it again', async () => {
+	const given = {
+		issues: [issue(5, ['stage: implement', 'tier: contained'], 'x'), issue(6, ['failed'], 'elsewhere')],
+		comments: { 5: [stamped('triage', 'advance', 0.1), mine('blocked-by: #6\n\n— team1-factory · implement · split · $0.10')] },
+	};
+	const p = pass(given);
+	let reads = 0;
+	const issueOf = p.github.issue;
+	p.github.issue = number => {
+		if (number === 5) reads += 1;
+
+		return issueOf(number);
+	};
+
+	await p.run();
+	await p.run();
+
+	expect(reads).toBe(1);
+
+	given.issues = given.issues.filter(open => open.number !== 6);
+	await p.run();
+
+	expect(reads).toBe(2);
+});
+
 test('a card waiting in review in one area is worked before a card in triage in another, and that change ends the pass', async () => {
 	const p = pass({
 		issues: [issue(5, ['stage: triage', 'project: web'], 'new'), issue(6, ['stage: review', 'tier: contained', 'project: api'], 'built')],

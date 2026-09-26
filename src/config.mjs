@@ -59,6 +59,9 @@ export const state = {
 	landedAt: 0,
 	// A card whose run changed nothing (held, or it failed), by repo#number: not tried again before this time.
 	restingUntil: new Map(),
+	// A blocked card, by repo#number: its blockers and the update they were read from. Read again only when the card changes or a
+	// blocker closes.
+	blockedCards: new Map(),
 	repoStates: {},
 	hiddenReadings: {},
 };
@@ -129,6 +132,7 @@ export function loadEnv(env) {
 	state.landings         = 0;
 	state.landedAt         = 0;
 	state.restingUntil     = new Map();
+	state.blockedCards     = new Map();
 	state.repoStates       = {};
 	state.hiddenReadings   = {};
 }
